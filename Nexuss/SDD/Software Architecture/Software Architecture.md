@@ -56,8 +56,8 @@ src/
             │   │
             │   └── out/
             │       └── persistence/
-            │           └── mongodb/
-            │               ├── documents/
+            │           └── mysql/
+            │               ├── entities/
             │               ├── repositories/
             │               ├── adapters/
             │               └── mappers/
@@ -119,14 +119,14 @@ Represent outgoing HTTP payloads. Hide internal domain implementation and standa
 ### Mappers
 Convert Request DTO ↔ Domain Model and Domain Model ↔ Response DTO, so the domain never depends on transport objects.
 
-## Output Adapters — `adapters/out/persistence/mongodb`
+## Output Adapters — `adapters/out/persistence/mysql`
 
-Responsible for document-based persistence of all business data (users, sellers, buyers, warehouses, products, inventory, carts, orders).
+Responsible for relational persistence of all business data (users, sellers, buyers, warehouses, products, inventory, carts, orders).
 
-- **Documents:** represent MongoDB collections (classes annotated with `@Document`), following the embedding/referencing strategy defined in the [Persistence Strategy](#persistence-strategy-embedding-vs-referencing) section below.
-- **Repositories:** implement raw persistence operations (Spring Data MongoDB repositories, extending `MongoRepository`).
-- **Mappers:** convert Domain Models into persistence documents and back.
-- **Adapters:** implement the Domain Output Ports, isolating MongoDB-specific details from the domain.
+- **Entities:** represent relational database tables.
+- **Repositories:** implement raw persistence operations (Spring Data JPA repositories).
+- **Mappers:** convert Domain Models into persistence entities and back.
+- **Adapters:** implement the Domain Output Ports, isolating JPA-specific details from the domain.
 
 ---
 
@@ -184,39 +184,10 @@ Technical configuration required by the application. No business logic.
 REST configuration, serialization, environment configuration.
 
 ## Database
-MongoDB connection configuration (connection URI, database name), client initialization, and index configuration.
+MySQL connection and initialization configuration, connection pooling.
 
 ## Security
 Authentication and authorization configuration (e.g. JWT configuration, password encoding, authentication filters).
-
----
-
-# Persistence Strategy: Embedding vs. Referencing
-
-MongoDB is a document database: it has no JOINs and no foreign key constraints. Every relationship between Domain Models must be explicitly decided as either **embedded** (nested inside the parent document) or **referenced** (stored as an ID, resolved with a separate query).
-
-## Decision Criteria
-
-- **Embed** when the child object has no independent lifecycle, is always read together with its parent, and is not shared across other documents.
-- **Reference** when the related object is large, changes independently from the parent, or is shared/reused across many documents.
-
-## Applied Decisions
-
-| Relationship                      | Strategy        | Reason                                                                 |
-| ---------------------------------- | ---------------- | -------------------------------------------------------------------------- |
-| `Order` → `OrderLine`              | **Embed**        | Order lines have no independent lifecycle and are always read as part of their order. |
-| `ShoppingCart` → `CartLine`        | **Embed**        | Cart lines only make sense inside their cart; never queried on their own.  |
-| `Order` → `Buyer`                  | **Reference (ID)** | A buyer is a large, independent entity shared across many orders; embedding would duplicate buyer data in every order. |
-| `ShoppingCart` → `Buyer`           | **Reference (ID)** | Same reasoning as above. |
-| `Product` → `Seller`               | **Reference (ID)** | A seller is shared across many products; embedding would duplicate seller data in every product. |
-| `InventoryItem` → `Product`        | **Reference (ID)** | A product is shared across multiple inventory records (one per warehouse); embedding would duplicate product data. |
-| `InventoryItem` → `Warehouse`      | **Reference (ID)** | A warehouse holds many inventory records; embedding would duplicate warehouse data. |
-| `Warehouse` → `Seller` (owner)     | **Reference (ID)** | A seller may own multiple warehouses; embedding would duplicate seller data. |
-| `OrderLine` / `CartLine` → `Product` | **Reference (ID)**, with a denormalized snapshot of `name` and `unitPrice` (for `OrderLine` only) | The full product must not be duplicated, but an order must preserve the price and name exactly as they were at purchase time, even if the product changes later. |
-
-## Practical Consequence
-
-When implementing `documents/` in the MongoDB adapter, an `Order` document contains its `OrderLine` list directly (embedded), but each `OrderLine` stores only a `productId` (plus a frozen snapshot of `name` and `unitPrice`) — never the full `Product` document. To resolve a complete `Product`, `Seller`, or `Buyer`, the corresponding repository must be queried separately by ID.
 
 ---
 
@@ -235,7 +206,7 @@ Domain Service
 Output Port
         │
         ▼
-MongoDB Persistence Adapter
+MySQL Persistence Adapter
         │
         ▼
 Database
