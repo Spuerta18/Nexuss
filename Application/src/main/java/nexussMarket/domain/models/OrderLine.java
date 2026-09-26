@@ -11,11 +11,13 @@ public class OrderLine {
     private Product product;
     private Integer quantity;
     private BigDecimal unitPrice;
+    private String warehouseId;
 
-    public OrderLine(Product product, int quantity, BigDecimal unitPrice) {
+    public OrderLine(Product product, int quantity, BigDecimal unitPrice, String warehouseId) {
         this.product = product;
         this.quantity = requirePositive(quantity);
         this.unitPrice = unitPrice;
+        this.warehouseId = warehouseId;
     }
 
     private static int requirePositive(int value) {
@@ -50,5 +52,14 @@ public class OrderLine {
 
     public void setUnitPrice(BigDecimal unitPrice) {
         this.unitPrice = unitPrice;
+    }
+
+    /** Identifier of the warehouse the stock for this line was reserved from. */
+    public String getWarehouseId() {
+        return warehouseId;
+    }
+
+    public void setWarehouseId(String warehouseId) {
+        this.warehouseId = warehouseId;
     }
 }

@@ -1,5 +1,6 @@
 package nexussMarket.domain.models;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,6 +20,7 @@ public class Product {
     private List<String> variants = new ArrayList<>();
     private ProductStatus status;
     private Seller seller;
+    private BigDecimal price;
 
     public Product(String identifier, String name, ProductType productType, ProductStatus status) {
         this.identifier = identifier;
@@ -79,5 +81,14 @@ public class Product {
 
     public void setSeller(Seller seller) {
         this.seller = seller;
+    }
+
+    /** Current selling price per unit, snapshotted into OrderLine when an order is confirmed. */
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
     }
 }

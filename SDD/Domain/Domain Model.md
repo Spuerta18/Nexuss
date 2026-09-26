@@ -272,6 +272,9 @@ Physical products require inventory tracking and shipping; digital products are 
 | variants       | List\<String\>  | Variations such as color, size, or model. May be empty.       |
 | status         | ProductStatus   | Published, Suspended, or Discontinued.                        |
 | seller         | Seller          | Seller who owns and publishes the product.                    |
+| price          | BigDecimal      | Current selling price per unit.                               |
+
+> **Addition:** `price` was not part of the original attribute list. It was added because `OrderLine` must freeze the unit price at the moment an order is confirmed (see `unitPrice` under `OrderLine` below), and there was no other source for that value.
 
 ## Relationships
 
@@ -384,6 +387,9 @@ Represents a single confirmed product line within an order, fixing the quantity 
 | product      | Product  | Purchased product.                                   |
 | quantity     | Integer  | Quantity purchased. Must be greater than zero.        |
 | unitPrice    | Decimal  | Price per unit at the time the order was confirmed.    |
+| warehouseId  | String   | Identifier of the `Warehouse` the stock for this line was reserved from. |
+
+> **Addition:** `warehouseId` was not part of the original attribute list. It was added because releasing an inventory reservation (e.g. when an order is cancelled) requires knowing exactly which `Warehouse` the stock was reserved from — `InventoryItem` is keyed by `product` + `warehouse`, so the product alone is not enough to identify the reservation to release.
 
 ---
 

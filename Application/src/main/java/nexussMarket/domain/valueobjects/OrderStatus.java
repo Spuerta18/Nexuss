@@ -18,6 +18,8 @@ public final class OrderStatus extends DomainCatalog {
             new OrderStatus("SHIPPED", "Shipped", "The order has left the warehouse.");
     public static final OrderStatus DELIVERED =
             new OrderStatus("DELIVERED", "Delivered", "The order has been successfully completed. Cannot be modified.");
+    public static final OrderStatus CANCELLED =
+            new OrderStatus("CANCELLED", "Cancelled", "The order was cancelled before payment was confirmed.");
 
     private OrderStatus(String code, String name, String description) {
         super(code, name, description);
@@ -25,6 +27,6 @@ public final class OrderStatus extends DomainCatalog {
 
     /** Returns the full {@code OrderStatus} value list. */
     public static List<OrderStatus> values() {
-        return List.of(CART, PENDING_PAYMENT, PAID, SHIPPED, DELIVERED);
+        return List.of(CART, PENDING_PAYMENT, PAID, SHIPPED, DELIVERED, CANCELLED);
     }
 }

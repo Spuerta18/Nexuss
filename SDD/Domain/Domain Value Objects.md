@@ -203,6 +203,9 @@ Represents the current stage of an `Order` in its lifecycle.
 | PAID                 | Paid                 | Payment confirmed; fulfillment process begins.                |
 | SHIPPED              | Shipped              | The order has left the warehouse.                             |
 | DELIVERED            | Delivered            | The order has been successfully completed. Cannot be modified.|
+| CANCELLED            | Cancelled            | The order was cancelled before payment was confirmed.         |
+
+> **Addition:** `CANCELLED` was not part of the original allowed values. It was added because cancelling an order needs a terminal status distinct from `CART` (which means "provisional selection", not "voided order"). It is reached exclusively through `CancelOrderService`, never through `AdvanceOrderStatusService` — the forward-only lifecycle (`CART` → `PENDING_PAYMENT` → `PAID` → `SHIPPED` → `DELIVERED`) never transitions into or out of `CANCELLED`. Once an order reaches `CANCELLED`, it cannot move to any other status.
 
 ---
 

@@ -14,6 +14,7 @@ public class Warehouse {
     private String address;
     private WarehouseOwnerType ownerType;
     private Seller owner;
+    private boolean active = true;
 
     public Warehouse(String identifier, String name, String address, WarehouseOwnerType ownerType) {
         this.identifier = identifier;
@@ -65,5 +66,14 @@ public class Warehouse {
 
     public void setOwner(Seller owner) {
         this.owner = owner;
+    }
+
+    /** Whether the warehouse is currently operational. */
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 }
