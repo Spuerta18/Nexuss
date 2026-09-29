@@ -3,17 +3,17 @@ package nexussMarket.domain.services;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.InventoryItem;
 import nexussMarket.domain.models.InventoryMovement;
-import nexussMarket.domain.ports.in.ConfirmInventoryOutboundUseCase;
+import nexussMarket.domain.ports.in.ReportDamagedInventoryUseCase;
 import nexussMarket.domain.ports.out.InventoryMovementRepositoryPort;
 import nexussMarket.domain.ports.out.InventoryRepositoryPort;
 import nexussMarket.domain.valueobjects.InventoryMovementType;
 
-public class ConfirmInventoryOutboundService implements ConfirmInventoryOutboundUseCase {
+public class ReportDamagedInventoryService implements ReportDamagedInventoryUseCase {
 
     private final InventoryRepositoryPort inventoryRepositoryPort;
     private final InventoryMovementRepositoryPort inventoryMovementRepositoryPort;
 
-    public ConfirmInventoryOutboundService(InventoryRepositoryPort inventoryRepositoryPort,
+    public ReportDamagedInventoryService(InventoryRepositoryPort inventoryRepositoryPort,
             InventoryMovementRepositoryPort inventoryMovementRepositoryPort) {
         this.inventoryRepositoryPort = inventoryRepositoryPort;
         this.inventoryMovementRepositoryPort = inventoryMovementRepositoryPort;
@@ -25,10 +25,11 @@ public class ConfirmInventoryOutboundService implements ConfirmInventoryOutbound
                 .findByProductIdAndWarehouseId(command.productId(), command.warehouseId())
                 .orElseThrow(() -> new EntityNotFoundException(
                         "No inventory item found for product " + command.productId() + " in warehouse " + command.warehouseId()));
-        item.confirmOutbound(command.quantity());
+        item.markDamaged(command.quantity());
         InventoryItem saved = inventoryRepositoryPort.save(item);
+        // Damaged units leave the sellable stock, so they are recorded as a negative ADJUSTMENT.
         inventoryMovementRepositoryPort.save(
-                InventoryMovement.of(item, InventoryMovementType.SALE_OUTBOUND, command.quantity()));
+                InventoryMovement.of(item, InventoryMovementType.ADJUSTMENT, -command.quantity()));
         return saved;
     }
 }

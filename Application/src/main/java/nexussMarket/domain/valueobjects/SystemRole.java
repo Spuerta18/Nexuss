@@ -29,9 +29,6 @@ public final class SystemRole extends DomainCatalog {
 
     /** Resolves a {@code SystemRole} from its code, or {@code null} if unknown. */
     public static SystemRole fromCode(String code) {
-        return values().stream()
-                .filter(r -> r.getCode().equals(code))
-                .findFirst()
-                .orElse(null);
+        return fromCode(values(), code);
     }
 }

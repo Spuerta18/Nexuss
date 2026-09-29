@@ -20,4 +20,9 @@ public final class WarehouseOwnerType extends DomainCatalog {
     public static List<WarehouseOwnerType> values() {
         return List.of(MARKETPLACE, SELLER);
     }
+
+    /** Resolves a {@code WarehouseOwnerType} from its code, or {@code null} if unknown. */
+    public static WarehouseOwnerType fromCode(String code) {
+        return fromCode(values(), code);
+    }
 }

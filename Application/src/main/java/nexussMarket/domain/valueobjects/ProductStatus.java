@@ -23,4 +23,9 @@ public final class ProductStatus extends DomainCatalog {
     public static List<ProductStatus> values() {
         return List.of(PUBLISHED, SUSPENDED, DISCONTINUED);
     }
+
+    /** Resolves a {@code ProductStatus} from its code, or {@code null} if unknown. */
+    public static ProductStatus fromCode(String code) {
+        return fromCode(values(), code);
+    }
 }

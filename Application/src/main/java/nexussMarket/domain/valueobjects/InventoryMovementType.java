@@ -27,4 +27,9 @@ public final class InventoryMovementType extends DomainCatalog {
     public static List<InventoryMovementType> values() {
         return List.of(INBOUND, RESERVATION, SALE_OUTBOUND, ADJUSTMENT, RETURN);
     }
+
+    /** Resolves a {@code InventoryMovementType} from its code, or {@code null} if unknown. */
+    public static InventoryMovementType fromCode(String code) {
+        return fromCode(values(), code);
+    }
 }

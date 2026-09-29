@@ -6,6 +6,7 @@ import java.util.List;
 
 import nexussMarket.domain.valueobjects.ProductStatus;
 import nexussMarket.domain.valueobjects.ProductType;
+import nexussMarket.domain.valueobjects.ProductVariant;
 
 /**
  * A good, physical or digital, offered for sale in the catalog. Physical
@@ -17,7 +18,7 @@ public class Product {
     private String identifier;
     private String name;
     private ProductType productType;
-    private List<String> variants = new ArrayList<>();
+    private List<ProductVariant> variants = new ArrayList<>();
     private ProductStatus status;
     private Seller seller;
     private BigDecimal price;
@@ -57,11 +58,11 @@ public class Product {
     }
 
     /** Variations such as color, size, or model (may be empty). */
-    public List<String> getVariants() {
+    public List<ProductVariant> getVariants() {
         return variants;
     }
 
-    public void setVariants(List<String> variants) {
+    public void setVariants(List<ProductVariant> variants) {
         this.variants = variants != null ? variants : new ArrayList<>();
     }
 

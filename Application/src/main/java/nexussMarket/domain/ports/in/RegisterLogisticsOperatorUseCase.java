@@ -4,7 +4,7 @@ import nexussMarket.domain.models.LogisticsOperator;
 
 public interface RegisterLogisticsOperatorUseCase {
 
-    record Command(String identifier, String fullName, String email) {}
+    record Command(String identifier, String fullName, String email, String password) {}
 
     LogisticsOperator execute(Command command);
 }

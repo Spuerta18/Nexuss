@@ -1,15 +1,24 @@
 package nexussMarket.domain.services;
 
+import java.time.LocalDateTime;
+
+import nexussMarket.domain.ports.out.AuditLogPort;
+
 /**
- * Internal service, not exposed as a use case. Injected as a constructor
- * dependency by services that need to audit an operation.
- *
- * <p>No {@code AuditRepositoryPort} exists yet, so this is a conscious
- * placeholder: it only logs, it does not persist.</p>
+ * Internal service, not exposed as a use case. Records which authenticated
+ * user performed which operation. It is invoked for every authenticated
+ * request by the security layer, so traceability does not depend on each use
+ * case remembering to call it.
  */
 public class AuditOperationService {
 
+    private final AuditLogPort auditLogPort;
+
+    public AuditOperationService(AuditLogPort auditLogPort) {
+        this.auditLogPort = auditLogPort;
+    }
+
     public void record(String userId, String operation) {
-        System.out.println("[AUDIT] userId=" + userId + " operation=" + operation);
+        auditLogPort.record(userId, operation, LocalDateTime.now());
     }
 }

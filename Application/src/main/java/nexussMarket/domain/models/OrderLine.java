@@ -3,21 +3,24 @@ package nexussMarket.domain.models;
 import java.math.BigDecimal;
 
 /**
- * A single confirmed product line within an order, fixing the quantity and
- * unit price at the time of purchase. Quantity must be greater than zero.
+ * A single confirmed product line within an order, fixing the product name,
+ * quantity and unit price at the time of purchase. Quantity must be greater
+ * than zero.
  */
 public class OrderLine {
 
     private Product product;
+    private String productName;
     private Integer quantity;
     private BigDecimal unitPrice;
-    private String warehouseId;
+    private Warehouse warehouse;
 
-    public OrderLine(Product product, int quantity, BigDecimal unitPrice, String warehouseId) {
+    public OrderLine(Product product, String productName, int quantity, BigDecimal unitPrice, Warehouse warehouse) {
         this.product = product;
+        this.productName = productName;
         this.quantity = requirePositive(quantity);
         this.unitPrice = unitPrice;
-        this.warehouseId = warehouseId;
+        this.warehouse = warehouse;
     }
 
     private static int requirePositive(int value) {
@@ -34,6 +37,15 @@ public class OrderLine {
 
     public void setProduct(Product product) {
         this.product = product;
+    }
+
+    /** Product name at the time the order was confirmed. */
+    public String getProductName() {
+        return productName;
+    }
+
+    public void setProductName(String productName) {
+        this.productName = productName;
     }
 
     /** Quantity purchased. Must be greater than zero. */
@@ -54,12 +66,12 @@ public class OrderLine {
         this.unitPrice = unitPrice;
     }
 
-    /** Identifier of the warehouse the stock for this line was reserved from. */
-    public String getWarehouseId() {
-        return warehouseId;
+    /** Warehouse the stock for this line was reserved from. */
+    public Warehouse getWarehouse() {
+        return warehouse;
     }
 
-    public void setWarehouseId(String warehouseId) {
-        this.warehouseId = warehouseId;
+    public void setWarehouse(Warehouse warehouse) {
+        this.warehouse = warehouse;
     }
 }

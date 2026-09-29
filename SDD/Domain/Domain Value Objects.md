@@ -22,6 +22,11 @@ Represents the common shape of every business catalog defined below: a controlle
 | name          | String | Human-readable name.                        |
 | description   | String | Explanation of the value's business meaning. |
 
+## Rules
+
+* Each catalog exposes its allowed values as constants, a `values()` list, and `fromCode(code)`, which returns the constant with that code (or `null` if unknown).
+* Persistence mappers must rebuild values with `fromCode`, never with a new instance, so rebuilt entities hold the same constants that the domain compares against.
+
 ---
 
 # SystemRole
@@ -205,7 +210,26 @@ Represents the current stage of an `Order` in its lifecycle.
 | DELIVERED            | Delivered            | The order has been successfully completed. Cannot be modified.|
 | CANCELLED            | Cancelled            | The order was cancelled before payment was confirmed.         |
 
-> **Addition:** `CANCELLED` was not part of the original allowed values. It was added because cancelling an order needs a terminal status distinct from `CART` (which means "provisional selection", not "voided order"). It is reached exclusively through `CancelOrderService`, never through `AdvanceOrderStatusService` — the forward-only lifecycle (`CART` → `PENDING_PAYMENT` → `PAID` → `SHIPPED` → `DELIVERED`) never transitions into or out of `CANCELLED`. Once an order reaches `CANCELLED`, it cannot move to any other status.
+> **Addition:** `CANCELLED` was not part of the original allowed values. It was added because cancelling an order needs a terminal status distinct from `CART` (which means "provisional selection", not "voided order"). It is reached exclusively through `Order.cancel()` (used by `CancelOrderService`), never through `Order.advanceTo()` (used by `AdvanceOrderStatusService`), and only from `CART` or `PENDING_PAYMENT` — the forward-only lifecycle (`CART` → `PENDING_PAYMENT` → `PAID` → `SHIPPED` → `DELIVERED`) never transitions into or out of `CANCELLED`. Once an order reaches `CANCELLED`, it cannot move to any other status.
+
+---
+
+# ProductVariant
+
+## Description
+
+Represents one variation of a `Product`, such as color "red" or size "M". Unlike the catalogs above, its values are not a fixed list: the `value` is free text chosen by the seller, while the `attribute` is limited to `VariantAttributeType`.
+
+## Attributes
+
+| Attribute   | Type                 | Description                                   |
+| ------------ | -------------------- | ---------------------------------------------- |
+| attribute    | VariantAttributeType | Dimension the variant varies by (COLOR, SIZE, MODEL). |
+| value        | String               | Concrete value of that dimension (e.g. "red", "M"). |
+
+## Rules
+
+* Immutable and compared by value. Both attributes are required.
 
 ---
 

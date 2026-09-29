@@ -21,4 +21,9 @@ public final class ProductType extends DomainCatalog {
     public static List<ProductType> values() {
         return List.of(PHYSICAL, DIGITAL);
     }
+
+    /** Resolves a {@code ProductType} from its code, or {@code null} if unknown. */
+    public static ProductType fromCode(String code) {
+        return fromCode(values(), code);
+    }
 }

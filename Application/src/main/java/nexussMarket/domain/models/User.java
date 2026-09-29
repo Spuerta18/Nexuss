@@ -18,6 +18,7 @@ public abstract class User {
     private String email;
     private SystemRole role;
     private UserStatus status;
+    private String passwordHash;
 
     protected User(String identifier, String fullName, String email, SystemRole role, UserStatus status) {
         this.identifier = identifier;
@@ -70,5 +71,17 @@ public abstract class User {
 
     public void setStatus(UserStatus status) {
         this.status = status;
+    }
+
+    /**
+     * Hashed credential used to authenticate the user. The domain never sees
+     * the plain password nor the hashing algorithm (see {@code PasswordHasherPort}).
+     */
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 }

@@ -1,6 +1,7 @@
 package nexussMarket.domain.services;
 
 import nexussMarket.domain.exceptions.EntityNotFoundException;
+import nexussMarket.domain.exceptions.SellerNotAuthorizedException;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.User;
@@ -8,6 +9,7 @@ import nexussMarket.domain.ports.in.PublishProductUseCase;
 import nexussMarket.domain.ports.out.ProductRepositoryPort;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
 import nexussMarket.domain.valueobjects.ProductStatus;
+import nexussMarket.domain.valueobjects.SellerStatus;
 
 public class PublishProductService implements PublishProductUseCase {
 
@@ -22,6 +24,9 @@ public class PublishProductService implements PublishProductUseCase {
     @Override
     public Product execute(Command command) {
         Seller seller = findSeller(command.sellerId());
+        if (seller.getSellerStatus() != SellerStatus.ACTIVE) {
+            throw new SellerNotAuthorizedException("Seller " + command.sellerId() + " is not allowed to publish products");
+        }
         Product product = new Product(command.identifier(), command.name(), command.productType(), ProductStatus.PUBLISHED);
         product.setSeller(seller);
         product.setVariants(command.variants());

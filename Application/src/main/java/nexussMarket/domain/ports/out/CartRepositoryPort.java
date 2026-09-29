@@ -9,4 +9,6 @@ public interface CartRepositoryPort {
     ShoppingCart save(ShoppingCart cart);
 
     Optional<ShoppingCart> findById(String identifier);
+
+    void deleteById(String identifier);
 }

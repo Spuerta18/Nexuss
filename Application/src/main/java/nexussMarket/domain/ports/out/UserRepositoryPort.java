@@ -12,5 +12,7 @@ public interface UserRepositoryPort {
 
     Optional<User> findByEmail(String email);
 
+    boolean existsById(String identifier);
+
     boolean existsByEmail(String email);
 }

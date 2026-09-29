@@ -29,4 +29,9 @@ public final class OrderStatus extends DomainCatalog {
     public static List<OrderStatus> values() {
         return List.of(CART, PENDING_PAYMENT, PAID, SHIPPED, DELIVERED, CANCELLED);
     }
+
+    /** Resolves a {@code OrderStatus} from its code, or {@code null} if unknown. */
+    public static OrderStatus fromCode(String code) {
+        return fromCode(values(), code);
+    }
 }

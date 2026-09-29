@@ -21,4 +21,9 @@ public final class SellerStatus extends DomainCatalog {
     public static List<SellerStatus> values() {
         return List.of(ACTIVE, SUSPENDED);
     }
+
+    /** Resolves a {@code SellerStatus} from its code, or {@code null} if unknown. */
+    public static SellerStatus fromCode(String code) {
+        return fromCode(values(), code);
+    }
 }

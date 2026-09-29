@@ -26,9 +26,6 @@ public final class UserStatus extends DomainCatalog {
 
     /** Resolves a {@code UserStatus} from its code, or {@code null} if unknown. */
     public static UserStatus fromCode(String code) {
-        return values().stream()
-                .filter(s -> s.getCode().equals(code))
-                .findFirst()
-                .orElse(null);
+        return fromCode(values(), code);
     }
 }

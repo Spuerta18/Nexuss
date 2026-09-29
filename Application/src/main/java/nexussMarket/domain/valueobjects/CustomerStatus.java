@@ -21,4 +21,9 @@ public final class CustomerStatus extends DomainCatalog {
     public static List<CustomerStatus> values() {
         return List.of(ENABLED, SUSPENDED);
     }
+
+    /** Resolves a {@code CustomerStatus} from its code, or {@code null} if unknown. */
+    public static CustomerStatus fromCode(String code) {
+        return fromCode(values(), code);
+    }
 }

@@ -19,6 +19,8 @@ The model distinguishes between:
 
 > **Scope note:** the source specification only details the business rules and attributes for the domains **Users, Buyers, Sellers, Warehouses, Catalog, Inventory, and Orders**. Objectives referring to Invoicing, Shipping/Logistics execution, Returns/Refunds, and Administrative Reporting are named in the specification's objectives list but are not developed with attributes or rules in the source document. They are therefore **out of scope for this model** and should be specified in a future iteration before being implemented.
 
+> **Rule references:** codes such as `RG-02` and `RG-03` refer to the business rules of the NexusMarket Functional Business Specification. That document is not stored in this repository.
+
 ---
 
 # Domain Class Hierarchy
@@ -36,11 +38,16 @@ Warehouse
 Product
 
 InventoryItem
+└── InventoryMovement (history)
 
 ShoppingCart
+└── CartLine
 
 Order
+└── OrderLine
 ```
+
+`CartLine` and `OrderLine` are child entities: they only exist inside their parent (`ShoppingCart` / `Order`) and have no independent lifecycle.
 
 ---
 
@@ -66,6 +73,9 @@ Seller
 Product
    └── stocked in ───────────────> InventoryItem ──> Warehouse
 
+InventoryItem
+   └── records ──────────────────> InventoryMovement
+
 Buyer
    ├── owns ─────────────────────> ShoppingCart
    └── places ───────────────────> Order
@@ -76,6 +86,7 @@ ShoppingCart
 Order
    ├── created from ─────────────> ShoppingCart
    ├── contains ─────────────────> OrderLine ──> Product
+   │                                          └──> Warehouse (reserved from)
    └── reserves/consumes ────────> InventoryItem
 ```
 
@@ -104,6 +115,7 @@ This class cannot be instantiated directly.
 | email          | String     | Primary email address. Unique across the platform.                            |
 | role           | SystemRole | Business role that defines the user's responsibilities within the system.     |
 | status         | UserStatus | Current operational status of the user (Active, Blocked, etc.).               |
+| passwordHash   | String     | Hashed credential used for authentication. The domain never handles the plain password nor the hashing algorithm (see `PasswordHasherPort`). |
 
 ## Relationships
 
@@ -115,6 +127,7 @@ This class cannot be instantiated directly.
 * A user has exactly one role within the system (RG-02).
 * A user cannot manage information outside the scope of their role (RG-03).
 * `identifier` and `email` must be unique across the platform.
+* Only users whose `status` is `ACTIVE` can authenticate.
 
 ---
 
@@ -146,6 +159,10 @@ A buyer never manages information belonging to other buyers, nor manages invento
 * A buyer places zero or more `Order` instances.
 * `carts` and `orders` are not populated by default; they are loaded on demand.
 
+## Business Rules
+
+* A buyer can only confirm an order when their `status` is `ACTIVE` and their `commercialStatus` is `ENABLED`.
+
 ---
 
 # Seller
@@ -176,7 +193,8 @@ Sellers cannot self-register; they are incorporated into the platform by an `Adm
 
 ## Business Rules
 
-* Sellers must be registered by an `Administrator`; self-registration is not allowed.
+* Sellers must be registered by an existing `Administrator`; self-registration is not allowed.
+* Only sellers whose `sellerStatus` is `ACTIVE` can publish products.
 
 ---
 
@@ -246,11 +264,18 @@ Warehouses are classified by ownership: Marketplace-owned or Seller-owned.
 | address      | String          | Physical location of the warehouse.                         |
 | ownerType    | WarehouseOwnerType | Classification of ownership (Marketplace or Seller).     |
 | owner        | Seller          | Owning seller. Present only when `ownerType` is `SELLER`.  |
+| active       | boolean         | Whether the warehouse is operational. `true` on registration. |
 
 ## Relationships
 
 * A warehouse stores zero or more `InventoryItem` instances.
 * A Seller-owned warehouse references exactly one `Seller` as its owner.
+
+## Business Rules
+
+* A Marketplace-owned warehouse can only be registered by an `Administrator`.
+* A Seller-owned warehouse must reference an existing `Seller`.
+* An inactive warehouse cannot receive stock, and its stock cannot be reserved.
 
 ---
 
@@ -269,7 +294,7 @@ Physical products require inventory tracking and shipping; digital products are 
 | identifier     | String          | Unique identifier of the product.                            |
 | name           | String          | Commercial name of the product.                              |
 | productType    | ProductType     | Physical or Digital.                                          |
-| variants       | List\<String\>  | Variations such as color, size, or model. May be empty.       |
+| variants       | List\<ProductVariant\> | Variations such as color "red" or size "M" (see `ProductVariant`). May be empty. |
 | status         | ProductStatus   | Published, Suspended, or Discontinued.                        |
 | seller         | Seller          | Seller who owns and publishes the product.                    |
 | price          | BigDecimal      | Current selling price per unit.                               |
@@ -280,6 +305,10 @@ Physical products require inventory tracking and shipping; digital products are 
 
 * A product is published by exactly one `Seller`.
 * A product is stocked through zero or more `InventoryItem` records (one per warehouse holding it), required only when `productType` is `PHYSICAL`.
+
+## Business Rules
+
+* Only products whose `status` is `PUBLISHED` can be added to a cart or included in an order.
 
 ---
 
@@ -297,16 +326,55 @@ Represents the distributed stock of a specific product held in a specific wareho
 | warehouse           | Warehouse     | Warehouse holding the stock.                                        |
 | availableQuantity   | Integer       | Quantity available for sale. Must never be negative.                |
 | reservedQuantity    | Integer       | Quantity reserved by open orders. Must never be negative.           |
+| damagedQuantity     | Integer       | Quantity marked as damaged. Never available for reservation. Must never be negative. |
 
 ## Relationships
 
 * An `InventoryItem` references exactly one `Product` and exactly one `Warehouse`.
+* An `InventoryItem` records zero or more `InventoryMovement` instances.
+* An `InventoryItem` is created on the first inbound of a product into a warehouse.
 
 ## Business Rules
 
 * Negative stock is not permitted under any circumstance.
-* Inventory that is nonexistent or marked as damaged cannot be reserved.
-* Recognized movement types are: Inbound (`Ingreso`), Reservation (`Reserva`), Sale Outbound (`Salida por venta`), Adjustment (`Ajuste`), and Return (`Devolución`). Each movement must be traceable to the `InventoryItem` it affects.
+* Inventory that is nonexistent or marked as damaged cannot be reserved. Damaged units are moved from `availableQuantity` to `damagedQuantity`, so reservations (which only consume `availableQuantity`) never touch them.
+* Recognized movement types are: Inbound (`Ingreso`), Reservation (`Reserva`), Sale Outbound (`Salida por venta`), Adjustment (`Ajuste`), and Return (`Devolución`). Each movement must be traceable to the `InventoryItem` it affects, and is recorded as an `InventoryMovement`.
+
+---
+
+# InventoryMovement
+
+## Description
+
+Represents one traceable stock movement applied to an `InventoryItem`. Movements are append-only: once recorded, they are never modified.
+
+## Attributes
+
+| Attribute   | Type                  | Description                                                   |
+| ------------ | --------------------- | -------------------------------------------------------------- |
+| product      | Product               | Product of the affected inventory item.                          |
+| warehouse    | Warehouse             | Warehouse of the affected inventory item.                        |
+| type         | InventoryMovementType | Kind of movement applied.                                        |
+| quantity     | Integer               | Units moved. Negative for downward adjustments, damaged units, and released reservations. |
+| occurredAt   | LocalDateTime         | Date and time the movement happened.                             |
+
+## Relationships
+
+* An `InventoryMovement` belongs to exactly one `InventoryItem`, identified by `product` + `warehouse`.
+
+## Business Rules
+
+* Every change to an `InventoryItem` records exactly one movement:
+
+| Operation                    | Movement type   | Quantity sign |
+| ----------------------------- | ---------------- | -------------- |
+| Inbound                       | `INBOUND`        | +              |
+| Reservation                   | `RESERVATION`    | +              |
+| Reservation released          | `RESERVATION`    | −              |
+| Sale outbound (on `SHIPPED`)  | `SALE_OUTBOUND`  | +              |
+| Manual adjustment             | `ADJUSTMENT`     | + / −          |
+| Units marked as damaged       | `ADJUSTMENT`     | −              |
+| Return                        | `RETURN`         | +              |
 
 ---
 
@@ -320,13 +388,19 @@ Represents a buyer's provisional selection of products prior to confirming an or
 
 | Attribute   | Type              | Description                                     |
 | ------------ | ----------------- | -------------------------------------------------- |
+| identifier   | String            | Unique identifier of the cart.                       |
 | buyer        | Buyer             | Owner of the cart.                                   |
 | lines        | List\<CartLine\>  | Products and quantities currently selected.          |
 
 ## Relationships
 
 * A `ShoppingCart` belongs to exactly one `Buyer`.
-* A `ShoppingCart` is converted into an `Order` when the buyer confirms the purchase; it does not persist after conversion.
+* A `ShoppingCart` contains zero or more `CartLine` instances.
+* A `ShoppingCart` is converted into an `Order` when the buyer confirms the purchase; it is deleted after conversion.
+
+## Business Rules
+
+* An empty cart cannot be converted into an order.
 
 ---
 
@@ -369,8 +443,12 @@ Represents the formal commercial commitment between a buyer and one or more sell
 
 ## Business Rules
 
-* An order follows the lifecycle: `CART` → `PENDING_PAYMENT` → `PAID` → `SHIPPED` → `DELIVERED`.
+* An order follows the lifecycle: `CART` → `PENDING_PAYMENT` → `PAID` → `SHIPPED` → `DELIVERED`, advancing exactly one step at a time.
+* An order can be cancelled only while it is `CART` or `PENDING_PAYMENT`; it then moves to `CANCELLED`, and the stock reserved for each line is released. `CANCELLED` is terminal.
 * A finalized (`DELIVERED`) order cannot be modified under any circumstance.
+* The status can only change through the `Order` itself (`advanceTo` / `cancel`), never by setting it directly, so these rules cannot be bypassed.
+* When an order is confirmed, stock is reserved for every line. If any reservation fails, the reservations already made are released and no order is created.
+* When an order moves to `SHIPPED`, the reserved stock of each line leaves its warehouse (`SALE_OUTBOUND`).
 
 ---
 
@@ -384,12 +462,15 @@ Represents a single confirmed product line within an order, fixing the quantity 
 
 | Attribute   | Type     | Description                                   |
 | ------------ | -------- | -------------------------------------------------- |
-| product      | Product  | Purchased product.                                   |
-| quantity     | Integer  | Quantity purchased. Must be greater than zero.        |
-| unitPrice    | Decimal  | Price per unit at the time the order was confirmed.    |
-| warehouseId  | String   | Identifier of the `Warehouse` the stock for this line was reserved from. |
+| product      | Product    | Purchased product.                                   |
+| productName  | String     | Product name at the time the order was confirmed.    |
+| quantity     | Integer    | Quantity purchased. Must be greater than zero.        |
+| unitPrice    | BigDecimal | Price per unit at the time the order was confirmed.    |
+| warehouse    | Warehouse  | Warehouse the stock for this line was reserved from.   |
 
-> **Addition:** `warehouseId` was not part of the original attribute list. It was added because releasing an inventory reservation (e.g. when an order is cancelled) requires knowing exactly which `Warehouse` the stock was reserved from — `InventoryItem` is keyed by `product` + `warehouse`, so the product alone is not enough to identify the reservation to release.
+> **Addition:** `productName` and `warehouse` were not part of the original attribute list.
+> * `productName` freezes the name shown to the buyer, just like `unitPrice` freezes the price, so the order is not altered if the product is renamed later.
+> * `warehouse` is needed to release a reservation (when the order is cancelled) or to confirm the outbound (when it ships): `InventoryItem` is keyed by `product` + `warehouse`, so the product alone does not identify the stock to act on.
 
 ---
 
@@ -412,12 +493,13 @@ Represents a single confirmed product line within an order, fixing the quantity 
 * Every `InventoryItem` must be linked to exactly one `Product` and exactly one `Warehouse`.
 * Negative stock is forbidden under any circumstance.
 * Damaged or nonexistent inventory cannot be reserved.
+* Every stock change is recorded as an `InventoryMovement`.
 
 ## Carts and Orders
 
 * A `ShoppingCart` is provisional and carries no commercial commitment; it becomes an `Order` only upon buyer confirmation.
-* Every authenticated operation must be traceable to the `User` who performed it.
-* An `Order` follows a strict, forward-only lifecycle and can never be modified once `DELIVERED`.
+* Every authenticated operation must be traceable to the `User` who performed it. This is recorded by `AuditOperationService` through `AuditLogPort`, invoked by the security layer for every authenticated request.
+* An `Order` follows a strict, forward-only lifecycle, can only be cancelled before payment, and can never be modified once `DELIVERED` or `CANCELLED`.
 
 ## Value Objects
 

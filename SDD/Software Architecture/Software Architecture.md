@@ -41,9 +41,9 @@ Application
 src/
 └── main/
     └── java/
-        └── application/
+        └── nexussMarket/
             │
-            ├── App.java
+            ├── Application.java
             │
             ├── adapters/
             │   │
@@ -82,16 +82,15 @@ src/
 
 # Layer Responsibilities
 
-## Application
+## nexussMarket
 
 Root package. Contains the entry point and holds all architectural components together.
 
-## App.java
+## Application.java
 
-- Initializes the application.
-- Loads infrastructure.
-- Configures dependency injection.
-- Starts the REST server.
+- Spring Boot entry point (`@SpringBootApplication`).
+- Initializes the application and starts the REST server.
+- Dependency injection of the domain is **not** configured here: domain services are plain classes (no Spring annotations), so they are registered as beans in `infrastructure/config` (see [Infrastructure](#infrastructure)).
 
 ---
 
@@ -103,7 +102,7 @@ Adapters translate external requests into domain operations, and domain results 
 
 - Receive HTTP requests.
 - Validate incoming data.
-- Convert Request DTOs into Domain Models.
+- Convert Request DTOs into the use case `Command` records defined by each input port.
 - Execute application use cases (input ports).
 - Convert domain results into Response DTOs.
 
@@ -117,15 +116,15 @@ Represent incoming HTTP payloads. Perform structural/input validation only — n
 Represent outgoing HTTP payloads. Hide internal domain implementation and standardize API responses.
 
 ### Mappers
-Convert Request DTO ↔ Domain Model and Domain Model ↔ Response DTO, so the domain never depends on transport objects.
+Convert Request DTO → use case `Command` and Domain Model → Response DTO, so the domain never depends on transport objects.
 
 ## Output Adapters — `adapters/out/persistence/mongodb`
 
-Responsible for document-based persistence of all business data (users, sellers, buyers, warehouses, products, inventory, carts, orders).
+Responsible for document-based persistence of all business data (users, sellers, buyers, warehouses, products, inventory, inventory movements, carts, orders, audit log).
 
 - **Documents:** represent MongoDB collections (classes annotated with `@Document`), following the embedding/referencing strategy defined in the [Persistence Strategy](#persistence-strategy-embedding-vs-referencing) section below.
 - **Repositories:** implement raw persistence operations (Spring Data MongoDB repositories, extending `MongoRepository`).
-- **Mappers:** convert Domain Models into persistence documents and back.
+- **Mappers:** convert Domain Models into persistence documents and back. Value Objects are rebuilt with `fromCode(...)`, never with new instances, so the domain can compare them against its constants.
 - **Adapters:** implement the Domain Output Ports, isolating MongoDB-specific details from the domain.
 
 ---
@@ -135,44 +134,58 @@ Responsible for document-based persistence of all business data (users, sellers,
 The core of the application. Contains all business rules and must remain independent from any external technology (Spring, JPA, HTTP, REST, JSON, SQL).
 
 ## Models
-Business entities: `User`, `Buyer`, `Seller`, `LogisticsOperator`, `Administrator`, `Supervisor`, `Warehouse`, `Product`, `InventoryItem`, `ShoppingCart`, `Order`.
+Business entities: `User`, `Buyer`, `Seller`, `LogisticsOperator`, `Administrator`, `Supervisor`, `Warehouse`, `Product`, `InventoryItem`, `InventoryMovement`, `ShoppingCart`, `CartLine`, `Order`, `OrderLine`.
+
+Entities protect their own invariants: e.g. `Order` only changes status through `advanceTo` / `cancel`, and `InventoryItem` only changes stock through `receive`, `reserve`, `releaseReservation`, `confirmOutbound`, `adjust`, and `markDamaged`.
 
 ## Value Objects
-Immutable business concepts compared by value: `SystemRole`, `UserStatus`, `CustomerStatus`, `SellerStatus`, `ProductType`, `ProductStatus`, `OrderStatus`, `InventoryMovementType`, `WarehouseOwnerType`.
+Immutable business concepts compared by value: `SystemRole`, `UserStatus`, `CustomerStatus`, `SellerStatus`, `ProductType`, `ProductStatus`, `OrderStatus`, `InventoryMovementType`, `WarehouseOwnerType`, `ProductVariant`.
 
 ## Enums
 Fixed technical values without business metadata: `VariantAttributeType`, `NotificationChannel`.
 
 ## Services
-Business logic that does not naturally belong to a single entity. Examples:
-- `RegisterSellerService`
-- `PublishProductService`
-- `ReserveInventoryService`
-- `ConfirmOrderService`
-- `AdvanceOrderStatusService`
+Business logic that does not naturally belong to a single entity. Each input port has one service that implements it (`<Name>UseCase` → `<Name>Service`). In addition, three internal services are not exposed as use cases:
+- `ReserveInventoryService` — reserves stock from the first active warehouse with enough available units (used by `ConfirmOrderService`).
+- `AuditOperationService` — records which authenticated user performed which operation, through `AuditLogPort`.
+- `NotifyUserService` — sends notifications through `NotificationPort`.
+
+When a service needs another use case (e.g. `CancelOrderService` releasing reservations), it depends on the input port interface, not on the concrete service.
 
 ## Ports
 
 Ports define the communication contracts owned by the domain.
 
 ### Input Ports (use cases)
-- `RegisterBuyerUseCase`
-- `RegisterSellerUseCase`
-- `PublishProductUseCase`
-- `AddCartLineUseCase`
-- `ConfirmOrderUseCase`
-- `AdvanceOrderStatusUseCase`
+
+Each use case is an interface with a nested `Command` record (its input) and a single `execute(Command)` method.
+
+| Area       | Use cases |
+| ---------- | --------- |
+| Users      | `AuthenticateUserUseCase`, `RegisterBuyerUseCase`, `RegisterSellerUseCase`, `RegisterLogisticsOperatorUseCase`, `RegisterSupervisorUseCase`, `UpdateUserStatusUseCase`, `UpdateSellerStatusUseCase` |
+| Warehouses | `RegisterWarehouseUseCase`, `DeactivateWarehouseUseCase` |
+| Catalog    | `PublishProductUseCase`, `UpdateProductStatusUseCase`, `UpdateProductVariantsUseCase` |
+| Inventory  | `RegisterInventoryInboundUseCase`, `RegisterInventoryReturnUseCase`, `AdjustInventoryUseCase`, `ReportDamagedInventoryUseCase`, `ReleaseInventoryReservationUseCase`, `ConfirmInventoryOutboundUseCase` |
+| Carts      | `CreateShoppingCartUseCase`, `AddCartLineUseCase`, `UpdateCartLineQuantityUseCase`, `RemoveCartLineUseCase` |
+| Orders     | `ConfirmOrderUseCase`, `AdvanceOrderStatusUseCase`, `CancelOrderUseCase` |
 
 ### Output Ports (dependencies)
-- `UserRepositoryPort`
-- `ProductRepositoryPort`
-- `InventoryRepositoryPort`
-- `OrderRepositoryPort`
-- `WarehouseRepositoryPort`
-- `NotificationPort`
+
+| Port                               | Implemented by |
+| ---------------------------------- | -------------- |
+| `UserRepositoryPort`               | MongoDB adapter |
+| `WarehouseRepositoryPort`          | MongoDB adapter |
+| `ProductRepositoryPort`            | MongoDB adapter |
+| `InventoryRepositoryPort`          | MongoDB adapter |
+| `InventoryMovementRepositoryPort`  | MongoDB adapter |
+| `CartRepositoryPort`               | MongoDB adapter |
+| `OrderRepositoryPort`              | MongoDB adapter |
+| `AuditLogPort`                     | MongoDB adapter |
+| `PasswordHasherPort`               | Security adapter (`infrastructure/security`) |
+| `NotificationPort`                 | Notification adapter (not yet defined) |
 
 ## Exceptions
-Business exceptions belong exclusively to the domain. Examples: `InsufficientStockException`, `InvalidOrderStatusTransitionException`, `SellerNotAuthorizedException`.
+Business exceptions belong exclusively to the domain: `EntityNotFoundException`, `DuplicateResourceException`, `InsufficientStockException`, `InvalidOrderStatusTransitionException`, `SellerNotAuthorizedException`, `OperationNotAllowedException`, `InvalidCredentialsException`.
 
 ---
 
@@ -181,13 +194,15 @@ Business exceptions belong exclusively to the domain. Examples: `InsufficientSto
 Technical configuration required by the application. No business logic.
 
 ## Config
-REST configuration, serialization, environment configuration.
+REST configuration, serialization, environment configuration, and **domain wiring**: a configuration class registers every domain service as a Spring bean, injecting the adapters that implement its output ports. This is the only place where the domain meets Spring, and it can only be completed once the output adapters exist.
 
 ## Database
 MongoDB connection configuration (connection URI, database name), client initialization, and index configuration.
 
 ## Security
-Authentication and authorization configuration (e.g. JWT configuration, password encoding, authentication filters).
+Authentication and authorization configuration (e.g. JWT configuration, authentication filters). It also contains:
+- The adapter implementing `PasswordHasherPort` (e.g. with a Spring Security `PasswordEncoder`). The domain only stores `User.passwordHash` and never knows the algorithm.
+- The filter/interceptor that calls `AuditOperationService` for every authenticated request, so every operation is traceable to its `User`.
 
 ---
 
@@ -212,11 +227,18 @@ MongoDB is a document database: it has no JOINs and no foreign key constraints. 
 | `InventoryItem` → `Product`        | **Reference (ID)** | A product is shared across multiple inventory records (one per warehouse); embedding would duplicate product data. |
 | `InventoryItem` → `Warehouse`      | **Reference (ID)** | A warehouse holds many inventory records; embedding would duplicate warehouse data. |
 | `Warehouse` → `Seller` (owner)     | **Reference (ID)** | A seller may own multiple warehouses; embedding would duplicate seller data. |
-| `OrderLine` / `CartLine` → `Product` | **Reference (ID)**, with a denormalized snapshot of `name` and `unitPrice` (for `OrderLine` only) | The full product must not be duplicated, but an order must preserve the price and name exactly as they were at purchase time, even if the product changes later. |
+| `OrderLine` / `CartLine` → `Product` | **Reference (ID)**, with the snapshot fields `productName` and `unitPrice` (for `OrderLine` only) | The full product must not be duplicated, but an order must preserve the price and name exactly as they were at purchase time, even if the product changes later. |
+| `OrderLine` → `Warehouse`          | **Reference (ID)** | Identifies the `InventoryItem` whose reservation must be released or dispatched; the warehouse is shared across many lines. |
+| `InventoryMovement` → `Product` / `Warehouse` | **Reference (ID)**, own collection | Movements are an append-only history that grows without bound; embedding them in `InventoryItem` would make that document grow indefinitely. |
+| `Buyer` → `carts` / `orders`, `Seller` → `warehouses` / `products` | **Not stored** | These lists are the inverse side of the references above (`ShoppingCart.buyerId`, `Order.buyerId`, `Warehouse.ownerId`, `Product.sellerId`). Storing them too would duplicate every relationship; they are loaded on demand by querying the other collection. |
+
+## User Inheritance
+
+All `User` specializations are stored in a single `users` collection. The `role` code (`BUYER`, `SELLER`, …) acts as the discriminator: the mapper reads it to rebuild the right subclass. Specialization-only fields (e.g. `primaryAddress`, `sellerStatus`) are simply absent on documents of other roles. A single collection keeps `identifier` and `email` unique across all roles with one unique index each.
 
 ## Practical Consequence
 
-When implementing `documents/` in the MongoDB adapter, an `Order` document contains its `OrderLine` list directly (embedded), but each `OrderLine` stores only a `productId` (plus a frozen snapshot of `name` and `unitPrice`) — never the full `Product` document. To resolve a complete `Product`, `Seller`, or `Buyer`, the corresponding repository must be queried separately by ID.
+When implementing `documents/` in the MongoDB adapter, an `Order` document contains its `OrderLine` list directly (embedded), but each `OrderLine` stores only a `productId` and a `warehouseId` (plus the frozen snapshot of `productName` and `unitPrice`) — never the full `Product` or `Warehouse` document. To resolve a complete `Product`, `Seller`, or `Buyer`, the corresponding repository must be queried separately by ID.
 
 ---
 

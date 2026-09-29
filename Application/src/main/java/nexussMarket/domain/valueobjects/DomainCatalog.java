@@ -1,5 +1,6 @@
 package nexussMarket.domain.valueobjects;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -35,6 +36,18 @@ public abstract class DomainCatalog {
     /** Explanation of the value's business meaning. */
     public String getDescription() {
         return description;
+    }
+
+    /**
+     * Resolves the canonical constant with the given {@code code} from
+     * {@code values}, or {@code null} if unknown. Persistence mappers must use
+     * this so that rebuilt entities hold the same instances as the constants.
+     */
+    protected static <T extends DomainCatalog> T fromCode(List<T> values, String code) {
+        return values.stream()
+                .filter(v -> v.getCode().equals(code))
+                .findFirst()
+                .orElse(null);
     }
 
     @Override
