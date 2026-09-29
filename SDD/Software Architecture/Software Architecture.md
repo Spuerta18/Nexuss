@@ -134,12 +134,12 @@ Responsible for document-based persistence of all business data (users, sellers,
 The core of the application. Contains all business rules and must remain independent from any external technology (Spring, JPA, HTTP, REST, JSON, SQL).
 
 ## Models
-Business entities: `User`, `Buyer`, `Seller`, `LogisticsOperator`, `Administrator`, `Supervisor`, `Warehouse`, `Product`, `InventoryItem`, `InventoryMovement`, `ShoppingCart`, `CartLine`, `Order`, `OrderLine`.
+Business entities: `User`, `Buyer`, `Seller`, `LogisticsOperator`, `Administrator`, `Supervisor`, `Warehouse`, `Product`, `InventoryItem`, `InventoryMovement`, `ShoppingCart`, `CartLine`, `Order`, `OrderLine`, `Shipment`, `Invoice`, `ReturnRequest`, `Refund`.
 
 Entities protect their own invariants: e.g. `Order` only changes status through `advanceTo` / `cancel`, and `InventoryItem` only changes stock through `receive`, `reserve`, `releaseReservation`, `confirmOutbound`, `adjust`, and `markDamaged`.
 
 ## Value Objects
-Immutable business concepts compared by value: `SystemRole`, `UserStatus`, `CustomerStatus`, `SellerStatus`, `ProductType`, `ProductStatus`, `OrderStatus`, `InventoryMovementType`, `WarehouseOwnerType`, `ProductVariant`.
+Immutable business concepts compared by value: `SystemRole`, `UserStatus`, `CustomerStatus`, `SellerStatus`, `ProductType`, `ProductStatus`, `OrderStatus`, `InventoryMovementType`, `WarehouseOwnerType`, `ShipmentStatus`, `ReturnStatus`, `RefundStatus`, `ProductVariant`.
 
 ## Enums
 Fixed technical values without business metadata: `VariantAttributeType`, `NotificationChannel`.
@@ -182,10 +182,11 @@ Each use case is an interface with a nested `Command` record (its input) and a s
 | `OrderRepositoryPort`              | MongoDB adapter |
 | `AuditLogPort`                     | MongoDB adapter |
 | `PasswordHasherPort`               | Security adapter (`infrastructure/security`) |
+| `TokenServicePort`                 | Security adapter (`infrastructure/security`, JWT) |
 | `NotificationPort`                 | Notification adapter (not yet defined) |
 
 ## Exceptions
-Business exceptions belong exclusively to the domain: `EntityNotFoundException`, `DuplicateResourceException`, `InsufficientStockException`, `InvalidOrderStatusTransitionException`, `SellerNotAuthorizedException`, `OperationNotAllowedException`, `InvalidCredentialsException`.
+Business exceptions belong exclusively to the domain: `EntityNotFoundException`, `DuplicateResourceException`, `InsufficientStockException`, `InvalidOrderStatusTransitionException`, `InvalidShipmentStatusTransitionException`, `SellerNotAuthorizedException`, `OperationNotAllowedException`, `BusinessRuleViolationException`, `InvalidCredentialsException`. All of them extend `DomainException`.
 
 ---
 
@@ -234,7 +235,7 @@ MongoDB is a document database: it has no JOINs and no foreign key constraints. 
 
 ## User Inheritance
 
-All `User` specializations are stored in a single `users` collection. The `role` code (`BUYER`, `SELLER`, …) acts as the discriminator: the mapper reads it to rebuild the right subclass. Specialization-only fields (e.g. `primaryAddress`, `sellerStatus`) are simply absent on documents of other roles. A single collection keeps `identifier` and `email` unique across all roles with one unique index each.
+All `User` specializations are stored in a single `users` collection. The `userType` field, holding the role code (`BUYER`, `SELLER`, …), acts as the discriminator: the mapper reads it to rebuild the right subclass. Specialization-only fields (e.g. `primaryAddress`, `sellerStatus`) are simply absent on documents of other roles. A single collection keeps `identifier` and `email` unique across all roles with one unique index each.
 
 ## Practical Consequence
 

@@ -12,4 +12,6 @@ public interface ProductRepositoryPort {
     Optional<Product> findById(String identifier);
 
     List<Product> findBySellerId(String sellerId);
+
+    List<Product> findAllPublished();
 }

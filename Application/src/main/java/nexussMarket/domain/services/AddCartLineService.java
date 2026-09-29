@@ -2,8 +2,8 @@ package nexussMarket.domain.services;
 
 import java.util.Optional;
 
+import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
-import nexussMarket.domain.exceptions.OperationNotAllowedException;
 import nexussMarket.domain.models.CartLine;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.ShoppingCart;
@@ -29,7 +29,7 @@ public class AddCartLineService implements AddCartLineUseCase {
         Product product = productRepositoryPort.findById(command.productId())
                 .orElseThrow(() -> new EntityNotFoundException("No product found with id " + command.productId()));
         if (product.getStatus() != ProductStatus.PUBLISHED) {
-            throw new OperationNotAllowedException("Product " + command.productId() + " is not available for purchase");
+            throw new BusinessRuleViolationException("Product " + command.productId() + " is not available for purchase");
         }
 
         Optional<CartLine> existingLine = cart.getLines().stream()

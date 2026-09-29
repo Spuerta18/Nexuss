@@ -17,7 +17,7 @@ The model distinguishes between:
 * **Shopping Carts**, which represent a buyer's provisional product selection.
 * **Orders**, which represent a confirmed commercial commitment and its fulfillment lifecycle.
 
-> **Scope note:** the source specification only details the business rules and attributes for the domains **Users, Buyers, Sellers, Warehouses, Catalog, Inventory, and Orders**. Objectives referring to Invoicing, Shipping/Logistics execution, Returns/Refunds, and Administrative Reporting are named in the specification's objectives list but are not developed with attributes or rules in the source document. They are therefore **out of scope for this model** and should be specified in a future iteration before being implemented.
+> **Scope note:** the source specification only details the business rules and attributes for the domains **Users, Buyers, Sellers, Warehouses, Catalog, Inventory, and Orders**. Objectives referring to Invoicing, Shipping/Logistics execution, Returns/Refunds, and Administrative Reporting are named in the specification's objectives list but are not developed with attributes or rules in the source document. `Shipment`, `Invoice`, `ReturnRequest` and `Refund` were added in a later iteration with the attributes and rules defined below, which are this project's own design, not the source specification's. Administrative Reporting remains **out of scope**.
 
 > **Rule references:** codes such as `RG-02` and `RG-03` refer to the business rules of the NexusMarket Functional Business Specification. That document is not stored in this repository.
 
@@ -45,6 +45,13 @@ ShoppingCart
 
 Order
 └── OrderLine
+
+Shipment
+
+Invoice
+
+ReturnRequest
+└── Refund
 ```
 
 `CartLine` and `OrderLine` are child entities: they only exist inside their parent (`ShoppingCart` / `Order`) and have no independent lifecycle.
@@ -88,7 +95,15 @@ Order
    ├── contains ─────────────────> OrderLine ──> Product
    │                                          └──> Warehouse (reserved from)
    └── reserves/consumes ────────> InventoryItem
+
+Shipment ── delivers ──────────────> Order
+Invoice ─── bills ─────────────────> Order, Buyer
+ReturnRequest ── returns ──────────> Order, Buyer
+   └── decided by ───────────────> User
+Refund ──── refunds ───────────────> ReturnRequest
 ```
+
+`Shipment`, `Invoice`, `ReturnRequest` and `Refund` point to the entity they belong to; the referenced entity (`Order`, `ReturnRequest`) does not hold them back.
 
 ---
 
@@ -444,6 +459,7 @@ Represents the formal commercial commitment between a buyer and one or more sell
 ## Business Rules
 
 * An order follows the lifecycle: `CART` → `PENDING_PAYMENT` → `PAID` → `SHIPPED` → `DELIVERED`, advancing exactly one step at a time.
+  > **Note:** `SHIPPED` and `DELIVERED` are no longer reached through a generic status advance — they are driven by the `Shipment` lifecycle (see [# Shipments in Domain Services.md](Domain%20Services.md#shipments)).
 * An order can be cancelled only while it is `CART` or `PENDING_PAYMENT`; it then moves to `CANCELLED`, and the stock reserved for each line is released. `CANCELLED` is terminal.
 * A finalized (`DELIVERED`) order cannot be modified under any circumstance.
 * The status can only change through the `Order` itself (`advanceTo` / `cancel`), never by setting it directly, so these rules cannot be bypassed.
@@ -471,6 +487,121 @@ Represents a single confirmed product line within an order, fixing the quantity 
 > **Addition:** `productName` and `warehouse` were not part of the original attribute list.
 > * `productName` freezes the name shown to the buyer, just like `unitPrice` freezes the price, so the order is not altered if the product is renamed later.
 > * `warehouse` is needed to release a reservation (when the order is cancelled) or to confirm the outbound (when it ships): `InventoryItem` is keyed by `product` + `warehouse`, so the product alone does not identify the stock to act on.
+
+---
+
+# Shipment
+
+## Description
+
+Represents the physical delivery of an `Order`, from registration until the buyer receives it.
+
+## Attributes
+
+| Attribute    | Type           | Description                                                        |
+| ------------ | -------------- | ------------------------------------------------------------------ |
+| identifier   | String         | Unique identifier of the shipment.                                 |
+| order        | Order          | Order being delivered.                                             |
+| status       | ShipmentStatus | Current stage of the shipment.                                     |
+| createdAt    | LocalDateTime  | Date and time the shipment was created.                            |
+| packedAt     | LocalDateTime  | Date and time the goods were packed. `null` until packed.          |
+| dispatchedAt | LocalDateTime  | Date and time the shipment left the warehouse. `null` until dispatched. |
+| deliveredAt  | LocalDateTime  | Date and time the shipment was delivered. `null` until delivered.  |
+
+## Relationships
+
+* A `Shipment` references exactly one `Order`. `Order` does not reference its shipment; the relationship is navigated from `Shipment` (by `orderId` in persistence).
+
+## Business Rules
+
+* A shipment follows the lifecycle `CREATED` → `PACKED` → `DISPATCHED` → `DELIVERED`, advancing exactly one step at a time, and never goes back.
+* The status only changes through the `Shipment` itself (`pack`, `dispatch`, `confirmDelivery`); each step sets its own timestamp. Any other transition fails with `InvalidShipmentStatusTransitionException`.
+* `DELIVERED` is final.
+
+---
+
+# Invoice
+
+## Description
+
+Represents the invoice issued to a buyer for an order. It is a simple record: it is issued once and has no lifecycle of its own.
+
+## Attributes
+
+| Attribute   | Type          | Description                          |
+| ----------- | ------------- | ------------------------------------ |
+| identifier  | String        | Unique identifier of the invoice.    |
+| order       | Order         | Order being invoiced.                |
+| buyer       | Buyer         | Buyer the invoice is issued to.      |
+| totalAmount | BigDecimal    | Total amount charged.                |
+| issuedAt    | LocalDateTime | Date and time the invoice was issued. |
+
+## Relationships
+
+* An `Invoice` references exactly one `Order` and one `Buyer`. `Order` does not reference its invoice.
+
+## Business Rules
+
+* An invoice is immutable once issued.
+
+---
+
+# ReturnRequest
+
+## Description
+
+Represents a buyer's request to return an order, and the decision taken on it.
+
+## Attributes
+
+| Attribute   | Type          | Description                                                      |
+| ----------- | ------------- | ---------------------------------------------------------------- |
+| identifier  | String        | Unique identifier of the return request.                         |
+| order       | Order         | Order the buyer wants to return.                                 |
+| buyer       | Buyer         | Buyer who requested the return.                                  |
+| reason      | String        | Reason given by the buyer.                                       |
+| status      | ReturnStatus  | Current decision state.                                          |
+| requestedAt | LocalDateTime | Date and time the return was requested.                          |
+| decidedAt   | LocalDateTime | Date and time the request was decided. `null` until decided.     |
+| decidedBy   | User          | User who decided the request. `null` until decided.              |
+
+## Relationships
+
+* A `ReturnRequest` references exactly one `Order` and one `Buyer`. `Order` does not reference its return requests.
+* It references the deciding `User` once decided.
+
+## Business Rules
+
+* A return request is created `REQUESTED` and is decided exactly once, through `approve(decider)` or `reject(decider)`, which record who decided and when.
+* Deciding a request that is no longer `REQUESTED` fails with `BusinessRuleViolationException`. `APPROVED` and `REJECTED` are final.
+
+---
+
+# Refund
+
+## Description
+
+Represents the money paid back to a buyer for a return request.
+
+## Attributes
+
+| Attribute     | Type          | Description                                                    |
+| ------------- | ------------- | -------------------------------------------------------------- |
+| identifier    | String        | Unique identifier of the refund.                               |
+| returnRequest | ReturnRequest | Return request being refunded.                                 |
+| amount        | BigDecimal    | Amount paid back to the buyer.                                 |
+| status        | RefundStatus  | Current processing state.                                      |
+| createdAt     | LocalDateTime | Date and time the refund was created.                          |
+| processedAt   | LocalDateTime | Date and time the refund was processed. `null` until processed. |
+
+## Relationships
+
+* A `Refund` references exactly one `ReturnRequest`. `ReturnRequest` does not reference its refund.
+
+## Business Rules
+
+* A refund is created `PENDING` and is processed exactly once, through `process()`, which records when.
+* Processing a refund that is no longer `PENDING` fails with `BusinessRuleViolationException`. `PROCESSED` is final.
 
 ---
 

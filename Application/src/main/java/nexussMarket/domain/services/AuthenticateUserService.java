@@ -2,9 +2,11 @@ package nexussMarket.domain.services;
 
 import nexussMarket.domain.exceptions.InvalidCredentialsException;
 import nexussMarket.domain.exceptions.OperationNotAllowedException;
+import nexussMarket.domain.models.AuthenticationResult;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.in.AuthenticateUserUseCase;
 import nexussMarket.domain.ports.out.PasswordHasherPort;
+import nexussMarket.domain.ports.out.TokenServicePort;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
 import nexussMarket.domain.valueobjects.UserStatus;
 
@@ -12,14 +14,17 @@ public class AuthenticateUserService implements AuthenticateUserUseCase {
 
     private final UserRepositoryPort userRepositoryPort;
     private final PasswordHasherPort passwordHasherPort;
+    private final TokenServicePort tokenServicePort;
 
-    public AuthenticateUserService(UserRepositoryPort userRepositoryPort, PasswordHasherPort passwordHasherPort) {
+    public AuthenticateUserService(UserRepositoryPort userRepositoryPort, PasswordHasherPort passwordHasherPort,
+                                   TokenServicePort tokenServicePort) {
         this.userRepositoryPort = userRepositoryPort;
         this.passwordHasherPort = passwordHasherPort;
+        this.tokenServicePort = tokenServicePort;
     }
 
     @Override
-    public User execute(Command command) {
+    public AuthenticationResult execute(Command command) {
         // Same message for unknown email and wrong password, so accounts cannot be enumerated.
         User user = userRepositoryPort.findByEmail(command.email())
                 .filter(u -> u.getPasswordHash() != null
@@ -28,6 +33,6 @@ public class AuthenticateUserService implements AuthenticateUserUseCase {
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new OperationNotAllowedException("User " + user.getIdentifier() + " is not active");
         }
-        return user;
+        return new AuthenticationResult(user, tokenServicePort.generateToken(user));
     }
 }

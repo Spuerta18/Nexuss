@@ -214,6 +214,68 @@ Represents the current stage of an `Order` in its lifecycle.
 
 ---
 
+# ShipmentStatus
+
+## Description
+
+Represents the current stage of a `Shipment`. The lifecycle is forward-only, one step at a time, in the order below.
+
+## Inherits From
+
+`DomainCatalog`
+
+## Allowed Values
+
+| Code       | Name       | Description                                                   |
+| ---------- | ---------- | ------------------------------------------------------------- |
+| CREATED    | Created    | The shipment has been registered for the order.               |
+| PACKED     | Packed     | The goods have been packed and are ready to leave the warehouse. |
+| DISPATCHED | Dispatched | The shipment has left the warehouse.                          |
+| DELIVERED  | Delivered  | The shipment has been delivered to the buyer. Final status.   |
+
+---
+
+# ReturnStatus
+
+## Description
+
+Represents the decision state of a `ReturnRequest`. A request is decided exactly once.
+
+## Inherits From
+
+`DomainCatalog`
+
+## Allowed Values
+
+| Code      | Name      | Description                                                  |
+| --------- | --------- | ------------------------------------------------------------ |
+| REQUESTED | Requested | The buyer has requested the return; awaiting a decision.     |
+| APPROVED  | Approved  | The return has been accepted. Final status.                  |
+| REJECTED  | Rejected  | The return has been refused. Final status.                   |
+
+---
+
+# RefundStatus
+
+## Description
+
+Represents the processing state of a `Refund`. A refund is processed exactly once.
+
+## Inherits From
+
+`DomainCatalog`
+
+## Allowed Values
+
+| Code      | Name      | Description                                                 |
+| --------- | --------- | ----------------------------------------------------------- |
+| PENDING   | Pending   | The refund has been created and awaits processing.          |
+| PROCESSED | Processed | The refund has been paid back to the buyer. Final status.   |
+
+> `Invoice` has no status Value Object: it is issued once and has no lifecycle of its own.
+
+---
+
 # ProductVariant
 
 ## Description

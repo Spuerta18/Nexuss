@@ -7,5 +7,5 @@ public interface UpdateUserStatusUseCase {
 
     record Command(String userId, UserStatus status) {}
 
-    User execute(Command command);
+    User execute(User actor, Command command);
 }
