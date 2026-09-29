@@ -14,7 +14,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import nexussMarket.domain.ports.out.AuditLogPort;
 import nexussMarket.domain.services.AuditOperationService;
 
 /**
@@ -56,15 +55,5 @@ public class SecurityConfig {
                 .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, userDetailsService, auditOperationService),
                         UsernamePasswordAuthenticationFilter.class);
         return http.build();
-    }
-
-    /**
-     * Domain service used by {@link JwtAuthenticationFilter}. Registered here
-     * because the security layer is its only consumer; the rest of the domain
-     * wiring belongs to {@code infrastructure/config}.
-     */
-    @Bean
-    public AuditOperationService auditOperationService(AuditLogPort auditLogPort) {
-        return new AuditOperationService(auditLogPort);
     }
 }
