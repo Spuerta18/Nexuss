@@ -1,7 +1,8 @@
 package nexussMarket.domain.models;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
+import nexussMarket.domain.valueobjects.Money;
 
 /**
  * The invoice issued to a {@link Buyer} for an {@link Order}. A simple record:
@@ -12,10 +13,10 @@ public class Invoice {
     private final String identifier;
     private final Order order;
     private final Buyer buyer;
-    private final BigDecimal totalAmount;
+    private final Money totalAmount;
     private final LocalDateTime issuedAt;
 
-    public Invoice(String identifier, Order order, Buyer buyer, BigDecimal totalAmount, LocalDateTime issuedAt) {
+    public Invoice(String identifier, Order order, Buyer buyer, Money totalAmount, LocalDateTime issuedAt) {
         this.identifier = identifier;
         this.order = order;
         this.buyer = buyer;
@@ -39,7 +40,7 @@ public class Invoice {
     }
 
     /** Total amount charged. */
-    public BigDecimal getTotalAmount() {
+    public Money getTotalAmount() {
         return totalAmount;
     }
 

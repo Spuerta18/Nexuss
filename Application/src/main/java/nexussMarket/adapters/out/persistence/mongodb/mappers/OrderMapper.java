@@ -47,7 +47,8 @@ public final class OrderMapper {
         order.setCreatedAt(document.getCreatedAt());
         order.setLines(document.getLines().stream()
                 .map(line -> new OrderLine(productsById.get(line.getProductId()), line.getProductName(),
-                        line.getQuantity(), line.getUnitPrice(), warehousesById.get(line.getWarehouseId())))
+                        line.getQuantity(), MoneyMapper.toDomain(line.getUnitPrice()),
+                        warehousesById.get(line.getWarehouseId())))
                 .collect(Collectors.toCollection(ArrayList::new)));
         return order;
     }
@@ -67,7 +68,7 @@ public final class OrderMapper {
         document.setProductId(line.getProduct().getIdentifier());
         document.setProductName(line.getProductName());
         document.setQuantity(line.getQuantity());
-        document.setUnitPrice(line.getUnitPrice());
+        document.setUnitPrice(MoneyMapper.toDocument(line.getUnitPrice()));
         document.setWarehouseId(line.getWarehouse().getIdentifier());
         return document;
     }

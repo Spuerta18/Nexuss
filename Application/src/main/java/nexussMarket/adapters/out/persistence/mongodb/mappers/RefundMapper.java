@@ -19,7 +19,7 @@ public final class RefundMapper {
         RefundDocument document = new RefundDocument();
         document.setId(refund.getIdentifier());
         document.setReturnRequestId(refund.getReturnRequest().getIdentifier());
-        document.setAmount(refund.getAmount());
+        document.setAmount(MoneyMapper.toDocument(refund.getAmount()));
         document.setStatus(refund.getStatus().getCode());
         document.setCreatedAt(refund.getCreatedAt());
         document.setProcessedAt(refund.getProcessedAt());
@@ -28,7 +28,7 @@ public final class RefundMapper {
 
     /** {@code returnRequest} is the return request referenced by {@code returnRequestId}. */
     public static Refund toDomain(RefundDocument document, ReturnRequest returnRequest) {
-        return new Refund(document.getId(), returnRequest, document.getAmount(),
+        return new Refund(document.getId(), returnRequest, MoneyMapper.toDomain(document.getAmount()),
                 CatalogCodes.resolve(RefundStatus::fromCode, document.getStatus(), "RefundStatus"),
                 document.getCreatedAt(), document.getProcessedAt());
     }

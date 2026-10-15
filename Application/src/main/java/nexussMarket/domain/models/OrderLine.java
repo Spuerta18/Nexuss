@@ -1,6 +1,6 @@
 package nexussMarket.domain.models;
 
-import java.math.BigDecimal;
+import nexussMarket.domain.valueobjects.Money;
 
 /**
  * A single confirmed product line within an order, fixing the product name,
@@ -12,10 +12,10 @@ public class OrderLine {
     private Product product;
     private String productName;
     private Integer quantity;
-    private BigDecimal unitPrice;
+    private Money unitPrice;
     private Warehouse warehouse;
 
-    public OrderLine(Product product, String productName, int quantity, BigDecimal unitPrice, Warehouse warehouse) {
+    public OrderLine(Product product, String productName, int quantity, Money unitPrice, Warehouse warehouse) {
         this.product = product;
         this.productName = productName;
         this.quantity = requirePositive(quantity);
@@ -58,11 +58,11 @@ public class OrderLine {
     }
 
     /** Price per unit at the time the order was confirmed. */
-    public BigDecimal getUnitPrice() {
+    public Money getUnitPrice() {
         return unitPrice;
     }
 
-    public void setUnitPrice(BigDecimal unitPrice) {
+    public void setUnitPrice(Money unitPrice) {
         this.unitPrice = unitPrice;
     }
 

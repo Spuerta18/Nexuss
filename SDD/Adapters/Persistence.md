@@ -63,7 +63,7 @@ The embed-vs-reference decisions are exactly those of the [Persistence Strategy]
   "status": "ACTIVE",
   "passwordHash": "$2a$10$...",
 
-  "primaryAddress": "Cra 1 # 2-3",          // BUYER only
+  "primaryAddress": "1 Main Street",         // BUYER only
   "additionalAddresses": ["..."],           // BUYER only
   "commercialStatus": "ENABLED",            // BUYER only
   "sellerStatus": "ACTIVE"                  // SELLER only
@@ -75,7 +75,7 @@ Indexes: unique on `email`. See [User Hierarchy](#user-hierarchy).
 ### `warehouses`
 
 ```json
-{ "_id": "WH-01", "name": "Bodega Norte", "address": "...", "ownerType": "SELLER", "ownerId": "900123456", "active": true }
+{ "_id": "WH-01", "name": "North Warehouse", "address": "...", "ownerType": "SELLER", "ownerId": "900123456", "active": true }
 ```
 
 `ownerId` is absent for `MARKETPLACE` warehouses.

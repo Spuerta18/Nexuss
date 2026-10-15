@@ -19,13 +19,14 @@ public final class InvoiceMapper {
         document.setId(invoice.getIdentifier());
         document.setOrderId(invoice.getOrder().getIdentifier());
         document.setBuyerId(invoice.getBuyer().getIdentifier());
-        document.setTotalAmount(invoice.getTotalAmount());
+        document.setTotalAmount(MoneyMapper.toDocument(invoice.getTotalAmount()));
         document.setIssuedAt(invoice.getIssuedAt());
         return document;
     }
 
     /** {@code order} and {@code buyer} are the entities referenced by the document. */
     public static Invoice toDomain(InvoiceDocument document, Order order, Buyer buyer) {
-        return new Invoice(document.getId(), order, buyer, document.getTotalAmount(), document.getIssuedAt());
+        return new Invoice(document.getId(), order, buyer, MoneyMapper.toDomain(document.getTotalAmount()),
+                document.getIssuedAt());
     }
 }

@@ -64,26 +64,14 @@ public class InventoryItem {
         return availableQuantity;
     }
 
-    public void setAvailableQuantity(Integer availableQuantity) {
-        this.availableQuantity = requireNonNegative(availableQuantity, "availableQuantity");
-    }
-
     /** Quantity reserved by open orders. Must never be negative. */
     public Integer getReservedQuantity() {
         return reservedQuantity;
     }
 
-    public void setReservedQuantity(Integer reservedQuantity) {
-        this.reservedQuantity = requireNonNegative(reservedQuantity, "reservedQuantity");
-    }
-
     /** Quantity marked as damaged. Never available for reservation. Must never be negative. */
     public Integer getDamagedQuantity() {
         return damagedQuantity;
-    }
-
-    public void setDamagedQuantity(Integer damagedQuantity) {
-        this.damagedQuantity = requireNonNegative(damagedQuantity, "damagedQuantity");
     }
 
     /** Adds received or returned units to the available stock. */

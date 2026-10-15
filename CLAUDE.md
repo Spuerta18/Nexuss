@@ -1,74 +1,83 @@
 # CLAUDE.md
 
-Guía para trabajar en este repositorio. El código vive en `Application/` (Spring Boot 4, Java 17, MongoDB, JWT).
+Guide for working in this repository. The code lives in `Application/` (Spring Boot 4, Java 17, MongoDB, JWT).
 
-## Comandos
+## Language Rule (permanent)
 
-Ejecutar desde `Application/`:
+**Every artifact is written in English, with no exceptions.** This covers code, names, Javadoc, comments, exception
+and log messages, commit messages, every `.md` file in `SDD/`, and this `CLAUDE.md`. Do not generate Spanish versions
+or translations of any artifact.
 
-- Compilar: `mvn -o clean compile`
-- Tests (incluye carga del contexto de Spring): `mvn -o clean test`
+## Commands
 
-`ApplicationTests.contextLoads` arranca el contexto completo sin necesitar MongoDB levantado: el driver registra
-`MongoSocketOpenException` en el hilo monitor, pero el contexto carga igual. El secreto JWT de test está en
+Run from `Application/`:
+
+- Compile: `mvn -o clean compile`
+- Tests (including the Spring context load): `mvn -o clean test`
+
+`ApplicationTests.contextLoads` starts the full context without a running MongoDB: the driver logs
+`MongoSocketOpenException` in its monitor thread, but the context still loads. The test JWT secret is in
 `src/test/resources/application.properties`.
 
-## Arquitectura (hexagonal, alineada con la del profesor)
+## Architecture (hexagonal, aligned with the professor's architecture)
 
-- `domain/models`, `domain/valueobjects`, `domain/exceptions`: modelo de dominio.
-- `domain/services`: Domain Services, clases concretas `@Service` que reciben modelos de dominio y contienen
-  toda la lógica de negocio y las validaciones de autorización.
-- `domain/services/authorization`: servicios de autorización (`ValidateRoleAuthorizationService`,
-  `AuthorizeCartAccessService`, `AuthorizeOrderAccessService`, ...). Se cablean como beans en
+- `domain/models`, `domain/valueobjects`, `domain/exceptions`: domain model.
+- `domain/services`: Domain Services, concrete `@Service` classes that receive domain models and hold all the
+  business logic and authorization checks.
+- `domain/services/authorization`: authorization services (`ValidateRoleAuthorizationService`,
+  `AuthorizeCartAccessService`, `AuthorizeOrderAccessService`, ...). They are wired as beans in
   `infrastructure/config/AuthorizationBeanConfiguration`.
-- `domain/ports/in`: **un puerto de entrada por rol**: `PublicAccessPort`, `BuyerPort`, `SellerPort`,
+- `domain/ports/in`: **one input port per role**: `PublicAccessPort`, `BuyerPort`, `SellerPort`,
   `AdministratorPort`, `LogisticsOperatorPort`, `SupervisorPort`.
-- `adapters/useCases`: una clase `*UseCaseImpl` por puerto (`@Service` + `@RequiredArgsConstructor`). Cada método
-  **solo delega** al Domain Service correspondiente: sin `if`, sin validaciones, sin lógica.
-- `domain/ports/out` + `adapters/out/persistence`: persistencia Mongo.
-- `adapters/in/rest`: controladores, mappers y DTOs REST.
-- `infrastructure/config`, `infrastructure/security`: configuración de beans y seguridad JWT.
+- `adapters/useCases`: one `*UseCaseImpl` class per port (`@Service` + `@RequiredArgsConstructor`). Each method
+  **only delegates** to the corresponding Domain Service: no `if`, no validations, no logic.
+- `domain/ports/out` + `adapters/out/persistence`: MongoDB persistence.
+- `adapters/in/rest`: REST controllers, mappers and DTOs.
+- `infrastructure/config`, `infrastructure/security`: bean configuration and JWT security.
 
-## Estado del refactor de `domain/ports/in`
+## Status of the `domain/ports/in` Refactor
 
-- **Lote 1 — hecho.** Los 6 puertos por rol existen en `domain/ports/in`.
-- **Lote 2 — hecho.** Los servicios son clases concretas `@Service` que reciben modelos de dominio; lista de cambios
-  de lógica aprobada.
-- **Lote 3 — hecho.** `adapters/useCases` con `package-info.java` y los 6 `*UseCaseImpl`. Verificado: compila y el
-  contexto de Spring crea los 6 beans (uno por puerto) sin dependencias circulares ni beans faltantes.
-- **Lote 4 — hecho.** Javadoc de `package-info` de `domain/ports/in`, `domain/services` y
-  `adapters/in/rest/controllers` actualizado a la arquitectura por roles.
-- **Lote 5 — hecho.** Borradas las 41 interfaces antiguas `*UseCase` (una por operación, con su record `Command`)
-  de `domain/ports/in`, tras confirmar con grep que no quedaba ninguna referencia en `src/main` ni `src/test`.
-  Compila y el contexto de Spring carga.
-- **Lote 6 — hecho.** Documentación SDD alineada con la arquitectura por roles:
-  - Nuevos: `SDD/Domain/Input-ports.md` (principios Role Isolation y Domain Model Parameters, definición de los 6
-    puertos, nota sobre `User` abstracto) y `SDD/Adapters/Use-cases-adapters.md` (rol de la capa, flujo, tabla
-    puerto → impl → servicios, ejemplo).
-  - Actualizados: `Software Architecture.md` (árbol de paquetes, flujo de dependencias, restricciones 11 y 12,
-    config sin `*BeanConfiguration` de casos de uso, tabla de puertos), `Domain Services.md` (servicios concretos
-    con modelos de dominio, sección "Parameters" en lugar de "Command", cambios de autorización del refactor) y una
-    línea de `Persistence.md`.
-  - Verificado con grep: no queda ninguna referencia a las interfaces `*UseCase` en `SDD/`.
+- **Batch 1 — done.** The 6 role ports exist in `domain/ports/in`.
+- **Batch 2 — done.** Services are concrete `@Service` classes that receive domain models; the list of logic changes
+  was approved.
+- **Batch 3 — done.** `adapters/useCases` with `package-info.java` and the 6 `*UseCaseImpl` classes. Verified: it
+  compiles and the Spring context creates the 6 beans (one per port) with no circular dependencies or missing beans.
+- **Batch 4 — done.** `package-info` Javadoc of `domain/ports/in`, `domain/services` and
+  `adapters/in/rest/controllers` updated to the role-based architecture.
+- **Batch 5 — done.** Deleted the 41 old `*UseCase` interfaces (one per operation, each with its `Command` record)
+  from `domain/ports/in`, after confirming with grep that no reference remained in `src/main` or `src/test`.
+  It compiles and the Spring context loads.
+- **Batch 6 — done.** SDD documentation aligned with the role-based architecture:
+  - New: `SDD/Domain/Input-ports.md` (Role Isolation and Domain Model Parameters principles, definition of the 6
+    ports, note on the abstract `User`) and `SDD/Adapters/Use-cases-adapters.md` (role of the layer, flow,
+    port → impl → services table, example).
+  - Updated: `Software Architecture.md` (package tree, dependency flow, constraints 11 and 12, config without
+    per-use-case `*BeanConfiguration` classes, ports table), `Domain Services.md` (concrete services receiving domain
+    models, "Parameters" sections instead of "Command", authorization changes of the refactor) and one line of
+    `Persistence.md`.
+  - Verified with grep: no reference to the `*UseCase` interfaces remains in `SDD/`.
 
-## Decisiones tomadas
+## Decisions
 
-- **Carritos, solo `BUYER`:** `AddCartLineService`, `UpdateCartLineQuantityService`, `RemoveCartLineService` y
-  `ConsultCartService` validan `ValidateRoleAuthorizationService` con `SystemRole.BUYER` antes de
-  `AuthorizeCartAccessService`. El administrador **no** modifica ni consulta líneas de carrito.
-  `ConfirmOrderService` sigue permitiendo `BUYER` y `ADMINISTRATOR`.
-- **`CreateShoppingCartService` sin cambios:** ya exige que el actor sea un `Buyer`.
-- **Operador logístico consulta pedidos:** `AuthorizeOrderAccessService` permite `LogisticsOperator`. Es una
-  excepción puntual a la regla 7, solo para esto; no tocar ninguna otra regla de ese servicio. `CancelOrderService`
-  y `RequestReturnService` validan rol antes, así que en la práctica solo afecta a `ConsultOrderService`.
-- **`LogisticsOperatorPort.consultOrder(User, Order)`** añadido; `LogisticsOperatorUseCaseImpl` delega a
+- **Carts, `BUYER` only:** `AddCartLineService`, `UpdateCartLineQuantityService`, `RemoveCartLineService` and
+  `ConsultCartService` call `ValidateRoleAuthorizationService` with `SystemRole.BUYER` before
+  `AuthorizeCartAccessService`. Administrators do **not** modify or read cart lines.
+  `ConfirmOrderService` still allows `BUYER` and `ADMINISTRATOR`.
+- **`CreateShoppingCartService` unchanged:** it already requires the actor to be a `Buyer`.
+- **Logistics operators consult orders:** `AuthorizeOrderAccessService` allows `LogisticsOperator`. This is a scoped
+  exception to rule 7, for this purpose only; do not change any other rule of that service. `CancelOrderService` and
+  `RequestReturnService` check the role first, so in practice it only affects `ConsultOrderService`.
+- **`LogisticsOperatorPort.consultOrder(User, Order)`** added; `LogisticsOperatorUseCaseImpl` delegates to
   `ConsultOrderService`.
-- **Almacenes:** `AdministratorPort.registerMarketplaceWarehouse` y `SellerPort.registerWarehouse` delegan ambos en
-  `RegisterWarehouseService`, que decide el tipo de almacén según el rol del actor.
+- **Warehouses:** `AdministratorPort.registerMarketplaceWarehouse` and `SellerPort.registerWarehouse` both delegate to
+  `RegisterWarehouseService`, which decides the kind of warehouse from the actor's role.
+- **Staff registration:** `RegisterSellerService`, `RegisterSupervisorService` and `RegisterLogisticsOperatorService`
+  all authorize with `ValidateRoleAuthorizationService` (`ADMINISTRATOR`), so the actor must be an active
+  administrator.
 
-## Reglas de trabajo
+## Working Rules
 
-- Trabajar por lotes; compilar con `mvn -o clean compile` al terminar cada paso y no avanzar al siguiente lote sin
-  confirmación del usuario.
-- No inventar métodos en los puertos: los `*UseCaseImpl` implementan exactamente lo que declara su puerto.
-- `passwordHash` nunca aparece en DTOs; `/me` lee el principal autenticado, no `ConsultUserUseCase`.
+- Work in batches; compile with `mvn -o clean compile` after each step and do not move to the next batch without
+  the user's confirmation.
+- Do not invent port methods: each `*UseCaseImpl` implements exactly what its port declares.
+- `passwordHash` never appears in DTOs; `/me` reads the authenticated principal, not `ConsultUserService`.

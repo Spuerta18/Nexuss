@@ -1,9 +1,9 @@
 package nexussMarket.domain.models;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import nexussMarket.domain.exceptions.BusinessRuleViolationException;
+import nexussMarket.domain.valueobjects.Money;
 import nexussMarket.domain.valueobjects.RefundStatus;
 
 /**
@@ -15,18 +15,18 @@ public class Refund {
 
     private final String identifier;
     private final ReturnRequest returnRequest;
-    private final BigDecimal amount;
+    private final Money amount;
     private RefundStatus status;
     private final LocalDateTime createdAt;
     private LocalDateTime processedAt;
 
     /** A new refund, {@code PENDING} since now. */
-    public Refund(String identifier, ReturnRequest returnRequest, BigDecimal amount) {
+    public Refund(String identifier, ReturnRequest returnRequest, Money amount) {
         this(identifier, returnRequest, amount, RefundStatus.PENDING, LocalDateTime.now(), null);
     }
 
     /** Rebuilds an existing refund, e.g. when loaded from persistence. */
-    public Refund(String identifier, ReturnRequest returnRequest, BigDecimal amount, RefundStatus status,
+    public Refund(String identifier, ReturnRequest returnRequest, Money amount, RefundStatus status,
                   LocalDateTime createdAt, LocalDateTime processedAt) {
         this.identifier = identifier;
         this.returnRequest = returnRequest;
@@ -47,7 +47,7 @@ public class Refund {
     }
 
     /** Amount paid back to the buyer. */
-    public BigDecimal getAmount() {
+    public Money getAmount() {
         return amount;
     }
 

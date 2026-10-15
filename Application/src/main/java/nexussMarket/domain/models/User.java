@@ -16,7 +16,7 @@ public abstract class User {
     private String identifier;
     private String fullName;
     private String email;
-    private SystemRole role;
+    private final SystemRole role;
     private UserStatus status;
     private String passwordHash;
 
@@ -58,10 +58,6 @@ public abstract class User {
     /** Business role defining the user's responsibilities within the system. */
     public SystemRole getRole() {
         return role;
-    }
-
-    public void setRole(SystemRole role) {
-        this.role = role;
     }
 
     /** Current operational status of the user. */

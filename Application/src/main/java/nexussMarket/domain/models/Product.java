@@ -1,9 +1,9 @@
 package nexussMarket.domain.models;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
+import nexussMarket.domain.valueobjects.Money;
 import nexussMarket.domain.valueobjects.ProductStatus;
 import nexussMarket.domain.valueobjects.ProductType;
 import nexussMarket.domain.valueobjects.ProductVariant;
@@ -21,7 +21,7 @@ public class Product {
     private List<ProductVariant> variants = new ArrayList<>();
     private ProductStatus status;
     private Seller seller;
-    private BigDecimal price;
+    private Money price;
 
     public Product(String identifier, String name, ProductType productType, ProductStatus status) {
         this.identifier = identifier;
@@ -85,11 +85,11 @@ public class Product {
     }
 
     /** Current selling price per unit, snapshotted into OrderLine when an order is confirmed. */
-    public BigDecimal getPrice() {
+    public Money getPrice() {
         return price;
     }
 
-    public void setPrice(BigDecimal price) {
+    public void setPrice(Money price) {
         this.price = price;
     }
 }

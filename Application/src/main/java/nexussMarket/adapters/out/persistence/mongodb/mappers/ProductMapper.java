@@ -30,7 +30,7 @@ public final class ProductMapper {
         document.setProductType(product.getProductType().getCode());
         document.setStatus(product.getStatus().getCode());
         document.setSellerId(product.getSeller() != null ? product.getSeller().getIdentifier() : null);
-        document.setPrice(product.getPrice());
+        document.setPrice(MoneyMapper.toDocument(product.getPrice()));
         document.setVariants(product.getVariants().stream().map(ProductMapper::toDocument).toList());
         return document;
     }
@@ -41,7 +41,7 @@ public final class ProductMapper {
                 CatalogCodes.resolve(ProductType::fromCode, document.getProductType(), "ProductType"),
                 CatalogCodes.resolve(ProductStatus::fromCode, document.getStatus(), "ProductStatus"));
         product.setSeller(seller);
-        product.setPrice(document.getPrice());
+        product.setPrice(MoneyMapper.toDomain(document.getPrice()));
         product.setVariants(toDomain(document.getVariants()));
         return product;
     }

@@ -353,7 +353,7 @@ Represents the distributed stock of a specific product held in a specific wareho
 
 * Negative stock is not permitted under any circumstance.
 * Inventory that is nonexistent or marked as damaged cannot be reserved. Damaged units are moved from `availableQuantity` to `damagedQuantity`, so reservations (which only consume `availableQuantity`) never touch them.
-* Recognized movement types are: Inbound (`Ingreso`), Reservation (`Reserva`), Sale Outbound (`Salida por venta`), Adjustment (`Ajuste`), and Return (`Devolución`). Each movement must be traceable to the `InventoryItem` it affects, and is recorded as an `InventoryMovement`.
+* Recognized movement types are: Inbound (`INBOUND`), Reservation (`RESERVATION`), Sale Outbound (`SALE_OUTBOUND`), Adjustment (`ADJUSTMENT`), and Return (`RETURN`). Each movement must be traceable to the `InventoryItem` it affects, and is recorded as an `InventoryMovement`.
 
 ---
 

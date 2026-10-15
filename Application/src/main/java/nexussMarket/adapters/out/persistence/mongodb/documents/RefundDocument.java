@@ -1,13 +1,10 @@
 package nexussMarket.adapters.out.persistence.mongodb.documents;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.Field;
-import org.springframework.data.mongodb.core.mapping.FieldType;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,8 +27,7 @@ public class RefundDocument {
     @Indexed(unique = true)
     private String returnRequestId;
 
-    @Field(targetType = FieldType.DECIMAL128)
-    private BigDecimal amount;
+    private MoneyDocument amount;
 
     private String status;
     private LocalDateTime createdAt;
