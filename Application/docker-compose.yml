@@ -1,0 +1,39 @@
+# NexusMarket API + MongoDB.
+#
+#   NEXUS_JWT_SECRET="<base64 key, at least 32 bytes>" docker compose up --build
+#
+# Every setting comes from the environment (or from a local .env file next to this one, which is git-ignored).
+# NEXUS_JWT_SECRET is required; the other variables have defaults.
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Not published on the host by default (a local MongoDB may already use 27017).
+    # To reach it with mongosh from the host, uncomment:
+    # ports:
+    #   - "127.0.0.1:27018:27017"
+
+  api:
+    build: .
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      NEXUS_JWT_SECRET: ${NEXUS_JWT_SECRET:?Set NEXUS_JWT_SECRET to a Base64 key of at least 32 bytes}
+      NEXUS_MONGO_URI: ${NEXUS_MONGO_URI:-mongodb://mongo:27017/nexusmarket}
+      NEXUS_CORS_ORIGINS: ${NEXUS_CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      NEXUS_ADMIN_EMAIL: ${NEXUS_ADMIN_EMAIL:-}
+      NEXUS_ADMIN_PASSWORD: ${NEXUS_ADMIN_PASSWORD:-}
+    ports:
+      - "8080:8080"
+
+volumes:
+  mongo-data:

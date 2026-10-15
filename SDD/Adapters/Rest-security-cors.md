@@ -17,7 +17,7 @@ The API is protected with stateless JWT authentication (`infrastructure/security
 
 # Login and Token
 
-`POST /api/auth/login` calls `PublicAccessPort.authenticate`. On success it returns `AuthResponse` with the token (`tokenType: "Bearer"`) and the user. A wrong email and a wrong password both answer `401` with the same message, `"Invalid email or password"`, so accounts cannot be enumerated.
+`POST /api/auth/login` calls `PublicAccessPort.authenticate`. On success it returns `AuthResponse` with the token (`tokenType: "Bearer"`) and the user. A wrong email, a wrong password and a correct password for a user who is not `ACTIVE` (e.g. `BLOCKED`) all answer `401` with the same message, `"Invalid email or password"`: a failed login never reveals whether the account exists, whether the password was right, or whether the account is blocked. The rule lives in `AuthenticateUserService`, which throws the same `InvalidCredentialsException` in every case.
 
 The token is signed with HMAC-SHA using `NEXUS_JWT_SECRET` (Base64, at least 32 bytes). The algorithm follows the key length (jjwt's `Keys.hmacShaKeyFor`): a 32-byte key gives HS256, a 48-byte key HS384 and a 64-byte key HS512. The token expires after `nexus.security.jwt.expiration` (`1h` by default). Its claims are enough to rebuild the right `User` subtype:
 
@@ -58,6 +58,7 @@ The cost is one lookup by identifier per request.
 
 * Each role controller declares `@PreAuthorize("hasRole('<ROLE>')")` at **class level**, so every endpoint of the controller is restricted to its role. Method security is enabled with `@EnableMethodSecurity`.
 * An authenticated user with another role gets `403` (`"Access denied"`) before the port is called.
+* **Order of checks.** Request body validation (`@Valid`) runs while Spring MVC resolves the controller arguments, before the controller method and its `@PreAuthorize` proxy are invoked. A user with the wrong role who sends an *invalid* body therefore gets `400` instead of `403`. The port is never called in either case; the only thing revealed is the shape of the expected body, which is public in the API documentation.
 * The Domain Services still authorize the actor on each operation (ownership, status); a domain refusal also answers `403` (see [Global Exception Handler](Global-exception-handler.md)). The `@PreAuthorize` role check is the first barrier, not the only one.
 * Public routes: `POST /api/auth/login`, `POST /api/auth/register` and `/error`. `GET /api/me` needs any valid token.
 

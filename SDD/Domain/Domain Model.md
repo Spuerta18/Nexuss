@@ -506,7 +506,7 @@ Represents the formal commercial commitment between a buyer and one or more sell
 ## Business Rules
 
 * An order follows the lifecycle: `CART` → `PENDING_PAYMENT` → `PAID` → `SHIPPED` → `DELIVERED`, advancing exactly one step at a time.
-  > **Note:** `SHIPPED` and `DELIVERED` are no longer reached through a generic status advance — they are driven by the `Shipment` lifecycle (see [# Shipments in Domain Services.md](Domain%20Services.md#shipments)).
+  > **Note:** `SHIPPED` and `DELIVERED` are no longer reached through a generic status advance — they are driven by the `Shipment` lifecycle (see [# Shipments in Domain Services.md](services/fulfillment.md#shipments)).
 * An order can be cancelled only while it is `CART` or `PENDING_PAYMENT`; it then moves to `CANCELLED`, and the stock reserved for each line is released. `CANCELLED` is terminal.
 * A finalized (`DELIVERED`) order cannot be modified under any circumstance.
 * The status can only change through the `Order` itself (`advanceTo` / `cancel`), never by setting it directly, so these rules cannot be bypassed.

@@ -65,7 +65,7 @@ The controller depends only on the role port, never on the `UseCaseImpl` or on a
 
 Notes:
 
-* `AdministratorPort.registerMarketplaceWarehouse` and `SellerPort.registerWarehouse` both delegate to `RegisterWarehouseService`, which decides the kind of warehouse from the actor's role (see [RegisterWarehouseService](../Domain/Domain%20Services.md#registerwarehouseservice)).
+* `AdministratorPort.registerMarketplaceWarehouse` and `SellerPort.registerWarehouse` both delegate to `RegisterWarehouseService`, which decides the kind of warehouse from the actor's role (see [RegisterWarehouseService](../Domain/services/inventory.md#registerwarehouseservice)).
 * Services used only by other services (`ReserveInventoryService`, `ReleaseInventoryReservationService`, `ConfirmInventoryOutboundService`), the security layer (`AuditOperationService`) or nobody yet (`NotifyUserService`) are not injected into any use case adapter.
 
 ---

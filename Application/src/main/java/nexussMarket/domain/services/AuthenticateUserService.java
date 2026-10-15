@@ -3,7 +3,6 @@ package nexussMarket.domain.services;
 import org.springframework.stereotype.Service;
 
 import nexussMarket.domain.exceptions.InvalidCredentialsException;
-import nexussMarket.domain.exceptions.OperationNotAllowedException;
 import nexussMarket.domain.models.AuthenticationResult;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.out.PasswordHasherPort;
@@ -13,6 +12,8 @@ import nexussMarket.domain.valueobjects.UserStatus;
 
 @Service
 public class AuthenticateUserService {
+
+    static final String INVALID_CREDENTIALS = "Invalid email or password";
 
     private final UserRepositoryPort userRepositoryPort;
     private final PasswordHasherPort passwordHasherPort;
@@ -26,14 +27,13 @@ public class AuthenticateUserService {
     }
 
     public AuthenticationResult execute(String email, String password) {
-        // Same message for unknown email and wrong password, so accounts cannot be enumerated.
+        // The same error for an unknown email, a wrong password and a user who is not ACTIVE, so a failed login
+        // never reveals whether an account exists or whether the password was right.
         User user = userRepositoryPort.findByEmail(email)
                 .filter(u -> u.getPasswordHash() != null
                         && passwordHasherPort.matches(password, u.getPasswordHash()))
-                .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
-        if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new OperationNotAllowedException("User " + user.getIdentifier() + " is not active");
-        }
+                .filter(u -> u.getStatus() == UserStatus.ACTIVE)
+                .orElseThrow(() -> new InvalidCredentialsException(INVALID_CREDENTIALS));
         return new AuthenticationResult(user, tokenServicePort.generateToken(user));
     }
 }

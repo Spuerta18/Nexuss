@@ -29,7 +29,7 @@ The REST API exposes the [role input ports](../Domain/Input-ports.md) over HTTP.
 | POST | `/api/auth/register` | `registerBuyer` | `RegisterBuyerRequest` | `UserResponse` | 201 |
 | GET | `/api/me` | — (reads the authenticated principal) | — | `UserResponse` | 200 |
 
-A failed login answers `401` with the same message (`"Invalid email or password"`) whether the email or the password was wrong. `/api/me` needs a token but no specific role; the user's own profile is read from the principal, not through a use case.
+A failed login answers `401` with the same message (`"Invalid email or password"`) whether the email or the password was wrong, or the account is not `ACTIVE`. `/api/me` needs a token but no specific role; the user's own profile is read from the principal, not through a use case.
 
 ---
 

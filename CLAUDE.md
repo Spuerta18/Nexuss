@@ -107,6 +107,18 @@ a reachable MongoDB server to start.
   (full context, real security, every role port mocked plus `UserRepositoryPort` and `AuditLogPort`, so a single
   cached context serves all of them), and `RestMappersTest`.
 
+## Documentation and Delivery
+
+- `README.md` (repo root): overview, requirements, environment variables, build/test/run (including the offline
+  `java -cp` route, since `mvn -o spring-boot:run` lacks plugin artifacts), links to the SDD.
+- `SDD/C4/`: C4 model in Mermaid (levels 1-4, one view per layer, endpoint matrix and sequence diagrams per role),
+  built from the code. Keep it in sync when routes, ports or classes change.
+- `SDD/Domain/Output-ports.md`: every output port with its signature, users and adapter.
+- `SDD/Domain/Domain Services.md` is an index (conventions, catalog tables, collaboration diagram); the detailed
+  service descriptions live in `SDD/Domain/services/` (one file per area).
+- `Application/Dockerfile` (multi-stage) and `Application/docker-compose.yml` (API + `mongo:7`): written but never
+  run, because Docker is not installed on the development machine. `.env` is git-ignored.
+
 ## Decisions
 
 - **Carts, `BUYER` only:** `AddCartLineService`, `UpdateCartLineQuantityService`, `RemoveCartLineService` and
@@ -137,7 +149,8 @@ a reachable MongoDB server to start.
   from the database on every request and rejects it if it is not `ACTIVE` or its stored role differs from the token.
 - **Abstract `User` targets in REST:** the client sends the target user's role (body of `PATCH /users/{id}/status`,
   `?role=` on `GET /users/{id}`) and the mapper builds that subtype. The services only read the identifier.
-- **Login errors:** a wrong email and a wrong password both answer `401` with `"Invalid email or password"`.
+- **Login errors:** a wrong email, a wrong password and a user who is not `ACTIVE` all answer `401` with
+  `"Invalid email or password"` (decided in `AuthenticateUserService`). `expiresAt` is not part of the login response.
 - **Passwords:** 8 to 72 characters in `RegisterBuyerRequest` and `RegisterStaffRequest`. Passwords and tokens never
   appear in logs or in `ErrorResponse` (records mask them in `toString`; validation errors omit rejected values).
 
