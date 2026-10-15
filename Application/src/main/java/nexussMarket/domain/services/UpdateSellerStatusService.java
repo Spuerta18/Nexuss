@@ -1,14 +1,17 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.ports.in.UpdateSellerStatusUseCase;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
 import nexussMarket.domain.services.authorization.ValidateRoleAuthorizationService;
+import nexussMarket.domain.valueobjects.SellerStatus;
 import nexussMarket.domain.valueobjects.SystemRole;
 
-public class UpdateSellerStatusService implements UpdateSellerStatusUseCase {
+@Service
+public class UpdateSellerStatusService {
 
     private final UserRepositoryPort userRepositoryPort;
     private final ValidateRoleAuthorizationService validateRoleAuthorizationService;
@@ -19,15 +22,15 @@ public class UpdateSellerStatusService implements UpdateSellerStatusUseCase {
         this.validateRoleAuthorizationService = validateRoleAuthorizationService;
     }
 
-    @Override
-    public Seller execute(User actor, Command command) {
+    public Seller execute(User actor, Seller sellerReference, SellerStatus status) {
+        String sellerId = sellerReference.getIdentifier();
         validateRoleAuthorizationService.execute(actor, SystemRole.ADMINISTRATOR);
-        User user = userRepositoryPort.findById(command.sellerId())
-                .orElseThrow(() -> new EntityNotFoundException("No seller found with id " + command.sellerId()));
+        User user = userRepositoryPort.findById(sellerId)
+                .orElseThrow(() -> new EntityNotFoundException("No seller found with id " + sellerId));
         if (!(user instanceof Seller seller)) {
-            throw new EntityNotFoundException("No seller found with id " + command.sellerId());
+            throw new EntityNotFoundException("No seller found with id " + sellerId);
         }
-        seller.setSellerStatus(command.status());
+        seller.setSellerStatus(status);
         return (Seller) userRepositoryPort.save(seller);
     }
 }

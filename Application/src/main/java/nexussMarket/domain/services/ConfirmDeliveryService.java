@@ -1,10 +1,11 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Shipment;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.ports.in.ConfirmDeliveryUseCase;
 import nexussMarket.domain.ports.out.OrderRepositoryPort;
 import nexussMarket.domain.ports.out.ShipmentRepositoryPort;
 import nexussMarket.domain.services.authorization.ValidateRoleAuthorizationService;
@@ -12,7 +13,8 @@ import nexussMarket.domain.valueobjects.OrderStatus;
 import nexussMarket.domain.valueobjects.SystemRole;
 
 /** Confirms that a dispatched shipment reached the buyer, and moves its order to {@code DELIVERED}. */
-public class ConfirmDeliveryService implements ConfirmDeliveryUseCase {
+@Service
+public class ConfirmDeliveryService {
 
     private final ShipmentRepositoryPort shipmentRepositoryPort;
     private final OrderRepositoryPort orderRepositoryPort;
@@ -25,11 +27,11 @@ public class ConfirmDeliveryService implements ConfirmDeliveryUseCase {
         this.validateRoleAuthorizationService = validateRoleAuthorizationService;
     }
 
-    @Override
-    public Shipment execute(User actor, Command command) {
+    public Shipment execute(User actor, Shipment shipmentReference) {
+        String shipmentId = shipmentReference.getIdentifier();
         validateRoleAuthorizationService.execute(actor, SystemRole.LOGISTICS_OPERATOR, SystemRole.ADMINISTRATOR);
-        Shipment shipment = shipmentRepositoryPort.findById(command.shipmentId())
-                .orElseThrow(() -> new EntityNotFoundException("No shipment found with id " + command.shipmentId()));
+        Shipment shipment = shipmentRepositoryPort.findById(shipmentId)
+                .orElseThrow(() -> new EntityNotFoundException("No shipment found with id " + shipmentId));
         Order order = shipment.getOrder();
         shipment.confirmDelivery();
         order.advanceTo(OrderStatus.DELIVERED);

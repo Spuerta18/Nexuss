@@ -1,33 +1,41 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.models.LogisticsOperator;
-import nexussMarket.domain.ports.in.RegisterLogisticsOperatorUseCase;
+import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.out.PasswordHasherPort;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
+import nexussMarket.domain.services.authorization.ValidateRoleAuthorizationService;
+import nexussMarket.domain.valueobjects.SystemRole;
 import nexussMarket.domain.valueobjects.UserStatus;
 
-public class RegisterLogisticsOperatorService implements RegisterLogisticsOperatorUseCase {
+@Service
+public class RegisterLogisticsOperatorService {
 
     private final UserRepositoryPort userRepositoryPort;
     private final PasswordHasherPort passwordHasherPort;
+    private final ValidateRoleAuthorizationService validateRoleAuthorizationService;
 
-    public RegisterLogisticsOperatorService(UserRepositoryPort userRepositoryPort, PasswordHasherPort passwordHasherPort) {
+    public RegisterLogisticsOperatorService(UserRepositoryPort userRepositoryPort, PasswordHasherPort passwordHasherPort,
+            ValidateRoleAuthorizationService validateRoleAuthorizationService) {
         this.userRepositoryPort = userRepositoryPort;
         this.passwordHasherPort = passwordHasherPort;
+        this.validateRoleAuthorizationService = validateRoleAuthorizationService;
     }
 
-    @Override
-    public LogisticsOperator execute(Command command) {
-        if (userRepositoryPort.existsById(command.identifier())) {
-            throw new DuplicateResourceException("A user with identifier " + command.identifier() + " already exists");
+    public LogisticsOperator execute(User actor, LogisticsOperator logisticsOperator, String password) {
+        validateRoleAuthorizationService.execute(actor, SystemRole.ADMINISTRATOR);
+        if (userRepositoryPort.existsById(logisticsOperator.getIdentifier())) {
+            throw new DuplicateResourceException("A user with identifier " + logisticsOperator.getIdentifier() + " already exists");
         }
-        if (userRepositoryPort.existsByEmail(command.email())) {
-            throw new DuplicateResourceException("A user with email " + command.email() + " already exists");
+        if (userRepositoryPort.existsByEmail(logisticsOperator.getEmail())) {
+            throw new DuplicateResourceException("A user with email " + logisticsOperator.getEmail() + " already exists");
         }
-        LogisticsOperator operator = new LogisticsOperator(command.identifier(), command.fullName(),
-                command.email(), UserStatus.ACTIVE);
-        operator.setPasswordHash(passwordHasherPort.hash(command.password()));
-        return (LogisticsOperator) userRepositoryPort.save(operator);
+        LogisticsOperator newLogisticsOperator = new LogisticsOperator(logisticsOperator.getIdentifier(), logisticsOperator.getFullName(),
+                logisticsOperator.getEmail(), UserStatus.ACTIVE);
+        newLogisticsOperator.setPasswordHash(passwordHasherPort.hash(password));
+        return (LogisticsOperator) userRepositoryPort.save(newLogisticsOperator);
     }
 }

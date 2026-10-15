@@ -1,13 +1,16 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.ports.in.UpdateProductStatusUseCase;
 import nexussMarket.domain.ports.out.ProductRepositoryPort;
 import nexussMarket.domain.services.authorization.AuthorizeProductOwnershipService;
+import nexussMarket.domain.valueobjects.ProductStatus;
 
-public class UpdateProductStatusService implements UpdateProductStatusUseCase {
+@Service
+public class UpdateProductStatusService {
 
     private final ProductRepositoryPort productRepositoryPort;
     private final AuthorizeProductOwnershipService authorizeProductOwnershipService;
@@ -18,12 +21,12 @@ public class UpdateProductStatusService implements UpdateProductStatusUseCase {
         this.authorizeProductOwnershipService = authorizeProductOwnershipService;
     }
 
-    @Override
-    public Product execute(User actor, Command command) {
-        Product product = productRepositoryPort.findById(command.productId())
-                .orElseThrow(() -> new EntityNotFoundException("No product found with id " + command.productId()));
+    public Product execute(User actor, Product productReference, ProductStatus status) {
+        String productId = productReference.getIdentifier();
+        Product product = productRepositoryPort.findById(productId)
+                .orElseThrow(() -> new EntityNotFoundException("No product found with id " + productId));
         authorizeProductOwnershipService.execute(actor, product);
-        product.setStatus(command.status());
+        product.setStatus(status);
         return productRepositoryPort.save(product);
     }
 }

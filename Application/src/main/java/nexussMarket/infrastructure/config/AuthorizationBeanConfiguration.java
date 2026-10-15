@@ -11,20 +11,15 @@ import nexussMarket.domain.services.authorization.ValidateRoleAuthorizationServi
 import nexussMarket.domain.services.authorization.ValidateUserAuthorizationStatusService;
 
 /**
- * Domain wiring, split into one {@code @Configuration} class per area so each
- * stays readable (about sixty beans in total):
+ * Domain wiring for the services that are not component-scanned:
  * <ul>
  *   <li>{@code AuthorizationBeanConfiguration} — the authorization services, used by every area;</li>
- *   <li>{@link InternalServiceBeanConfiguration} — internal services without an input port;</li>
- *   <li>{@link UserBeanConfiguration}, {@link CatalogBeanConfiguration},
- *       {@link InventoryBeanConfiguration}, {@link CartOrderBeanConfiguration},
- *       {@link FulfillmentBeanConfiguration} — the use cases of each area.</li>
+ *   <li>{@link InternalServiceBeanConfiguration} — internal services without an input port.</li>
  * </ul>
- * Domain services are plain classes, so they are registered here instead of
- * being component-scanned. Use cases are exposed as their input port type, so
- * adapters and other services depend on the port, never on the concrete
- * service. Output port adapters are {@code @Repository} / {@code @Component}
- * and are found by component scanning.
+ * Use case services ({@code domain/services}) are {@code @Service} classes and
+ * the use case adapters ({@code adapters/useCases}) that implement the role
+ * input ports are component-scanned, as are the output port adapters
+ * ({@code @Repository} / {@code @Component}).
  *
  * <p>This class: the six authorization services.</p>
  */

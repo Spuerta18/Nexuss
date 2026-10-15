@@ -1,9 +1,10 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.ports.in.ConsultOrderUseCase;
 import nexussMarket.domain.ports.out.OrderRepositoryPort;
 import nexussMarket.domain.services.authorization.AuthorizeOrderAccessService;
 
@@ -11,7 +12,8 @@ import nexussMarket.domain.services.authorization.AuthorizeOrderAccessService;
  * Returns an order to its buyer, an administrator or a supervisor. Unlike
  * {@link CancelOrderService}, supervisors are allowed: this is a read.
  */
-public class ConsultOrderService implements ConsultOrderUseCase {
+@Service
+public class ConsultOrderService {
 
     private final OrderRepositoryPort orderRepositoryPort;
     private final AuthorizeOrderAccessService authorizeOrderAccessService;
@@ -22,10 +24,10 @@ public class ConsultOrderService implements ConsultOrderUseCase {
         this.authorizeOrderAccessService = authorizeOrderAccessService;
     }
 
-    @Override
-    public Order execute(User actor, Query query) {
-        Order order = orderRepositoryPort.findById(query.orderId())
-                .orElseThrow(() -> new EntityNotFoundException("No order found with id " + query.orderId()));
+    public Order execute(User actor, Order orderReference) {
+        String orderId = orderReference.getIdentifier();
+        Order order = orderRepositoryPort.findById(orderId)
+                .orElseThrow(() -> new EntityNotFoundException("No order found with id " + orderId));
         authorizeOrderAccessService.execute(actor, order);
         return order;
     }

@@ -1,12 +1,13 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.ReturnRequest;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.ports.in.RequestReturnUseCase;
 import nexussMarket.domain.ports.out.OrderRepositoryPort;
 import nexussMarket.domain.ports.out.ReturnRequestRepositoryPort;
 import nexussMarket.domain.services.authorization.AuthorizeOrderAccessService;
@@ -18,7 +19,8 @@ import nexussMarket.domain.valueobjects.SystemRole;
  * Lets a buyer request the return of one of its delivered orders. An order
  * has at most one return request.
  */
-public class RequestReturnService implements RequestReturnUseCase {
+@Service
+public class RequestReturnService {
 
     private final ReturnRequestRepositoryPort returnRequestRepositoryPort;
     private final OrderRepositoryPort orderRepositoryPort;
@@ -35,25 +37,26 @@ public class RequestReturnService implements RequestReturnUseCase {
         this.authorizeOrderAccessService = authorizeOrderAccessService;
     }
 
-    @Override
-    public ReturnRequest execute(User actor, Command command) {
+    public ReturnRequest execute(User actor, ReturnRequest returnRequest) {
+        String returnRequestId = returnRequest.getIdentifier();
+        String orderId = returnRequest.getOrder().getIdentifier();
         validateRoleAuthorizationService.execute(actor, SystemRole.BUYER);
-        Order order = orderRepositoryPort.findById(command.orderId())
-                .orElseThrow(() -> new EntityNotFoundException("No order found with id " + command.orderId()));
+        Order order = orderRepositoryPort.findById(orderId)
+                .orElseThrow(() -> new EntityNotFoundException("No order found with id " + orderId));
         // With the role restricted to BUYER above, this only lets the owning buyer through.
         authorizeOrderAccessService.execute(actor, order);
         if (order.getStatus() != OrderStatus.DELIVERED) {
             throw new BusinessRuleViolationException("Order " + order.getIdentifier() + " is "
                     + order.getStatus().getCode() + "; only DELIVERED orders can be returned");
         }
-        if (returnRequestRepositoryPort.findById(command.returnRequestId()).isPresent()) {
+        if (returnRequestRepositoryPort.findById(returnRequestId).isPresent()) {
             throw new DuplicateResourceException(
-                    "A return request with id " + command.returnRequestId() + " already exists");
+                    "A return request with id " + returnRequestId + " already exists");
         }
         if (returnRequestRepositoryPort.findByOrderId(order.getIdentifier()).isPresent()) {
             throw new DuplicateResourceException("Order " + order.getIdentifier() + " already has a return request");
         }
         return returnRequestRepositoryPort.save(
-                new ReturnRequest(command.returnRequestId(), order, order.getBuyer(), command.reason()));
+                new ReturnRequest(returnRequestId, order, order.getBuyer(), returnRequest.getReason()));
     }
 }

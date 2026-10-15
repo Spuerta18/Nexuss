@@ -1,16 +1,20 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.InventoryItem;
 import nexussMarket.domain.models.InventoryMovement;
+import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.ports.in.AdjustInventoryUseCase;
+import nexussMarket.domain.models.Warehouse;
 import nexussMarket.domain.ports.out.InventoryMovementRepositoryPort;
 import nexussMarket.domain.ports.out.InventoryRepositoryPort;
 import nexussMarket.domain.services.authorization.AuthorizeWarehouseOperationService;
 import nexussMarket.domain.valueobjects.InventoryMovementType;
 
-public class AdjustInventoryService implements AdjustInventoryUseCase {
+@Service
+public class AdjustInventoryService {
 
     private final InventoryRepositoryPort inventoryRepositoryPort;
     private final InventoryMovementRepositoryPort inventoryMovementRepositoryPort;
@@ -24,17 +28,18 @@ public class AdjustInventoryService implements AdjustInventoryUseCase {
         this.authorizeWarehouseOperationService = authorizeWarehouseOperationService;
     }
 
-    @Override
-    public InventoryItem execute(User actor, Command command) {
+    public InventoryItem execute(User actor, Product product, Warehouse warehouse, int quantityDelta) {
+        String productId = product.getIdentifier();
+        String warehouseId = warehouse.getIdentifier();
         InventoryItem item = inventoryRepositoryPort
-                .findByProductIdAndWarehouseId(command.productId(), command.warehouseId())
+                .findByProductIdAndWarehouseId(productId, warehouseId)
                 .orElseThrow(() -> new EntityNotFoundException(
-                        "No inventory item found for product " + command.productId() + " in warehouse " + command.warehouseId()));
+                        "No inventory item found for product " + productId + " in warehouse " + warehouseId));
         authorizeWarehouseOperationService.execute(actor, item.getWarehouse());
-        item.adjust(command.quantityDelta());
+        item.adjust(quantityDelta);
         InventoryItem saved = inventoryRepositoryPort.save(item);
         inventoryMovementRepositoryPort.save(
-                InventoryMovement.of(item, InventoryMovementType.ADJUSTMENT, command.quantityDelta()));
+                InventoryMovement.of(item, InventoryMovementType.ADJUSTMENT, quantityDelta));
         return saved;
     }
 }

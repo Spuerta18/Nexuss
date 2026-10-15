@@ -1,5 +1,7 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.InventoryItem;
@@ -7,7 +9,6 @@ import nexussMarket.domain.models.InventoryMovement;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
-import nexussMarket.domain.ports.in.RegisterInventoryInboundUseCase;
 import nexussMarket.domain.ports.out.InventoryMovementRepositoryPort;
 import nexussMarket.domain.ports.out.InventoryRepositoryPort;
 import nexussMarket.domain.ports.out.ProductRepositoryPort;
@@ -21,7 +22,8 @@ import nexussMarket.domain.valueobjects.ProductType;
  * product is stocked in a warehouse; only {@code PHYSICAL} products can be
  * stocked.
  */
-public class RegisterInventoryInboundService implements RegisterInventoryInboundUseCase {
+@Service
+public class RegisterInventoryInboundService {
 
     private final InventoryRepositoryPort inventoryRepositoryPort;
     private final InventoryMovementRepositoryPort inventoryMovementRepositoryPort;
@@ -41,32 +43,33 @@ public class RegisterInventoryInboundService implements RegisterInventoryInbound
         this.authorizeWarehouseOperationService = authorizeWarehouseOperationService;
     }
 
-    @Override
-    public InventoryItem execute(User actor, Command command) {
+    public InventoryItem execute(User actor, Product product, Warehouse warehouse, int quantity) {
+        String productId = product.getIdentifier();
+        String warehouseId = warehouse.getIdentifier();
         InventoryItem item = inventoryRepositoryPort
-                .findByProductIdAndWarehouseId(command.productId(), command.warehouseId())
-                .orElseGet(() -> newInventoryItem(command));
+                .findByProductIdAndWarehouseId(productId, warehouseId)
+                .orElseGet(() -> newInventoryItem(productId, warehouseId));
         authorizeWarehouseOperationService.execute(actor, item.getWarehouse());
         if (!item.getWarehouse().isActive()) {
             throw new BusinessRuleViolationException(
-                    "Warehouse " + command.warehouseId() + " is inactive and cannot receive stock");
+                    "Warehouse " + warehouseId + " is inactive and cannot receive stock");
         }
-        item.receive(command.quantity());
+        item.receive(quantity);
         InventoryItem saved = inventoryRepositoryPort.save(item);
         inventoryMovementRepositoryPort.save(
-                InventoryMovement.of(item, InventoryMovementType.INBOUND, command.quantity()));
+                InventoryMovement.of(item, InventoryMovementType.INBOUND, quantity));
         return saved;
     }
 
-    private InventoryItem newInventoryItem(Command command) {
-        Product product = productRepositoryPort.findById(command.productId())
-                .orElseThrow(() -> new EntityNotFoundException("No product found with id " + command.productId()));
+    private InventoryItem newInventoryItem(String productId, String warehouseId) {
+        Product product = productRepositoryPort.findById(productId)
+                .orElseThrow(() -> new EntityNotFoundException("No product found with id " + productId));
         // Checked only when the item is created: an existing item already passed this check.
         if (product.getProductType() != ProductType.PHYSICAL) {
             throw new BusinessRuleViolationException("DIGITAL products neither require nor allow inventory tracking.");
         }
-        Warehouse warehouse = warehouseRepositoryPort.findById(command.warehouseId())
-                .orElseThrow(() -> new EntityNotFoundException("No warehouse found with id " + command.warehouseId()));
+        Warehouse warehouse = warehouseRepositoryPort.findById(warehouseId)
+                .orElseThrow(() -> new EntityNotFoundException("No warehouse found with id " + warehouseId));
         return new InventoryItem(product, warehouse, 0, 0, 0);
     }
 }

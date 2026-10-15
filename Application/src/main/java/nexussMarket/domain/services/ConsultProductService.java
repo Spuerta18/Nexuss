@@ -1,9 +1,10 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.ports.in.ConsultProductUseCase;
 import nexussMarket.domain.ports.out.ProductRepositoryPort;
 import nexussMarket.domain.services.authorization.AuthorizeProductOwnershipService;
 import nexussMarket.domain.services.authorization.ValidateUserAuthorizationStatusService;
@@ -14,7 +15,8 @@ import nexussMarket.domain.valueobjects.ProductStatus;
  * product; any other status is only visible to an administrator or the
  * owning seller.
  */
-public class ConsultProductService implements ConsultProductUseCase {
+@Service
+public class ConsultProductService {
 
     private final ProductRepositoryPort productRepositoryPort;
     private final ValidateUserAuthorizationStatusService validateUserAuthorizationStatusService;
@@ -28,11 +30,11 @@ public class ConsultProductService implements ConsultProductUseCase {
         this.authorizeProductOwnershipService = authorizeProductOwnershipService;
     }
 
-    @Override
-    public Product execute(User actor, Query query) {
+    public Product execute(User actor, Product productReference) {
+        String productId = productReference.getIdentifier();
         validateUserAuthorizationStatusService.execute(actor);
-        Product product = productRepositoryPort.findById(query.productId())
-                .orElseThrow(() -> new EntityNotFoundException("No product found with id " + query.productId()));
+        Product product = productRepositoryPort.findById(productId)
+                .orElseThrow(() -> new EntityNotFoundException("No product found with id " + productId));
         if (product.getStatus() != ProductStatus.PUBLISHED) {
             // Suspended or discontinued products are out of the public catalog.
             authorizeProductOwnershipService.execute(actor, product);

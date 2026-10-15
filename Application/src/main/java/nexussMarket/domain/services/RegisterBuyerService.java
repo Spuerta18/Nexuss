@@ -1,14 +1,16 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.models.Buyer;
-import nexussMarket.domain.ports.in.RegisterBuyerUseCase;
 import nexussMarket.domain.ports.out.PasswordHasherPort;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
 import nexussMarket.domain.valueobjects.CustomerStatus;
 import nexussMarket.domain.valueobjects.UserStatus;
 
-public class RegisterBuyerService implements RegisterBuyerUseCase {
+@Service
+public class RegisterBuyerService {
 
     private final UserRepositoryPort userRepositoryPort;
     private final PasswordHasherPort passwordHasherPort;
@@ -18,18 +20,17 @@ public class RegisterBuyerService implements RegisterBuyerUseCase {
         this.passwordHasherPort = passwordHasherPort;
     }
 
-    @Override
-    public Buyer execute(Command command) {
-        if (userRepositoryPort.existsById(command.identifier())) {
-            throw new DuplicateResourceException("A user with identifier " + command.identifier() + " already exists");
+    public Buyer execute(Buyer buyer, String password) {
+        if (userRepositoryPort.existsById(buyer.getIdentifier())) {
+            throw new DuplicateResourceException("A user with identifier " + buyer.getIdentifier() + " already exists");
         }
-        if (userRepositoryPort.existsByEmail(command.email())) {
-            throw new DuplicateResourceException("A user with email " + command.email() + " already exists");
+        if (userRepositoryPort.existsByEmail(buyer.getEmail())) {
+            throw new DuplicateResourceException("A user with email " + buyer.getEmail() + " already exists");
         }
-        Buyer buyer = new Buyer(command.identifier(), command.fullName(), command.email(),
+        Buyer newBuyer = new Buyer(buyer.getIdentifier(), buyer.getFullName(), buyer.getEmail(),
                 UserStatus.ACTIVE, CustomerStatus.ENABLED);
-        buyer.setPrimaryAddress(command.primaryAddress());
-        buyer.setPasswordHash(passwordHasherPort.hash(command.password()));
-        return (Buyer) userRepositoryPort.save(buyer);
+        newBuyer.setPrimaryAddress(buyer.getPrimaryAddress());
+        newBuyer.setPasswordHash(passwordHasherPort.hash(password));
+        return (Buyer) userRepositoryPort.save(newBuyer);
     }
 }

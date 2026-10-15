@@ -1,0 +1,55 @@
+package nexussMarket.adapters.useCases;
+
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
+import lombok.RequiredArgsConstructor;
+
+import nexussMarket.domain.models.InventoryItem;
+import nexussMarket.domain.models.Order;
+import nexussMarket.domain.models.Product;
+import nexussMarket.domain.models.User;
+import nexussMarket.domain.ports.in.SupervisorPort;
+import nexussMarket.domain.services.ConsultInventoryService;
+import nexussMarket.domain.services.ConsultOrderService;
+import nexussMarket.domain.services.ConsultProductService;
+import nexussMarket.domain.services.ConsultUserService;
+import nexussMarket.domain.services.ListPublishedProductsService;
+
+/** Implements {@link SupervisorPort} by delegating each operation to its domain service. */
+@Service
+@RequiredArgsConstructor
+public class SupervisorUseCaseImpl implements SupervisorPort {
+
+    private final ConsultOrderService consultOrderService;
+    private final ConsultInventoryService consultInventoryService;
+    private final ConsultProductService consultProductService;
+    private final ConsultUserService consultUserService;
+    private final ListPublishedProductsService listPublishedProductsService;
+
+    @Override
+    public Order consultOrder(User user, Order order) {
+        return consultOrderService.execute(user, order);
+    }
+
+    @Override
+    public List<InventoryItem> consultInventory(User user, Product product) {
+        return consultInventoryService.execute(user, product);
+    }
+
+    @Override
+    public Product consultProduct(User user, Product product) {
+        return consultProductService.execute(user, product);
+    }
+
+    @Override
+    public User consultUser(User user, User target) {
+        return consultUserService.execute(user, target);
+    }
+
+    @Override
+    public List<Product> listPublishedProducts(User user) {
+        return listPublishedProductsService.execute(user);
+    }
+}

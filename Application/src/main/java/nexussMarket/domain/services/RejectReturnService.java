@@ -1,9 +1,10 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.ReturnRequest;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.ports.in.RejectReturnUseCase;
 import nexussMarket.domain.ports.out.ReturnRequestRepositoryPort;
 import nexussMarket.domain.services.authorization.ValidateRoleAuthorizationService;
 import nexussMarket.domain.valueobjects.SystemRole;
@@ -13,7 +14,8 @@ import nexussMarket.domain.valueobjects.SystemRole;
  * administrators may reject: an order can hold lines of several sellers, so no
  * single seller has authority over the whole return.
  */
-public class RejectReturnService implements RejectReturnUseCase {
+@Service
+public class RejectReturnService {
 
     private final ReturnRequestRepositoryPort returnRequestRepositoryPort;
     private final ValidateRoleAuthorizationService validateRoleAuthorizationService;
@@ -24,12 +26,12 @@ public class RejectReturnService implements RejectReturnUseCase {
         this.validateRoleAuthorizationService = validateRoleAuthorizationService;
     }
 
-    @Override
-    public ReturnRequest execute(User actor, Command command) {
+    public ReturnRequest execute(User actor, ReturnRequest returnRequestReference) {
+        String returnRequestId = returnRequestReference.getIdentifier();
         validateRoleAuthorizationService.execute(actor, SystemRole.ADMINISTRATOR);
-        ReturnRequest returnRequest = returnRequestRepositoryPort.findById(command.returnRequestId())
+        ReturnRequest returnRequest = returnRequestRepositoryPort.findById(returnRequestId)
                 .orElseThrow(() -> new EntityNotFoundException(
-                        "No return request found with id " + command.returnRequestId()));
+                        "No return request found with id " + returnRequestId));
         returnRequest.reject(actor);
         return returnRequestRepositoryPort.save(returnRequest);
     }

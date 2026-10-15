@@ -1,17 +1,19 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.exceptions.SellerNotAuthorizedException;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.ports.in.PublishProductUseCase;
 import nexussMarket.domain.ports.out.ProductRepositoryPort;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
 import nexussMarket.domain.valueobjects.ProductStatus;
 import nexussMarket.domain.valueobjects.SellerStatus;
 
-public class PublishProductService implements PublishProductUseCase {
+@Service
+public class PublishProductService {
 
     private final ProductRepositoryPort productRepositoryPort;
     private final UserRepositoryPort userRepositoryPort;
@@ -21,17 +23,17 @@ public class PublishProductService implements PublishProductUseCase {
         this.userRepositoryPort = userRepositoryPort;
     }
 
-    @Override
-    public Product execute(Command command) {
-        Seller seller = findSeller(command.sellerId());
+    public Product execute(User actor, Product product) {
+        Seller seller = findSeller(actor.getIdentifier());
         if (seller.getSellerStatus() != SellerStatus.ACTIVE) {
-            throw new SellerNotAuthorizedException("Seller " + command.sellerId() + " is not allowed to publish products");
+            throw new SellerNotAuthorizedException("Seller " + seller.getIdentifier() + " is not allowed to publish products");
         }
-        Product product = new Product(command.identifier(), command.name(), command.productType(), ProductStatus.PUBLISHED);
-        product.setSeller(seller);
-        product.setVariants(command.variants());
-        product.setPrice(command.price());
-        return productRepositoryPort.save(product);
+        Product newProduct = new Product(product.getIdentifier(), product.getName(), product.getProductType(),
+                ProductStatus.PUBLISHED);
+        newProduct.setSeller(seller);
+        newProduct.setVariants(product.getVariants());
+        newProduct.setPrice(product.getPrice());
+        return productRepositoryPort.save(newProduct);
     }
 
     private Seller findSeller(String sellerId) {

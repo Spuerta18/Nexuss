@@ -1,14 +1,18 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.InventoryItem;
 import nexussMarket.domain.models.InventoryMovement;
-import nexussMarket.domain.ports.in.ReleaseInventoryReservationUseCase;
+import nexussMarket.domain.models.Product;
+import nexussMarket.domain.models.Warehouse;
 import nexussMarket.domain.ports.out.InventoryMovementRepositoryPort;
 import nexussMarket.domain.ports.out.InventoryRepositoryPort;
 import nexussMarket.domain.valueobjects.InventoryMovementType;
 
-public class ReleaseInventoryReservationService implements ReleaseInventoryReservationUseCase {
+@Service
+public class ReleaseInventoryReservationService {
 
     private final InventoryRepositoryPort inventoryRepositoryPort;
     private final InventoryMovementRepositoryPort inventoryMovementRepositoryPort;
@@ -19,17 +23,18 @@ public class ReleaseInventoryReservationService implements ReleaseInventoryReser
         this.inventoryMovementRepositoryPort = inventoryMovementRepositoryPort;
     }
 
-    @Override
-    public InventoryItem execute(Command command) {
+    public InventoryItem execute(Product product, Warehouse warehouse, int quantity) {
+        String productId = product.getIdentifier();
+        String warehouseId = warehouse.getIdentifier();
         InventoryItem item = inventoryRepositoryPort
-                .findByProductIdAndWarehouseId(command.productId(), command.warehouseId())
+                .findByProductIdAndWarehouseId(productId, warehouseId)
                 .orElseThrow(() -> new EntityNotFoundException(
-                        "No inventory item found for product " + command.productId() + " in warehouse " + command.warehouseId()));
-        item.releaseReservation(command.quantity());
+                        "No inventory item found for product " + productId + " in warehouse " + warehouseId));
+        item.releaseReservation(quantity);
         InventoryItem saved = inventoryRepositoryPort.save(item);
         // A released reservation is recorded as a negative RESERVATION movement.
         inventoryMovementRepositoryPort.save(
-                InventoryMovement.of(item, InventoryMovementType.RESERVATION, -command.quantity()));
+                InventoryMovement.of(item, InventoryMovementType.RESERVATION, -quantity));
         return saved;
     }
 }

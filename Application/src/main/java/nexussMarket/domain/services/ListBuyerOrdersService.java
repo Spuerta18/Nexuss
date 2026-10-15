@@ -2,13 +2,14 @@ package nexussMarket.domain.services;
 
 import java.util.List;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.OperationNotAllowedException;
 import nexussMarket.domain.models.Administrator;
 import nexussMarket.domain.models.Buyer;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Supervisor;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.ports.in.ListBuyerOrdersUseCase;
 import nexussMarket.domain.ports.out.OrderRepositoryPort;
 import nexussMarket.domain.services.authorization.ValidateUserAuthorizationStatusService;
 
@@ -16,7 +17,8 @@ import nexussMarket.domain.services.authorization.ValidateUserAuthorizationStatu
  * Lists the orders placed by a buyer, most recent first. Administrators and
  * supervisors may list any buyer's orders; a buyer only its own.
  */
-public class ListBuyerOrdersService implements ListBuyerOrdersUseCase {
+@Service
+public class ListBuyerOrdersService {
 
     private final OrderRepositoryPort orderRepositoryPort;
     private final ValidateUserAuthorizationStatusService validateUserAuthorizationStatusService;
@@ -27,10 +29,9 @@ public class ListBuyerOrdersService implements ListBuyerOrdersUseCase {
         this.validateUserAuthorizationStatusService = validateUserAuthorizationStatusService;
     }
 
-    @Override
-    public List<Order> execute(User actor, Query query) {
-        authorize(actor, query.buyerId());
-        return orderRepositoryPort.findAllByBuyerId(query.buyerId());
+    public List<Order> execute(User actor, Buyer buyer) {
+        authorize(actor, buyer.getIdentifier());
+        return orderRepositoryPort.findAllByBuyerId(buyer.getIdentifier());
     }
 
     private void authorize(User actor, String buyerId) {

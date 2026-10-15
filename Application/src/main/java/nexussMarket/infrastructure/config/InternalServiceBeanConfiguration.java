@@ -12,7 +12,7 @@ import nexussMarket.domain.services.NotifyUserService;
 import nexussMarket.domain.services.ReserveInventoryService;
 
 /**
- * Internal domain services: they have no input port and are injected into
+ * Internal domain services: no role input port exposes them, and they are injected into
  * other services ({@link ReserveInventoryService}, {@link NotifyUserService})
  * or into the security layer ({@link AuditOperationService}). See
  * {@link AuthorizationBeanConfiguration} for how the domain wiring is split.

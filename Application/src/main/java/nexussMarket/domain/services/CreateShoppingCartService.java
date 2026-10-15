@@ -1,14 +1,16 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.Buyer;
 import nexussMarket.domain.models.ShoppingCart;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.ports.in.CreateShoppingCartUseCase;
 import nexussMarket.domain.ports.out.CartRepositoryPort;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
 
-public class CreateShoppingCartService implements CreateShoppingCartUseCase {
+@Service
+public class CreateShoppingCartService {
 
     private final CartRepositoryPort cartRepositoryPort;
     private final UserRepositoryPort userRepositoryPort;
@@ -18,13 +20,12 @@ public class CreateShoppingCartService implements CreateShoppingCartUseCase {
         this.userRepositoryPort = userRepositoryPort;
     }
 
-    @Override
-    public ShoppingCart execute(Command command) {
-        User user = userRepositoryPort.findById(command.buyerId())
-                .orElseThrow(() -> new EntityNotFoundException("No buyer found with id " + command.buyerId()));
+    public ShoppingCart execute(User actor, ShoppingCart cart) {
+        User user = userRepositoryPort.findById(actor.getIdentifier())
+                .orElseThrow(() -> new EntityNotFoundException("No buyer found with id " + actor.getIdentifier()));
         if (!(user instanceof Buyer buyer)) {
-            throw new EntityNotFoundException("No buyer found with id " + command.buyerId());
+            throw new EntityNotFoundException("No buyer found with id " + actor.getIdentifier());
         }
-        return cartRepositoryPort.save(new ShoppingCart(command.cartId(), buyer));
+        return cartRepositoryPort.save(new ShoppingCart(cart.getIdentifier(), buyer));
     }
 }

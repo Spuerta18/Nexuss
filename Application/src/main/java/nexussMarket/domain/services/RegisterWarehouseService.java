@@ -1,49 +1,58 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.exceptions.OperationNotAllowedException;
 import nexussMarket.domain.models.Administrator;
 import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
-import nexussMarket.domain.ports.in.RegisterWarehouseUseCase;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
 import nexussMarket.domain.ports.out.WarehouseRepositoryPort;
+import nexussMarket.domain.services.authorization.ValidateRoleAuthorizationService;
+import nexussMarket.domain.valueobjects.SystemRole;
 import nexussMarket.domain.valueobjects.WarehouseOwnerType;
 
 /**
- * Registers a warehouse. Marketplace-owned warehouses can only be registered
- * by an {@link Administrator}; Seller-owned warehouses must reference their
- * owning {@link Seller}.
+ * Registers a warehouse, according to the actor's role: an {@link Administrator}
+ * registers Marketplace-owned warehouses, and a {@link Seller} registers
+ * Seller-owned warehouses with themselves as owner. Any other combination is
+ * rejected.
  */
-public class RegisterWarehouseService implements RegisterWarehouseUseCase {
+@Service
+public class RegisterWarehouseService {
 
     private final WarehouseRepositoryPort warehouseRepositoryPort;
     private final UserRepositoryPort userRepositoryPort;
+    private final ValidateRoleAuthorizationService validateRoleAuthorizationService;
 
-    public RegisterWarehouseService(WarehouseRepositoryPort warehouseRepositoryPort, UserRepositoryPort userRepositoryPort) {
+    public RegisterWarehouseService(WarehouseRepositoryPort warehouseRepositoryPort, UserRepositoryPort userRepositoryPort,
+                                    ValidateRoleAuthorizationService validateRoleAuthorizationService) {
         this.warehouseRepositoryPort = warehouseRepositoryPort;
         this.userRepositoryPort = userRepositoryPort;
+        this.validateRoleAuthorizationService = validateRoleAuthorizationService;
     }
 
-    @Override
-    public Warehouse execute(Command command) {
-        Warehouse warehouse = new Warehouse(command.identifier(), command.name(), command.address(), command.ownerType());
-        if (command.ownerType() == WarehouseOwnerType.MARKETPLACE) {
-            requireAdministrator(command.administratorId());
-        } else {
-            warehouse.setOwner(findSeller(command.sellerId()));
+    public Warehouse execute(User actor, Warehouse warehouse) {
+        validateRoleAuthorizationService.execute(actor, SystemRole.SELLER, SystemRole.ADMINISTRATOR);
+        Warehouse newWarehouse = new Warehouse(warehouse.getIdentifier(), warehouse.getName(), warehouse.getAddress(),
+                warehouse.getOwnerType());
+        if (actor.getRole() == SystemRole.ADMINISTRATOR && warehouse.getOwnerType() == WarehouseOwnerType.MARKETPLACE) {
+            return warehouseRepositoryPort.save(newWarehouse);
         }
-        return warehouseRepositoryPort.save(warehouse);
+        if (actor.getRole() == SystemRole.SELLER && warehouse.getOwnerType() == WarehouseOwnerType.SELLER
+                && isOwnedByActor(warehouse, actor)) {
+            newWarehouse.setOwner(findSeller(actor.getIdentifier()));
+            return warehouseRepositoryPort.save(newWarehouse);
+        }
+        throw new OperationNotAllowedException(
+                "User " + actor.getIdentifier() + " is not allowed to register warehouse " + warehouse.getIdentifier());
     }
 
-    private void requireAdministrator(String administratorId) {
-        boolean isAdministrator = administratorId != null && userRepositoryPort.findById(administratorId)
-                .filter(Administrator.class::isInstance)
-                .isPresent();
-        if (!isAdministrator) {
-            throw new OperationNotAllowedException("A Marketplace-owned warehouse must be registered by an administrator");
-        }
+    /** A seller registers warehouses for themselves only: no owner, or themselves as owner. */
+    private static boolean isOwnedByActor(Warehouse warehouse, User actor) {
+        return warehouse.getOwner() == null || warehouse.getOwner().getIdentifier().equals(actor.getIdentifier());
     }
 
     private Seller findSeller(String sellerId) {

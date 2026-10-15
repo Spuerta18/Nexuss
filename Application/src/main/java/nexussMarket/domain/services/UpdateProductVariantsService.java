@@ -1,13 +1,18 @@
 package nexussMarket.domain.services;
 
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.ports.in.UpdateProductVariantsUseCase;
 import nexussMarket.domain.ports.out.ProductRepositoryPort;
 import nexussMarket.domain.services.authorization.AuthorizeProductOwnershipService;
+import nexussMarket.domain.valueobjects.ProductVariant;
 
-public class UpdateProductVariantsService implements UpdateProductVariantsUseCase {
+@Service
+public class UpdateProductVariantsService {
 
     private final ProductRepositoryPort productRepositoryPort;
     private final AuthorizeProductOwnershipService authorizeProductOwnershipService;
@@ -18,12 +23,12 @@ public class UpdateProductVariantsService implements UpdateProductVariantsUseCas
         this.authorizeProductOwnershipService = authorizeProductOwnershipService;
     }
 
-    @Override
-    public Product execute(User actor, Command command) {
-        Product product = productRepositoryPort.findById(command.productId())
-                .orElseThrow(() -> new EntityNotFoundException("No product found with id " + command.productId()));
+    public Product execute(User actor, Product productReference, List<ProductVariant> variants) {
+        String productId = productReference.getIdentifier();
+        Product product = productRepositoryPort.findById(productId)
+                .orElseThrow(() -> new EntityNotFoundException("No product found with id " + productId));
         authorizeProductOwnershipService.execute(actor, product);
-        product.setVariants(command.variants());
+        product.setVariants(variants);
         return productRepositoryPort.save(product);
     }
 }

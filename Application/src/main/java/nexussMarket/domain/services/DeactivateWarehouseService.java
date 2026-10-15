@@ -1,13 +1,15 @@
 package nexussMarket.domain.services;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
-import nexussMarket.domain.ports.in.DeactivateWarehouseUseCase;
 import nexussMarket.domain.ports.out.WarehouseRepositoryPort;
 import nexussMarket.domain.services.authorization.AuthorizeWarehouseOperationService;
 
-public class DeactivateWarehouseService implements DeactivateWarehouseUseCase {
+@Service
+public class DeactivateWarehouseService {
 
     private final WarehouseRepositoryPort warehouseRepositoryPort;
     private final AuthorizeWarehouseOperationService authorizeWarehouseOperationService;
@@ -18,10 +20,10 @@ public class DeactivateWarehouseService implements DeactivateWarehouseUseCase {
         this.authorizeWarehouseOperationService = authorizeWarehouseOperationService;
     }
 
-    @Override
-    public Warehouse execute(User actor, Command command) {
-        Warehouse warehouse = warehouseRepositoryPort.findById(command.warehouseId())
-                .orElseThrow(() -> new EntityNotFoundException("No warehouse found with id " + command.warehouseId()));
+    public Warehouse execute(User actor, Warehouse warehouseReference) {
+        String warehouseId = warehouseReference.getIdentifier();
+        Warehouse warehouse = warehouseRepositoryPort.findById(warehouseId)
+                .orElseThrow(() -> new EntityNotFoundException("No warehouse found with id " + warehouseId));
         authorizeWarehouseOperationService.execute(actor, warehouse);
         warehouse.setActive(false);
         return warehouseRepositoryPort.save(warehouse);

@@ -3,6 +3,8 @@ package nexussMarket.domain.services;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.stereotype.Service;
+
 import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.Buyer;
@@ -13,8 +15,6 @@ import nexussMarket.domain.models.OrderLine;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.ShoppingCart;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.ports.in.ConfirmOrderUseCase;
-import nexussMarket.domain.ports.in.ReleaseInventoryReservationUseCase;
 import nexussMarket.domain.ports.out.CartRepositoryPort;
 import nexussMarket.domain.ports.out.OrderRepositoryPort;
 import nexussMarket.domain.services.authorization.AuthorizeCartAccessService;
@@ -32,44 +32,45 @@ import nexussMarket.domain.valueobjects.UserStatus;
  * deleted once the order is saved. Only the buyer who owns the cart, or an
  * administrator, may confirm it.
  */
-public class ConfirmOrderService implements ConfirmOrderUseCase {
+@Service
+public class ConfirmOrderService {
 
     private final CartRepositoryPort cartRepositoryPort;
     private final OrderRepositoryPort orderRepositoryPort;
     private final ReserveInventoryService reserveInventoryService;
-    private final ReleaseInventoryReservationUseCase releaseInventoryReservationUseCase;
+    private final ReleaseInventoryReservationService releaseInventoryReservationService;
     private final ValidateRoleAuthorizationService validateRoleAuthorizationService;
     private final AuthorizeCartAccessService authorizeCartAccessService;
 
     public ConfirmOrderService(CartRepositoryPort cartRepositoryPort, OrderRepositoryPort orderRepositoryPort,
                                 ReserveInventoryService reserveInventoryService,
-                                ReleaseInventoryReservationUseCase releaseInventoryReservationUseCase,
+                                ReleaseInventoryReservationService releaseInventoryReservationService,
                                 ValidateRoleAuthorizationService validateRoleAuthorizationService,
                                 AuthorizeCartAccessService authorizeCartAccessService) {
         this.cartRepositoryPort = cartRepositoryPort;
         this.orderRepositoryPort = orderRepositoryPort;
         this.reserveInventoryService = reserveInventoryService;
-        this.releaseInventoryReservationUseCase = releaseInventoryReservationUseCase;
+        this.releaseInventoryReservationService = releaseInventoryReservationService;
         this.validateRoleAuthorizationService = validateRoleAuthorizationService;
         this.authorizeCartAccessService = authorizeCartAccessService;
     }
 
-    @Override
-    public Order execute(User actor, Command command) {
+    public Order execute(User actor, ShoppingCart cartReference, Order newOrder) {
+        String cartId = cartReference.getIdentifier();
         // Supervisors may consult carts but never turn them into orders.
         validateRoleAuthorizationService.execute(actor, SystemRole.BUYER, SystemRole.ADMINISTRATOR);
-        ShoppingCart cart = cartRepositoryPort.findById(command.cartId())
-                .orElseThrow(() -> new EntityNotFoundException("No shopping cart found with id " + command.cartId()));
+        ShoppingCart cart = cartRepositoryPort.findById(cartId)
+                .orElseThrow(() -> new EntityNotFoundException("No shopping cart found with id " + cartId));
         authorizeCartAccessService.execute(actor, cart);
         requireBuyerCanPurchase(cart.getBuyer());
         if (cart.getLines().isEmpty()) {
-            throw new BusinessRuleViolationException("Shopping cart " + command.cartId() + " is empty");
+            throw new BusinessRuleViolationException("Shopping cart " + cartId + " is empty");
         }
         for (CartLine cartLine : cart.getLines()) {
             requirePublished(cartLine.getProduct());
         }
 
-        Order order = new Order(command.orderId(), cart.getBuyer(), OrderStatus.PENDING_PAYMENT);
+        Order order = new Order(newOrder.getIdentifier(), cart.getBuyer(), OrderStatus.PENDING_PAYMENT);
         order.setLines(reserveLines(cart));
         Order saved = orderRepositoryPort.save(order);
         cartRepositoryPort.deleteById(cart.getIdentifier());
@@ -93,8 +94,7 @@ public class ConfirmOrderService implements ConfirmOrderUseCase {
     }
 
     private void release(OrderLine line) {
-        releaseInventoryReservationUseCase.execute(new ReleaseInventoryReservationUseCase.Command(
-                line.getProduct().getIdentifier(), line.getWarehouse().getIdentifier(), line.getQuantity()));
+        releaseInventoryReservationService.execute(line.getProduct(), line.getWarehouse(), line.getQuantity());
     }
 
     private static void requireBuyerCanPurchase(Buyer buyer) {
