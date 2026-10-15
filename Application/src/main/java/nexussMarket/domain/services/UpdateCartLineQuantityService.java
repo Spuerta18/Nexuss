@@ -3,7 +3,6 @@ package nexussMarket.domain.services;
 import org.springframework.stereotype.Service;
 
 import nexussMarket.domain.exceptions.EntityNotFoundException;
-import nexussMarket.domain.models.CartLine;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.ShoppingCart;
 import nexussMarket.domain.models.User;
@@ -30,24 +29,10 @@ public class UpdateCartLineQuantityService {
     public ShoppingCart execute(User actor, ShoppingCart cartReference, Product productReference, int quantity) {
         String cartId = cartReference.getIdentifier();
         validateRoleAuthorizationService.execute(actor, SystemRole.BUYER);
-        String productId = productReference.getIdentifier();
         ShoppingCart cart = cartRepositoryPort.findById(cartId)
                 .orElseThrow(() -> new EntityNotFoundException("No shopping cart found with id " + cartId));
         authorizeCartAccessService.execute(actor, cart);
-
-        CartLine line = cart.getLines().stream()
-                .filter(l -> l.getProduct().getIdentifier().equals(productId))
-                .findFirst()
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "No cart line found for product " + productId + " in cart " + cartId));
-
-        try {
-            line.setQuantity(quantity);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid quantity for product " + productId
-                    + " in cart " + cartId + ": " + e.getMessage(), e);
-        }
-
+        cart.updateLineQuantity(productReference, quantity);
         return cartRepositoryPort.save(cart);
     }
 }

@@ -6,21 +6,32 @@ import nexussMarket.domain.valueobjects.WarehouseOwnerType;
  * A physical location where product inventory is managed. Classified by
  * ownership: Marketplace-owned or Seller-owned. A Seller-owned warehouse
  * references exactly one {@link Seller} as its owner.
+ *
+ * <p>A warehouse starts active and only changes through {@link #deactivate()}.</p>
  */
 public class Warehouse {
 
-    private String identifier;
-    private String name;
-    private String address;
-    private WarehouseOwnerType ownerType;
-    private Seller owner;
-    private boolean active = true;
+    private final String identifier;
+    private final String name;
+    private final String address;
+    private final WarehouseOwnerType ownerType;
+    private final Seller owner;
+    private boolean active;
 
+    /** A reference or a new, active warehouse without owner. */
     public Warehouse(String identifier, String name, String address, WarehouseOwnerType ownerType) {
+        this(identifier, name, address, ownerType, null, true);
+    }
+
+    /** A complete warehouse, e.g. one being registered or loaded from persistence. */
+    public Warehouse(String identifier, String name, String address, WarehouseOwnerType ownerType, Seller owner,
+                     boolean active) {
         this.identifier = identifier;
         this.name = name;
         this.address = address;
         this.ownerType = ownerType;
+        this.owner = owner;
+        this.active = active;
     }
 
     /** Unique identifier of the warehouse. */
@@ -28,17 +39,9 @@ public class Warehouse {
         return identifier;
     }
 
-    public void setIdentifier(String identifier) {
-        this.identifier = identifier;
-    }
-
     /** Descriptive name of the warehouse. */
     public String getName() {
         return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
     }
 
     /** Physical location of the warehouse. */
@@ -46,17 +49,9 @@ public class Warehouse {
         return address;
     }
 
-    public void setAddress(String address) {
-        this.address = address;
-    }
-
     /** Classification of ownership (Marketplace or Seller). */
     public WarehouseOwnerType getOwnerType() {
         return ownerType;
-    }
-
-    public void setOwnerType(WarehouseOwnerType ownerType) {
-        this.ownerType = ownerType;
     }
 
     /** Owning seller, present only when the owner type is {@code SELLER}. */
@@ -64,16 +59,17 @@ public class Warehouse {
         return owner;
     }
 
-    public void setOwner(Seller owner) {
-        this.owner = owner;
-    }
-
     /** Whether the warehouse is currently operational. */
     public boolean isActive() {
         return active;
     }
 
-    public void setActive(boolean active) {
-        this.active = active;
+    /**
+     * Takes the warehouse out of operation: it can no longer receive inbound
+     * stock and is skipped when reserving stock. Deactivating an inactive
+     * warehouse has no effect.
+     */
+    public void deactivate() {
+        active = false;
     }
 }

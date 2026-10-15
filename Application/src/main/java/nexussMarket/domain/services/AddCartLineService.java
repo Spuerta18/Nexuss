@@ -1,12 +1,8 @@
 package nexussMarket.domain.services;
 
-import java.util.Optional;
-
 import org.springframework.stereotype.Service;
 
-import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
-import nexussMarket.domain.models.CartLine;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.ShoppingCart;
 import nexussMarket.domain.models.User;
@@ -14,9 +10,13 @@ import nexussMarket.domain.ports.out.CartRepositoryPort;
 import nexussMarket.domain.ports.out.ProductRepositoryPort;
 import nexussMarket.domain.services.authorization.AuthorizeCartAccessService;
 import nexussMarket.domain.services.authorization.ValidateRoleAuthorizationService;
-import nexussMarket.domain.valueobjects.ProductStatus;
 import nexussMarket.domain.valueobjects.SystemRole;
 
+/**
+ * Adds a product to a buyer's cart. The cart rules (published products only,
+ * one line per product, a single currency) are enforced by
+ * {@link ShoppingCart#addLine}.
+ */
 @Service
 public class AddCartLineService {
 
@@ -43,38 +43,7 @@ public class AddCartLineService {
         authorizeCartAccessService.execute(actor, cart);
         Product product = productRepositoryPort.findById(productId)
                 .orElseThrow(() -> new EntityNotFoundException("No product found with id " + productId));
-        if (product.getStatus() != ProductStatus.PUBLISHED) {
-            throw new BusinessRuleViolationException("Product " + productId + " is not available for purchase");
-        }
-
-        Optional<CartLine> existingLine = cart.getLines().stream()
-                .filter(line -> line.getProduct().getIdentifier().equals(productId))
-                .findFirst();
-
-        if (existingLine.isPresent()) {
-            mergeQuantity(existingLine.get(), cartId, productId, quantity);
-        } else {
-            cart.getLines().add(newCartLine(product, cartId, quantity));
-        }
-
+        cart.addLine(product, quantity);
         return cartRepositoryPort.save(cart);
-    }
-
-    private void mergeQuantity(CartLine line, String cartId, String productId, int quantity) {
-        try {
-            line.setQuantity(line.getQuantity() + quantity);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid quantity for product " + productId
-                    + " in cart " + cartId + ": " + e.getMessage(), e);
-        }
-    }
-
-    private CartLine newCartLine(Product product, String cartId, int quantity) {
-        try {
-            return new CartLine(product, quantity);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid quantity for product " + product.getIdentifier()
-                    + " in cart " + cartId + ": " + e.getMessage(), e);
-        }
     }
 }

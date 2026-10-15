@@ -27,10 +27,8 @@ public final class WarehouseMapper {
 
     /** {@code owner} is the seller referenced by {@code ownerId}, or {@code null} for Marketplace warehouses. */
     public static Warehouse toDomain(WarehouseDocument document, Seller owner) {
-        Warehouse warehouse = new Warehouse(document.getId(), document.getName(), document.getAddress(),
-                CatalogCodes.resolve(WarehouseOwnerType::fromCode, document.getOwnerType(), "WarehouseOwnerType"));
-        warehouse.setOwner(owner);
-        warehouse.setActive(document.isActive());
-        return warehouse;
+        return new Warehouse(document.getId(), document.getName(), document.getAddress(),
+                CatalogCodes.resolve(WarehouseOwnerType::fromCode, document.getOwnerType(), "WarehouseOwnerType"),
+                owner, document.isActive());
     }
 }

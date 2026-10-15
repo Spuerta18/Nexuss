@@ -2,6 +2,7 @@ package nexussMarket.domain.services;
 
 import org.springframework.stereotype.Service;
 
+import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.exceptions.SellerNotAuthorizedException;
 import nexussMarket.domain.models.Product;
@@ -28,11 +29,12 @@ public class PublishProductService {
         if (seller.getSellerStatus() != SellerStatus.ACTIVE) {
             throw new SellerNotAuthorizedException("Seller " + seller.getIdentifier() + " is not allowed to publish products");
         }
+        if (product.getPrice() == null || !product.getPrice().isPositive()) {
+            throw new BusinessRuleViolationException(
+                    "Product " + product.getIdentifier() + " must have a price greater than zero");
+        }
         Product newProduct = new Product(product.getIdentifier(), product.getName(), product.getProductType(),
-                ProductStatus.PUBLISHED);
-        newProduct.setSeller(seller);
-        newProduct.setVariants(product.getVariants());
-        newProduct.setPrice(product.getPrice());
+                ProductStatus.PUBLISHED, seller, product.getPrice(), product.getVariants());
         return productRepositoryPort.save(newProduct);
     }
 

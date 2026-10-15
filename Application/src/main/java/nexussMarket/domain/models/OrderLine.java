@@ -5,15 +5,15 @@ import nexussMarket.domain.valueobjects.Money;
 /**
  * A single confirmed product line within an order, fixing the product name,
  * quantity and unit price at the time of purchase. Quantity must be greater
- * than zero.
+ * than zero. Immutable once created.
  */
 public class OrderLine {
 
-    private Product product;
-    private String productName;
-    private Integer quantity;
-    private Money unitPrice;
-    private Warehouse warehouse;
+    private final Product product;
+    private final String productName;
+    private final Integer quantity;
+    private final Money unitPrice;
+    private final Warehouse warehouse;
 
     public OrderLine(Product product, String productName, int quantity, Money unitPrice, Warehouse warehouse) {
         this.product = product;
@@ -35,17 +35,9 @@ public class OrderLine {
         return product;
     }
 
-    public void setProduct(Product product) {
-        this.product = product;
-    }
-
     /** Product name at the time the order was confirmed. */
     public String getProductName() {
         return productName;
-    }
-
-    public void setProductName(String productName) {
-        this.productName = productName;
     }
 
     /** Quantity purchased. Must be greater than zero. */
@@ -53,25 +45,13 @@ public class OrderLine {
         return quantity;
     }
 
-    public void setQuantity(Integer quantity) {
-        this.quantity = requirePositive(quantity);
-    }
-
     /** Price per unit at the time the order was confirmed. */
     public Money getUnitPrice() {
         return unitPrice;
     }
 
-    public void setUnitPrice(Money unitPrice) {
-        this.unitPrice = unitPrice;
-    }
-
     /** Warehouse the stock for this line was reserved from. */
     public Warehouse getWarehouse() {
         return warehouse;
-    }
-
-    public void setWarehouse(Warehouse warehouse) {
-        this.warehouse = warehouse;
     }
 }

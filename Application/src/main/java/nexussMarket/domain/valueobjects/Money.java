@@ -1,18 +1,18 @@
 package nexussMarket.domain.valueobjects;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 import nexussMarket.domain.exceptions.DomainException;
 
 /**
  * An amount of money in a given {@link Currency}. Immutable and compared by
- * value; the amount is never negative.
+ * value; the amount is never negative. Equality ignores the scale of the
+ * amount, so {@code 10.0} and {@code 10.00} are the same money.
  */
 @Getter
-@EqualsAndHashCode
 public final class Money {
 
     private final BigDecimal amount;
@@ -66,6 +66,22 @@ public final class Money {
         if (!currency.equals(other.currency)) {
             throw new DomainException("Cannot combine " + currency.getCode() + " with " + other.currency.getCode());
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof Money other)) {
+            return false;
+        }
+        return amount.compareTo(other.amount) == 0 && currency.equals(other.currency);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(amount.stripTrailingZeros(), currency);
     }
 
     @Override

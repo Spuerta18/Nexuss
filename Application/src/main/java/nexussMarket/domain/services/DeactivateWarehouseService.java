@@ -25,7 +25,7 @@ public class DeactivateWarehouseService {
         Warehouse warehouse = warehouseRepositoryPort.findById(warehouseId)
                 .orElseThrow(() -> new EntityNotFoundException("No warehouse found with id " + warehouseId));
         authorizeWarehouseOperationService.execute(actor, warehouse);
-        warehouse.setActive(false);
+        warehouse.deactivate();
         return warehouseRepositoryPort.save(warehouse);
     }
 }

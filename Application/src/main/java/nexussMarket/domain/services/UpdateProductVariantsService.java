@@ -28,7 +28,7 @@ public class UpdateProductVariantsService {
         Product product = productRepositoryPort.findById(productId)
                 .orElseThrow(() -> new EntityNotFoundException("No product found with id " + productId));
         authorizeProductOwnershipService.execute(actor, product);
-        product.setVariants(variants);
+        product.replaceVariants(variants);
         return productRepositoryPort.save(product);
     }
 }

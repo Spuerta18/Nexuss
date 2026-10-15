@@ -26,7 +26,7 @@ public class UpdateProductStatusService {
         Product product = productRepositoryPort.findById(productId)
                 .orElseThrow(() -> new EntityNotFoundException("No product found with id " + productId));
         authorizeProductOwnershipService.execute(actor, product);
-        product.setStatus(status);
+        product.changeStatus(status);
         return productRepositoryPort.save(product);
     }
 }

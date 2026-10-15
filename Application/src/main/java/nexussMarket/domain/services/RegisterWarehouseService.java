@@ -36,18 +36,21 @@ public class RegisterWarehouseService {
 
     public Warehouse execute(User actor, Warehouse warehouse) {
         validateRoleAuthorizationService.execute(actor, SystemRole.SELLER, SystemRole.ADMINISTRATOR);
-        Warehouse newWarehouse = new Warehouse(warehouse.getIdentifier(), warehouse.getName(), warehouse.getAddress(),
-                warehouse.getOwnerType());
         if (actor.getRole() == SystemRole.ADMINISTRATOR && warehouse.getOwnerType() == WarehouseOwnerType.MARKETPLACE) {
-            return warehouseRepositoryPort.save(newWarehouse);
+            return warehouseRepositoryPort.save(newWarehouse(warehouse, null));
         }
         if (actor.getRole() == SystemRole.SELLER && warehouse.getOwnerType() == WarehouseOwnerType.SELLER
                 && isOwnedByActor(warehouse, actor)) {
-            newWarehouse.setOwner(findSeller(actor.getIdentifier()));
-            return warehouseRepositoryPort.save(newWarehouse);
+            return warehouseRepositoryPort.save(newWarehouse(warehouse, findSeller(actor.getIdentifier())));
         }
         throw new OperationNotAllowedException(
                 "User " + actor.getIdentifier() + " is not allowed to register warehouse " + warehouse.getIdentifier());
+    }
+
+    /** The warehouse to store: always active, with {@code owner} as its owner. */
+    private static Warehouse newWarehouse(Warehouse warehouse, Seller owner) {
+        return new Warehouse(warehouse.getIdentifier(), warehouse.getName(), warehouse.getAddress(),
+                warehouse.getOwnerType(), owner, true);
     }
 
     /** A seller registers warehouses for themselves only: no owner, or themselves as owner. */

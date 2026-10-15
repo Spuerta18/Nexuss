@@ -37,13 +37,10 @@ public final class ProductMapper {
 
     /** {@code seller} is the seller referenced by {@code sellerId}. */
     public static Product toDomain(ProductDocument document, Seller seller) {
-        Product product = new Product(document.getId(), document.getName(),
+        return new Product(document.getId(), document.getName(),
                 CatalogCodes.resolve(ProductType::fromCode, document.getProductType(), "ProductType"),
-                CatalogCodes.resolve(ProductStatus::fromCode, document.getStatus(), "ProductStatus"));
-        product.setSeller(seller);
-        product.setPrice(MoneyMapper.toDomain(document.getPrice()));
-        product.setVariants(toDomain(document.getVariants()));
-        return product;
+                CatalogCodes.resolve(ProductStatus::fromCode, document.getStatus(), "ProductStatus"),
+                seller, MoneyMapper.toDomain(document.getPrice()), toDomain(document.getVariants()));
     }
 
     private static ProductVariantDocument toDocument(ProductVariant variant) {

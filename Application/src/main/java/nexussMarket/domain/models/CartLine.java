@@ -2,11 +2,11 @@ package nexussMarket.domain.models;
 
 /**
  * A single product selection, with quantity, inside a shopping cart. Quantity
- * must be greater than zero.
+ * must be greater than zero. It only changes through its {@link ShoppingCart}.
  */
 public class CartLine {
 
-    private Product product;
+    private final Product product;
     private Integer quantity;
 
     public CartLine(Product product, int quantity) {
@@ -26,16 +26,13 @@ public class CartLine {
         return product;
     }
 
-    public void setProduct(Product product) {
-        this.product = product;
-    }
-
     /** Quantity selected. Must be greater than zero. */
     public Integer getQuantity() {
         return quantity;
     }
 
-    public void setQuantity(Integer quantity) {
+    /** Package-private: only {@link ShoppingCart} changes the quantity of its lines. */
+    void setQuantity(Integer quantity) {
         this.quantity = requirePositive(quantity);
     }
 }

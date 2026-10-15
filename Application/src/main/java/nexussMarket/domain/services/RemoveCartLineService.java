@@ -29,17 +29,10 @@ public class RemoveCartLineService {
     public ShoppingCart execute(User actor, ShoppingCart cartReference, Product productReference) {
         String cartId = cartReference.getIdentifier();
         validateRoleAuthorizationService.execute(actor, SystemRole.BUYER);
-        String productId = productReference.getIdentifier();
         ShoppingCart cart = cartRepositoryPort.findById(cartId)
                 .orElseThrow(() -> new EntityNotFoundException("No shopping cart found with id " + cartId));
         authorizeCartAccessService.execute(actor, cart);
-
-        boolean removed = cart.getLines().removeIf(line -> line.getProduct().getIdentifier().equals(productId));
-        if (!removed) {
-            throw new EntityNotFoundException(
-                    "No cart line found for product " + productId + " in cart " + cartId);
-        }
-
+        cart.removeLine(productReference);
         return cartRepositoryPort.save(cart);
     }
 }
