@@ -1,9 +1,7 @@
 package nexussMarket.adapters.out.persistence.mongodb.mappers;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.OrderDocument;
 import nexussMarket.adapters.out.persistence.mongodb.documents.OrderDocument.OrderLineDocument;
@@ -42,15 +40,14 @@ public final class OrderMapper {
      */
     public static Order toDomain(OrderDocument document, Buyer buyer, Map<String, Product> productsById,
                                  Map<String, Warehouse> warehousesById) {
-        Order order = new Order(document.getId(), buyer,
-                CatalogCodes.resolve(OrderStatus::fromCode, document.getStatus(), "OrderStatus"));
-        order.setCreatedAt(document.getCreatedAt());
-        order.setLines(document.getLines().stream()
+        List<OrderLine> lines = document.getLines().stream()
                 .map(line -> new OrderLine(productsById.get(line.getProductId()), line.getProductName(),
                         line.getQuantity(), MoneyMapper.toDomain(line.getUnitPrice()),
                         warehousesById.get(line.getWarehouseId())))
-                .collect(Collectors.toCollection(ArrayList::new)));
-        return order;
+                .toList();
+        return new Order(document.getId(), buyer,
+                CatalogCodes.resolve(OrderStatus::fromCode, document.getStatus(), "OrderStatus"),
+                lines, document.getCreatedAt());
     }
 
     /** Identifiers of every product referenced by the order lines. */

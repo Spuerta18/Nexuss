@@ -22,7 +22,7 @@ adapters/out/persistence/mongodb/
 * **The domain identifier is the document `_id`.** Every aggregate root receives its identifier from the domain model passed to the Domain Service (e.g. the `identifier` of the new `ShoppingCart`, `Order` or `User`), so documents never rely on MongoDB-generated IDs. The only exceptions are the append-only collections (`inventory_movements`, `audit_logs`), whose domain objects have no identifier; there `_id` is a MongoDB-generated `ObjectId`.
 * **References are stored as plain `String` IDs** named `<relation>Id` (`sellerId`, `buyerId`, `productId`, `warehouseId`, `ownerId`). DBRefs and `@DocumentReference` are not used: resolving references is the adapter's job, so it stays explicit and can be batched.
 * **Value Objects are stored as their `code`** and rebuilt with `fromCode(...)`, never with new instances, so the domain can compare them against its constants (`status == OrderStatus.PAID`). A stored code the catalog does not know is corrupt data and makes the mapper fail with `IllegalStateException` naming the code, instead of rebuilding the entity with a `null` value. Primitive enums (`VariantAttributeType`, `NotificationChannel`) are stored by `name()`.
-* **Money is stored as `Decimal128`** (`@Field(targetType = FieldType.DECIMAL128)`), never as `double` or as a string, so prices keep their exact scale and can be compared/aggregated in queries.
+* **Money is stored as an embedded `{ amount, currency }` subdocument** (`MoneyDocument`): the amount as `Decimal128` (`@Field(targetType = FieldType.DECIMAL128)`), never as `double` or as a string, so it keeps its exact scale and can be compared/aggregated in queries; the currency as its `Currency` code. `MoneyMapper` converts it to and from the `Money` value object.
 * **Dates** (`LocalDateTime`) are stored as BSON dates by Spring Data's default conversion.
 * **Inverse lists are not stored.** `Buyer.carts` / `orders` and `Seller.warehouses` / `products` are the inverse side of `ShoppingCart.buyerId`, `Order.buyerId`, `Warehouse.ownerId` and `Product.sellerId`. They are rebuilt empty; loading them is a query on the other collection.
 * **Documents are persistence types only.** They are never returned by an adapter nor exposed through the API (architectural constraints 4 and 5).
@@ -84,8 +84,8 @@ Indexes: unique on `email`. See [User Hierarchy](#user-hierarchy).
 
 ```json
 {
-  "_id": "P-001", "name": "Camiseta", "productType": "PHYSICAL", "status": "PUBLISHED",
-  "sellerId": "900123456", "price": NumberDecimal("49900.00"),
+  "_id": "P-001", "name": "T-shirt", "productType": "PHYSICAL", "status": "PUBLISHED",
+  "sellerId": "900123456", "price": { "amount": NumberDecimal("49900.00"), "currency": "COP" },
   "variants": [ { "attribute": "COLOR", "value": "red" }, { "attribute": "SIZE", "value": "M" } ]
 }
 ```
@@ -126,8 +126,8 @@ Indexes: `buyerId` (backs `CartRepositoryPort.findByBuyerId`). The cart is delet
   "_id": "O-500", "buyerId": "1020304050", "status": "PENDING_PAYMENT",
   "createdAt": ISODate("2026-09-29T10:15:00Z"),
   "lines": [
-    { "productId": "P-001", "productName": "Camiseta", "quantity": 2,
-      "unitPrice": NumberDecimal("49900.00"), "warehouseId": "WH-01" }
+    { "productId": "P-001", "productName": "T-shirt", "quantity": 2,
+      "unitPrice": { "amount": NumberDecimal("49900.00"), "currency": "COP" }, "warehouseId": "WH-01" }
   ]
 }
 ```
@@ -148,7 +148,7 @@ Step timestamps (`packedAt`, `dispatchedAt`, `deliveredAt`) are absent until the
 
 ```json
 { "_id": "INV-O-500", "orderId": "O-500", "buyerId": "1020304050",
-  "totalAmount": NumberDecimal("99900.50"), "issuedAt": ISODate("2026-09-29T12:00:00Z") }
+  "totalAmount": { "amount": NumberDecimal("99900.50"), "currency": "COP" }, "issuedAt": ISODate("2026-09-29T12:00:00Z") }
 ```
 
 Written once, when the order becomes `PAID`, and never updated. Indexes: unique on `orderId` (backs `InvoiceRepositoryPort.findByOrderId`), and `buyerId`.
@@ -166,7 +166,7 @@ Written once, when the order becomes `PAID`, and never updated. Indexes: unique 
 ### `refunds`
 
 ```json
-{ "_id": "REF-RR-01", "returnRequestId": "RR-01", "amount": NumberDecimal("99900.50"),
+{ "_id": "REF-RR-01", "returnRequestId": "RR-01", "amount": { "amount": NumberDecimal("99900.50"), "currency": "COP" },
   "status": "PENDING", "createdAt": ISODate("2026-10-02T15:00:00Z") }
 ```
 

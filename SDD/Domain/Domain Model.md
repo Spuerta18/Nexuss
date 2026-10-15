@@ -52,9 +52,13 @@ Invoice
 
 ReturnRequest
 └── Refund
+
+AuthenticationResult (result of a login, not persisted)
 ```
 
 `CartLine` and `OrderLine` are child entities: they only exist inside their parent (`ShoppingCart` / `Order`) and have no independent lifecycle.
+
+Entities change state only through their behavior methods (listed under **Behavior** in each section). Fields that never change after creation have no setter, and collections are exposed read-only where a rule depends on them.
 
 ---
 
@@ -143,6 +147,7 @@ This class cannot be instantiated directly.
 * A user cannot manage information outside the scope of their role (RG-03).
 * `identifier` and `email` must be unique across the platform.
 * Only users whose `status` is `ACTIVE` can authenticate.
+* The `role` is fixed by the concrete subclass when the user is created (e.g. a `Buyer` is always `BUYER`) and can never be changed afterwards: `User` has no role setter.
 
 ---
 
@@ -291,6 +296,13 @@ Warehouses are classified by ownership: Marketplace-owned or Seller-owned.
 * A Marketplace-owned warehouse can only be registered by an `Administrator`.
 * A Seller-owned warehouse must reference an existing `Seller`.
 * An inactive warehouse cannot receive stock, and its stock cannot be reserved.
+* Identifier, name, address, owner type and owner are fixed when the warehouse is created.
+
+## Behavior
+
+| Method | Effect |
+| ------ | ------ |
+| `deactivate()` | Takes the warehouse out of operation (`active = false`). Deactivating an inactive warehouse has no effect. It is the only way `active` changes. |
 
 ---
 
@@ -312,7 +324,7 @@ Physical products require inventory tracking and shipping; digital products are 
 | variants       | List\<ProductVariant\> | Variations such as color "red" or size "M" (see `ProductVariant`). May be empty. |
 | status         | ProductStatus   | Published, Suspended, or Discontinued.                        |
 | seller         | Seller          | Seller who owns and publishes the product.                    |
-| price          | BigDecimal      | Current selling price per unit.                               |
+| price          | Money           | Current selling price per unit, with its currency (see `Money`). |
 
 > **Addition:** `price` was not part of the original attribute list. It was added because `OrderLine` must freeze the unit price at the moment an order is confirmed (see `unitPrice` under `OrderLine` below), and there was no other source for that value.
 
@@ -324,6 +336,14 @@ Physical products require inventory tracking and shipping; digital products are 
 ## Business Rules
 
 * Only products whose `status` is `PUBLISHED` can be added to a cart or included in an order.
+* A product is published with a price greater than zero. The price and the seller are fixed when the product is created.
+
+## Behavior
+
+| Method | Effect |
+| ------ | ------ |
+| `changeStatus(ProductStatus)` | Moves the product to the given status (e.g. withdraws it from sale). Rejects `null`. |
+| `replaceVariants(List<ProductVariant>)` | Replaces every variant; `null` leaves the product without variants. |
 
 ---
 
@@ -354,6 +374,18 @@ Represents the distributed stock of a specific product held in a specific wareho
 * Negative stock is not permitted under any circumstance.
 * Inventory that is nonexistent or marked as damaged cannot be reserved. Damaged units are moved from `availableQuantity` to `damagedQuantity`, so reservations (which only consume `availableQuantity`) never touch them.
 * Recognized movement types are: Inbound (`INBOUND`), Reservation (`RESERVATION`), Sale Outbound (`SALE_OUTBOUND`), Adjustment (`ADJUSTMENT`), and Return (`RETURN`). Each movement must be traceable to the `InventoryItem` it affects, and is recorded as an `InventoryMovement`.
+* The quantities only change through the behavior methods below; there are no quantity setters. The initial quantities given to the constructor must not be negative.
+
+## Behavior
+
+| Method | Effect |
+| ------ | ------ |
+| `receive(amount)` | available `+amount` |
+| `reserve(amount)` | available `−amount`, reserved `+amount`; fails if not enough is available |
+| `releaseReservation(amount)` | reserved `−amount`, available `+amount` |
+| `confirmOutbound(amount)` | reserved `−amount` (the units leave the warehouse) |
+| `adjust(quantityDelta)` | available `±quantityDelta`; fails if the result would be negative |
+| `markDamaged(amount)` | available `−amount`, damaged `+amount` |
 
 ---
 
@@ -416,6 +448,18 @@ Represents a buyer's provisional selection of products prior to confirming an or
 ## Business Rules
 
 * An empty cart cannot be converted into an order.
+* A cart holds at most one line per product: adding a product already in the cart merges the quantities.
+* Only `PUBLISHED` products can be added.
+* **Single currency:** every product in a cart is priced in the same `Currency`. A product priced in another currency, or without a price, is rejected.
+* The lines are exposed read-only; they only change through the behavior methods below.
+
+## Behavior
+
+| Method | Effect |
+| ------ | ------ |
+| `addLine(Product, quantity)` | Adds the product, or merges the quantity into its existing line. Fails with `BusinessRuleViolationException` if the product is not `PUBLISHED`, has no price, or is priced in another currency than the cart; with `IllegalArgumentException` if the resulting quantity is not positive. |
+| `updateLineQuantity(Product, quantity)` | Replaces the quantity of the product's line. Fails with `EntityNotFoundException` if the cart has no line for it, or `IllegalArgumentException` if the quantity is not positive. |
+| `removeLine(Product)` | Removes the product's line. Fails with `EntityNotFoundException` if the cart has no line for it. |
 
 ---
 
@@ -431,6 +475,8 @@ Represents a single product selection, with quantity, inside a shopping cart.
 | ----------- | -------- | -------------------------------------- |
 | product     | Product  | Selected product.                        |
 | quantity    | Integer  | Quantity selected. Must be greater than zero. |
+
+The quantity only changes through its `ShoppingCart`; the product is fixed.
 
 ---
 
@@ -463,6 +509,7 @@ Represents the formal commercial commitment between a buyer and one or more sell
 * An order can be cancelled only while it is `CART` or `PENDING_PAYMENT`; it then moves to `CANCELLED`, and the stock reserved for each line is released. `CANCELLED` is terminal.
 * A finalized (`DELIVERED`) order cannot be modified under any circumstance.
 * The status can only change through the `Order` itself (`advanceTo` / `cancel`), never by setting it directly, so these rules cannot be bypassed.
+* Identifier, buyer, lines and `createdAt` are fixed by the constructor. The lines are exposed read-only and each `OrderLine` is immutable, so a `DELIVERED` order cannot be modified by any route.
 * When an order is confirmed, stock is reserved for every line. If any reservation fails, the reservations already made are released and no order is created.
 * When an order moves to `SHIPPED`, the reserved stock of each line leaves its warehouse (`SALE_OUTBOUND`).
 
@@ -481,12 +528,14 @@ Represents a single confirmed product line within an order, fixing the quantity 
 | product      | Product    | Purchased product.                                   |
 | productName  | String     | Product name at the time the order was confirmed.    |
 | quantity     | Integer    | Quantity purchased. Must be greater than zero.        |
-| unitPrice    | BigDecimal | Price per unit at the time the order was confirmed.    |
+| unitPrice    | Money      | Price per unit at the time the order was confirmed.    |
 | warehouse    | Warehouse  | Warehouse the stock for this line was reserved from.   |
 
 > **Addition:** `productName` and `warehouse` were not part of the original attribute list.
 > * `productName` freezes the name shown to the buyer, just like `unitPrice` freezes the price, so the order is not altered if the product is renamed later.
 > * `warehouse` is needed to release a reservation (when the order is cancelled) or to confirm the outbound (when it ships): `InventoryItem` is keyed by `product` + `warehouse`, so the product alone does not identify the stock to act on.
+
+An `OrderLine` is immutable: every attribute is fixed by the constructor, which rejects a quantity that is not greater than zero.
 
 ---
 
@@ -533,7 +582,7 @@ Represents the invoice issued to a buyer for an order. It is a simple record: it
 | identifier  | String        | Unique identifier of the invoice.    |
 | order       | Order         | Order being invoiced.                |
 | buyer       | Buyer         | Buyer the invoice is issued to.      |
-| totalAmount | BigDecimal    | Total amount charged.                |
+| totalAmount | Money         | Total amount charged: the sum of `quantity × unitPrice` over the order lines. |
 | issuedAt    | LocalDateTime | Date and time the invoice was issued. |
 
 ## Relationships
@@ -589,7 +638,7 @@ Represents the money paid back to a buyer for a return request.
 | ------------- | ------------- | -------------------------------------------------------------- |
 | identifier    | String        | Unique identifier of the refund.                               |
 | returnRequest | ReturnRequest | Return request being refunded.                                 |
-| amount        | BigDecimal    | Amount paid back to the buyer.                                 |
+| amount        | Money         | Amount paid back to the buyer.                                 |
 | status        | RefundStatus  | Current processing state.                                      |
 | createdAt     | LocalDateTime | Date and time the refund was created.                          |
 | processedAt   | LocalDateTime | Date and time the refund was processed. `null` until processed. |
@@ -602,6 +651,26 @@ Represents the money paid back to a buyer for a return request.
 
 * A refund is created `PENDING` and is processed exactly once, through `process()`, which records when.
 * Processing a refund that is no longer `PENDING` fails with `BusinessRuleViolationException`. `PROCESSED` is final.
+
+---
+
+# AuthenticationResult
+
+## Description
+
+The outcome of a successful login: the authenticated user and the access token issued for it. It is returned by `AuthenticateUserService` (through `PublicAccessPort.authenticate`) and is never persisted.
+
+## Attributes
+
+| Attribute | Type   | Description                                                        |
+| --------- | ------ | ------------------------------------------------------------------ |
+| user      | User   | The authenticated user, already checked to be `ACTIVE`.            |
+| token     | String | Access token issued through `TokenServicePort`. The domain never knows its format (JWT, in `infrastructure/security`). |
+
+## Business Rules
+
+* Immutable: both attributes are fixed by the constructor.
+* It only exists for valid credentials of an `ACTIVE` user; any other case fails before it is built.
 
 ---
 
@@ -637,4 +706,5 @@ Represents the money paid back to a buyer for a return request.
 * Value Objects are immutable.
 * Equality is determined by value, not identity.
 * Business entities reference Value Objects instead of primitive strings for controlled business concepts (status, type, role).
+* Money is always a `Money` value (amount + `Currency`), never a bare `BigDecimal`.
 * Fixed technical values without business metadata are represented as primitive enumerations instead of Value Objects.

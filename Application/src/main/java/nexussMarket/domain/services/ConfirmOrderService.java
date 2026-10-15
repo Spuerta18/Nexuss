@@ -70,8 +70,8 @@ public class ConfirmOrderService {
             requirePublished(cartLine.getProduct());
         }
 
-        Order order = new Order(newOrder.getIdentifier(), cart.getBuyer(), OrderStatus.PENDING_PAYMENT);
-        order.setLines(reserveLines(cart));
+        Order order = new Order(newOrder.getIdentifier(), cart.getBuyer(), OrderStatus.PENDING_PAYMENT,
+                reserveLines(cart));
         Order saved = orderRepositoryPort.save(order);
         cartRepositoryPort.deleteById(cart.getIdentifier());
         return saved;

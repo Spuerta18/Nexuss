@@ -1,7 +1,6 @@
 package nexussMarket.domain.models;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 import nexussMarket.domain.exceptions.InvalidOrderStatusTransitionException;
@@ -12,7 +11,9 @@ import nexussMarket.domain.valueobjects.OrderStatus;
  * Its lifecycle is the central process of the system and follows a strict,
  * forward-only sequence; once {@code DELIVERED} it can never be modified.
  *
- * <p>The status can only change through {@link #advanceTo(OrderStatus)} and
+ * <p>Identifier, buyer, lines and creation date are fixed by the constructor,
+ * and the lines are immutable ({@link OrderLine}) and exposed read-only. The
+ * status can only change through {@link #advanceTo(OrderStatus)} and
  * {@link #cancel()}, so the lifecycle rules cannot be bypassed.</p>
  */
 public class Order {
@@ -20,17 +21,29 @@ public class Order {
     private static final List<OrderStatus> LIFECYCLE = List.of(
             OrderStatus.CART, OrderStatus.PENDING_PAYMENT, OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED);
 
-    private String identifier;
-    private Buyer buyer;
-    private List<OrderLine> lines = new ArrayList<>();
+    private final String identifier;
+    private final Buyer buyer;
+    private final List<OrderLine> lines;
     private OrderStatus status;
-    private LocalDateTime createdAt;
+    private final LocalDateTime createdAt;
 
+    /** A reference to an existing order, or an order without lines. */
     public Order(String identifier, Buyer buyer, OrderStatus status) {
+        this(identifier, buyer, status, null);
+    }
+
+    /** A new order with its lines, created now. */
+    public Order(String identifier, Buyer buyer, OrderStatus status, List<OrderLine> lines) {
+        this(identifier, buyer, status, lines, LocalDateTime.now());
+    }
+
+    /** A complete order, e.g. loaded from persistence. */
+    public Order(String identifier, Buyer buyer, OrderStatus status, List<OrderLine> lines, LocalDateTime createdAt) {
         this.identifier = identifier;
         this.buyer = buyer;
         this.status = status;
-        this.createdAt = LocalDateTime.now();
+        this.lines = lines != null ? List.copyOf(lines) : List.of();
+        this.createdAt = createdAt;
     }
 
     /** Unique identifier of the order. */
@@ -38,26 +51,14 @@ public class Order {
         return identifier;
     }
 
-    public void setIdentifier(String identifier) {
-        this.identifier = identifier;
-    }
-
     /** Buyer who placed the order. */
     public Buyer getBuyer() {
         return buyer;
     }
 
-    public void setBuyer(Buyer buyer) {
-        this.buyer = buyer;
-    }
-
-    /** Products, quantities, and unit prices confirmed for this order. */
+    /** Products, quantities, and unit prices confirmed for this order. Read-only. */
     public List<OrderLine> getLines() {
         return lines;
-    }
-
-    public void setLines(List<OrderLine> lines) {
-        this.lines = lines != null ? lines : new ArrayList<>();
     }
 
     /** Current state of the order lifecycle. */
@@ -68,10 +69,6 @@ public class Order {
     /** Date and time the order was created. */
     public LocalDateTime getCreatedAt() {
         return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
     }
 
     /**

@@ -276,6 +276,56 @@ Represents the processing state of a `Refund`. A refund is processed exactly onc
 
 ---
 
+# Currency
+
+## Description
+
+Represents the currency a `Money` amount is expressed in. Codes follow ISO 4217.
+
+## Inherits From
+
+`DomainCatalog`
+
+## Allowed Values
+
+| Code | Name           | Description                              |
+| ---- | -------------- | ---------------------------------------- |
+| COP  | Colombian Peso | Official currency of Colombia.           |
+| USD  | US Dollar      | Official currency of the United States.  |
+
+---
+
+# Money
+
+## Description
+
+Represents an amount of money in a given `Currency`. It is used for every monetary attribute of the domain: `Product.price`, `OrderLine.unitPrice`, `Invoice.totalAmount` and `Refund.amount`. Unlike the catalogs above, it does not inherit from `DomainCatalog`: its values are not a fixed list.
+
+## Attributes
+
+| Attribute | Type       | Description                         |
+| --------- | ---------- | ----------------------------------- |
+| amount    | BigDecimal | The amount. Never negative.         |
+| currency  | Currency   | Currency the amount is expressed in. |
+
+## Operations
+
+| Operation | Description |
+| --------- | ----------- |
+| `Money.of(amount, currency)` | Creates a money value. |
+| `Money.zero(currency)` | Zero in the given currency. |
+| `isPositive()` / `isZero()` | Whether the amount is greater than zero / exactly zero. |
+| `add(other)` | Sum of both amounts. Both must be in the same currency. |
+| `subtract(other)` | Difference of both amounts. Both must be in the same currency, and the result must not be negative. |
+
+## Rules
+
+* Immutable. A `null` amount, a `null` currency or a negative amount fail with `DomainException`, as does combining two different currencies in `add` / `subtract`.
+* **Equality by value, ignoring scale:** two values are equal when they have the same currency and their amounts compare as equal (`compareTo`), so `10.0 COP` equals `10.00 COP`. The hash code uses the amount without trailing zeros, consistent with that equality.
+* Persisted as an embedded `{ amount: Decimal128, currency: "<code>" }` subdocument (see [Persistence](../Adapters/Persistence.md)).
+
+---
+
 # ProductVariant
 
 ## Description

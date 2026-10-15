@@ -18,11 +18,12 @@ There are two kinds of services:
 * **One operation, one service.** Each operation has one concrete service class with a single `execute(...)` method. When several role ports expose the same operation (e.g. `consultProduct`), they all delegate to the same service, so the rule is written once.
 * **Services receive domain models.** A parameter is either a **reference** — a model carrying only the identifier of an existing entity, which the service loads through its output port (`Order orderReference`) — or a **new model** carrying the data of the entity to create (`Product product`). When creating, the service builds the stored entity itself, so the initial status, owner and timestamps are always set by the domain. Plain values (`int quantity`, `OrderStatus targetStatus`, `String password`) are separate parameters.
 * **Authorized operations receive the actor.** Operations restricted to some users take the authenticated `User actor` as first parameter. The service authorizes the actor through an authorization service before it changes anything (see [Authorization Services](#authorization-services)). Only `AuthenticateUserService`, `RegisterBuyerService` and the internal services have no actor.
-* **Entities protect their own invariants.** Services never modify stock or order status directly: they call the entity methods (`InventoryItem.receive`, `reserve`, `releaseReservation`, `confirmOutbound`, `adjust`, `markDamaged`; `Order.advanceTo`, `cancel`). Services add the rules that need more than one entity (e.g. the warehouse must be active, the seller must be `ACTIVE`).
+* **Entities protect their own invariants.** Services never change entity state through setters: they call the entity methods (`InventoryItem.receive`, `reserve`, `releaseReservation`, `confirmOutbound`, `adjust`, `markDamaged`; `Order.advanceTo`, `cancel`; `ShoppingCart.addLine`, `updateLineQuantity`, `removeLine`; `Product.changeStatus`, `replaceVariants`; `Warehouse.deactivate`). The rules of a single entity live in that entity (see [Domain Model](Domain%20Model.md)); services add authorization, loading and the rules that need more than one entity (e.g. the warehouse must be active, the seller must be `ACTIVE`).
 * **Services inject other services directly.** When a service needs another one, it receives the concrete class (e.g. `CancelOrderService` → `ReleaseInventoryReservationService`). Services never depend on input ports: ports are the entry point from outside, not a way for the domain to call itself.
 * **Every stock change records an `InventoryMovement`.** Each inventory service saves the `InventoryItem` and then an `InventoryMovement` through `InventoryMovementRepositoryPort`.
 * **Lookups fail with `EntityNotFoundException`.** When an identifier refers to a user of the wrong role (e.g. a `Seller` reference whose identifier belongs to a `Buyer`), the service also throws `EntityNotFoundException`, so the role of other accounts is not revealed.
-* **Invalid quantities** are rejected by the entities with `IllegalArgumentException`. Cart services rethrow it with the cart and product in the message.
+* **Invalid quantities** are rejected by the entities with `IllegalArgumentException`. `ShoppingCart` rethrows it with the cart and product in the message.
+* **Money is a `Money` value.** Prices and totals carry their `Currency`; amounts of different currencies are never added together (see [Money](Domain%20Value%20Objects.md#money)).
 
 ---
 
@@ -345,7 +346,7 @@ Registers a Marketplace-owned or Seller-owned warehouse. The kind of warehouse t
 
 ## Description
 
-Marks a warehouse as inactive. An inactive warehouse cannot receive inbound stock and is skipped when reserving stock.
+Marks a warehouse as inactive through `Warehouse.deactivate()`. An inactive warehouse cannot receive inbound stock and is skipped when reserving stock.
 
 ## Parameters
 
@@ -384,13 +385,14 @@ Creates a product in the catalog and publishes it immediately (`status = PUBLISH
 | Parameter | Type    | Description |
 | --------- | ------- | ----------- |
 | actor     | User    | Seller publishing the product. It is set as the product's `seller`. |
-| product   | Product | New model: `identifier`, `name`, `productType` (`PHYSICAL` or `DIGITAL`), `price`, `variants`. Its `status` and `seller` are ignored. |
+| product   | Product | New model: `identifier`, `name`, `productType` (`PHYSICAL` or `DIGITAL`), `price` (`Money`), `variants`. Its `status` and `seller` are ignored. |
 
 **Returns:** `Product`
 
 ## Business Rules
 
 * Only a `Seller` whose `sellerStatus` is `ACTIVE` can publish products, and always as the product's seller: a product cannot be published for another seller.
+* **The price is required and must be greater than zero.** It is fixed when the product is created, together with the seller; `OrderLine` freezes it when an order is confirmed.
 
 ## Exceptions
 
@@ -398,6 +400,7 @@ Creates a product in the catalog and publishes it immediately (`status = PUBLISH
 | --------- | ---- |
 | `EntityNotFoundException` | The actor's identifier does not belong to a `Seller`. |
 | `SellerNotAuthorizedException` | The seller's `sellerStatus` is not `ACTIVE`. |
+| `BusinessRuleViolationException` | The product has no price, or its price is zero. |
 
 ---
 
@@ -405,7 +408,7 @@ Creates a product in the catalog and publishes it immediately (`status = PUBLISH
 
 ## Description
 
-Changes the `ProductStatus` of a product (e.g. withdraws it from sale). Only `PUBLISHED` products can be added to a cart or ordered.
+Changes the `ProductStatus` of a product (e.g. withdraws it from sale) through `Product.changeStatus`. Only `PUBLISHED` products can be added to a cart or ordered.
 
 ## Parameters
 
@@ -432,7 +435,7 @@ Changes the `ProductStatus` of a product (e.g. withdraws it from sale). Only `PU
 
 ## Description
 
-Replaces the list of variants of a product.
+Replaces the list of variants of a product through `Product.replaceVariants`.
 
 ## Parameters
 
@@ -574,6 +577,14 @@ Removes previously reserved units from the warehouse because they were sold and 
 
 # Carts
 
+The cart rules live in `ShoppingCart` (see [Domain Model](Domain%20Model.md#shoppingcart)): one line per product, only `PUBLISHED` products, a single currency, positive quantities. The cart services only authorize the actor, load the cart (and the product), call the cart method and save the cart:
+
+| Service | Cart method |
+| ------- | ----------- |
+| `AddCartLineService` | `ShoppingCart.addLine(product, quantity)` |
+| `UpdateCartLineQuantityService` | `ShoppingCart.updateLineQuantity(product, quantity)` |
+| `RemoveCartLineService` | `ShoppingCart.removeLine(product)` |
+
 ---
 
 # CreateShoppingCartService
@@ -620,11 +631,19 @@ Adds a product to a cart. If the cart already has a line for that product, the q
 
 **Returns:** `ShoppingCart`
 
+## Flow
+
+1. Authorize the actor as `BUYER`, load the cart and check it with `AuthorizeCartAccessService`.
+2. Load the product.
+3. Call `ShoppingCart.addLine(product, quantity)` and save the cart.
+
 ## Business Rules
 
 * Only the buyer who owns the cart can change it: the role is restricted to `BUYER` with `ValidateRoleAuthorizationService` before loading anything, and the loaded cart is checked with `AuthorizeCartAccessService`.
-* Only `PUBLISHED` products can be added to a cart.
-* A cart holds at most one line per product.
+* Enforced by `ShoppingCart.addLine`:
+  * Only `PUBLISHED` products can be added to a cart.
+  * A cart holds at most one line per product.
+  * **Single currency:** every product in the cart must be priced in the same `Currency`; a product priced in another currency, or without a price, is rejected.
 * A cart carries no commercial commitment: no stock is reserved when adding lines.
 
 ## Exceptions
@@ -633,7 +652,7 @@ Adds a product to a cart. If the cart already has a line for that product, the q
 | --------- | ---- |
 | `OperationNotAllowedException` | The actor is not an active `BUYER`, or the cart belongs to another buyer. |
 | `EntityNotFoundException` | The cart or the product does not exist. |
-| `BusinessRuleViolationException` | The product is not `PUBLISHED`. |
+| `BusinessRuleViolationException` | The product is not `PUBLISHED`, has no price, or is priced in another currency than the products already in the cart. |
 | `IllegalArgumentException` | The resulting quantity is not valid for `CartLine`. |
 
 ---
@@ -642,7 +661,7 @@ Adds a product to a cart. If the cart already has a line for that product, the q
 
 ## Description
 
-Replaces the quantity of an existing cart line. Like every cart change, it is restricted to the buyer who owns the cart (`BUYER` role, then `AuthorizeCartAccessService`).
+Replaces the quantity of an existing cart line through `ShoppingCart.updateLineQuantity`. Like every cart change, it is restricted to the buyer who owns the cart (`BUYER` role, then `AuthorizeCartAccessService`).
 
 ## Parameters
 
@@ -671,7 +690,7 @@ Replaces the quantity of an existing cart line. Like every cart change, it is re
 
 ## Description
 
-Removes the line of a product from a cart. Restricted to the buyer who owns the cart (`BUYER` role, then `AuthorizeCartAccessService`).
+Removes the line of a product from a cart through `ShoppingCart.removeLine`. Restricted to the buyer who owns the cart (`BUYER` role, then `AuthorizeCartAccessService`).
 
 ## Parameters
 
@@ -721,7 +740,7 @@ Converts a shopping cart into an `Order` in `PENDING_PAYMENT`, reserving stock f
 1. Authorize the actor as `BUYER` or `ADMINISTRATOR`, load the cart, and check it with `AuthorizeCartAccessService`.
 2. Check that the buyer can purchase (`status = ACTIVE` and `commercialStatus = ENABLED`).
 3. Check that the cart is not empty and that every product is `PUBLISHED`.
-4. For each cart line, reserve stock with `ReserveInventoryService` and build an `OrderLine` that freezes `productName` and `unitPrice` and records the `warehouse` the stock was reserved from.
+4. For each cart line, reserve stock with `ReserveInventoryService` and build an immutable `OrderLine` that freezes `productName` and `unitPrice` (`Money`) and records the `warehouse` the stock was reserved from. The order is created with all its lines at once; they cannot be changed afterwards.
 5. If any reservation fails, release the reservations already made (through `ReleaseInventoryReservationService`) and rethrow the error. No order is created.
 6. Save the order and delete the cart.
 
@@ -774,7 +793,7 @@ Confirms the payment of an order, moving it from `PENDING_PAYMENT` to `PAID`, an
 * `SHIPPED` and `DELIVERED` can only be reached through `DispatchShipmentService` and `ConfirmDeliveryService`, so an order cannot be marked as shipped without a shipment, or without its stock leaving the warehouse.
 * `CANCELLED` cannot be reached by advancing; use `CancelOrderService`.
 * A `DELIVERED` or `CANCELLED` order can never be modified.
-* The invoice is issued automatically when the order becomes `PAID`; it has no operation of its own. Its `totalAmount` is the sum of `quantity × unitPrice` over the order lines (the prices frozen at confirmation), its `buyer` is the order's buyer, and its identifier is `INV-<order identifier>`: an order is paid once, so it has exactly one invoice.
+* The invoice is issued automatically when the order becomes `PAID`; it has no operation of its own. Its `totalAmount` is a `Money`: the sum of `quantity × unitPrice` over the order lines (the prices frozen at confirmation, all in the same currency because the cart allows only one), its `buyer` is the order's buyer, and its identifier is `INV-<order identifier>`: an order is paid once, so it has exactly one invoice.
 
 ## Exceptions
 
@@ -1073,7 +1092,7 @@ Approves a return request: every order line goes back to the warehouse it was sh
 ## Business Rules
 
 * Only administrators may approve a return: an order can hold lines of several sellers, so no single seller has authority over the whole return.
-* The refund amount is the same total the invoice charged: the sum of `quantity × unitPrice` over the order lines.
+* The refund amount is the same total the invoice charged: the sum of `quantity × unitPrice` over the order lines, as a `Money` in the order's currency.
 * A return request has exactly one refund, so the refund identifier derives from the request's.
 
 ---

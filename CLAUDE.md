@@ -57,6 +57,23 @@ Run from `Application/`:
     `Persistence.md`.
   - Verified with grep: no reference to the `*UseCase` interfaces remains in `SDD/`.
 
+## Status of the Domain Model Hardening
+
+- **Batch A — done.** Removed `User.setRole` (the role is fixed by each subclass constructor) and the quantity
+  setters of `InventoryItem` (stock only changes through its behavior methods).
+- **Batch B — done.** `Money` value object (`amount` + `Currency`, never negative, equality ignoring scale) and
+  `Currency` catalog (`COP`, `USD`). Used by `Product.price`, `OrderLine.unitPrice`, `Invoice.totalAmount` and
+  `Refund.amount`; persisted as an embedded `{ amount: Decimal128, currency }` subdocument (`MoneyDocument`,
+  `MoneyMapper`).
+- **Batch C — done.** Behavior moved into the entities: `Product.changeStatus` / `replaceVariants`,
+  `Warehouse.deactivate`, `ShoppingCart.addLine` / `updateLineQuantity` / `removeLine`; `OrderLine` is immutable.
+  `Order` has no setters: identifier, buyer, lines and `createdAt` are fixed by the constructor, lines are read-only.
+  Unused setters were removed and mappers rebuild entities through constructors.
+- **Batch D — done.** `Domain Model.md`, `Domain Value Objects.md`, `Domain Services.md` and `Persistence.md`
+  updated (Money, Currency, entity behavior, `AuthenticationResult`).
+- **Unit tests** (no MongoDB needed): `UserMapperTest`, `InventoryItemMapperTest`, `MoneyMapperTest`, `MoneyTest`,
+  `ShoppingCartTest`, `OrderTest`.
+
 ## Decisions
 
 - **Carts, `BUYER` only:** `AddCartLineService`, `UpdateCartLineQuantityService`, `RemoveCartLineService` and
@@ -74,6 +91,14 @@ Run from `Application/`:
 - **Staff registration:** `RegisterSellerService`, `RegisterSupervisorService` and `RegisterLogisticsOperatorService`
   all authorize with `ValidateRoleAuthorizationService` (`ADMINISTRATOR`), so the actor must be an active
   administrator.
+- **Single currency per cart:** `ShoppingCart.addLine` rejects a product priced in another currency than the lines
+  already in the cart, or without a price. Orders and invoices therefore never mix currencies.
+- **Price required:** `PublishProductService` requires a price that is not null and greater than zero.
+- **No data migration** for the new money format: documents stored before Batch B cannot be read.
+- **Remaining setters** in `User`, `Buyer` and `Seller` are kept for now; do not remove them without the user's
+  confirmation. Reviewed: `User.setIdentifier` and `User.setEmail` can bypass the uniqueness rule (checked only at
+  registration), and `Buyer.setCarts` / `setOrders` and `Seller.setWarehouses` / `setProducts` can attach entities
+  owned by someone else. The other setters break no business rule.
 
 ## Working Rules
 
