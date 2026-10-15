@@ -4,65 +4,68 @@
 
 Domain Services contain the business logic of NexusMarket that does not naturally belong to a single entity: they load entities through output ports, coordinate them, enforce cross-entity rules, and persist the result.
 
-Services are plain Java classes with no framework annotations. Their dependencies (output ports, and other use cases when needed) are received through the constructor and wired as Spring beans in `infrastructure/config` (see [Software Architecture](../Software%20Architecture/Software%20Architecture.md)).
+Operation services are concrete Spring `@Service` classes that implement no interface. Their dependencies (output ports, and other services when needed) are received through the constructor and found by component scan. The authorization services and three internal services (`ReserveInventoryService`, `AuditOperationService`, `NotifyUserService`) are plain classes registered as beans in `infrastructure/config` (see [Software Architecture](../Software%20Architecture/Software%20Architecture.md)).
 
 There are two kinds of services:
 
-* **Use case services** — each implements exactly one input port (`<Name>UseCase` → `<Name>Service`) and is invoked by input adapters through its `execute(Command)` method — or `execute(User actor, Command)` when the use case must be authorized (see [Authorization Services](#authorization-services)).
-* **Internal services** — not exposed as use cases; they are injected into other services or into the security layer. The authorization services in `domain/services/authorization/` are internal services.
+* **Operation services** — one per operation. Each exposes a single `execute(...)` method that receives domain models, with the authenticated `User actor` first when the operation must be authorized. They are reached from the [role input ports](Input-ports.md) through the [use case adapters](../Adapters/Use-cases-adapters.md), which only delegate to them.
+* **Internal services** — not reached from any role port; they are injected into other services or into the security layer. The authorization services in `domain/services/authorization/` are internal services, and so are `ReleaseInventoryReservationService` and `ConfirmInventoryOutboundService`.
 
 ---
 
 # Design Conventions
 
-* **One use case, one service.** Every input port is an interface with a nested `Command` record and a single `execute(Command)` method. Its service is the only implementation.
-* **Authorized use cases receive the actor.** Use cases restricted to some users take the authenticated `User` as first parameter, `execute(User actor, Command)`; the actor is never part of the `Command`. The service authorizes the actor through an authorization service before it changes anything (see [Authorization Services](#authorization-services)).
+* **One operation, one service.** Each operation has one concrete service class with a single `execute(...)` method. When several role ports expose the same operation (e.g. `consultProduct`), they all delegate to the same service, so the rule is written once.
+* **Services receive domain models.** A parameter is either a **reference** — a model carrying only the identifier of an existing entity, which the service loads through its output port (`Order orderReference`) — or a **new model** carrying the data of the entity to create (`Product product`). When creating, the service builds the stored entity itself, so the initial status, owner and timestamps are always set by the domain. Plain values (`int quantity`, `OrderStatus targetStatus`, `String password`) are separate parameters.
+* **Authorized operations receive the actor.** Operations restricted to some users take the authenticated `User actor` as first parameter. The service authorizes the actor through an authorization service before it changes anything (see [Authorization Services](#authorization-services)). Only `AuthenticateUserService`, `RegisterBuyerService` and the internal services have no actor.
 * **Entities protect their own invariants.** Services never modify stock or order status directly: they call the entity methods (`InventoryItem.receive`, `reserve`, `releaseReservation`, `confirmOutbound`, `adjust`, `markDamaged`; `Order.advanceTo`, `cancel`). Services add the rules that need more than one entity (e.g. the warehouse must be active, the seller must be `ACTIVE`).
-* **Services depend on ports, never on concrete services.** When a service needs another use case, it depends on the input port interface (e.g. `CancelOrderService` → `ReleaseInventoryReservationUseCase`). Internal services, which have no input port, are injected directly.
+* **Services inject other services directly.** When a service needs another one, it receives the concrete class (e.g. `CancelOrderService` → `ReleaseInventoryReservationService`). Services never depend on input ports: ports are the entry point from outside, not a way for the domain to call itself.
 * **Every stock change records an `InventoryMovement`.** Each inventory service saves the `InventoryItem` and then an `InventoryMovement` through `InventoryMovementRepositoryPort`.
-* **Lookups fail with `EntityNotFoundException`.** When an ID refers to a user of the wrong role (e.g. a `sellerId` that belongs to a `Buyer`), the service also throws `EntityNotFoundException`, so the role of other accounts is not revealed.
+* **Lookups fail with `EntityNotFoundException`.** When an identifier refers to a user of the wrong role (e.g. a `Seller` reference whose identifier belongs to a `Buyer`), the service also throws `EntityNotFoundException`, so the role of other accounts is not revealed.
 * **Invalid quantities** are rejected by the entities with `IllegalArgumentException`. Cart services rethrow it with the cart and product in the message.
 
 ---
 
 # Service Catalog
 
-| Area       | Service | Input port | Output ports / dependencies | Authorization |
+`Role ports` lists the [role input ports](Input-ports.md) that expose the operation. A service's authorization may accept more roles than the ports currently expose (e.g. `ADMINISTRATOR` in the shipment services); the port decides what a role can reach, the service decides what it is allowed to do.
+
+| Area       | Service | Role ports | Output ports / dependencies | Authorization |
 | ---------- | ------- | ---------- | ---------------------------- | ------------- |
-| Users      | `AuthenticateUserService` | `AuthenticateUserUseCase` | `UserRepositoryPort`, `PasswordHasherPort`, `TokenServicePort` | — |
-| Users      | `RegisterBuyerService` | `RegisterBuyerUseCase` | `UserRepositoryPort`, `PasswordHasherPort` | — |
-| Users      | `RegisterSellerService` | `RegisterSellerUseCase` | `UserRepositoryPort`, `PasswordHasherPort` | — |
-| Users      | `RegisterLogisticsOperatorService` | `RegisterLogisticsOperatorUseCase` | `UserRepositoryPort`, `PasswordHasherPort` | — |
-| Users      | `RegisterSupervisorService` | `RegisterSupervisorUseCase` | `UserRepositoryPort`, `PasswordHasherPort` | — |
-| Users      | `UpdateUserStatusService` | `UpdateUserStatusUseCase` | `UserRepositoryPort` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`) |
-| Users      | `UpdateSellerStatusService` | `UpdateSellerStatusUseCase` | `UserRepositoryPort` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`) |
-| Warehouses | `RegisterWarehouseService` | `RegisterWarehouseUseCase` | `WarehouseRepositoryPort`, `UserRepositoryPort` | — |
-| Warehouses | `DeactivateWarehouseService` | `DeactivateWarehouseUseCase` | `WarehouseRepositoryPort` | `AuthorizeWarehouseOperationService` |
-| Catalog    | `PublishProductService` | `PublishProductUseCase` | `ProductRepositoryPort`, `UserRepositoryPort` | — |
-| Catalog    | `UpdateProductStatusService` | `UpdateProductStatusUseCase` | `ProductRepositoryPort` | `AuthorizeProductOwnershipService` |
-| Catalog    | `UpdateProductVariantsService` | `UpdateProductVariantsUseCase` | `ProductRepositoryPort` | `AuthorizeProductOwnershipService` |
-| Inventory  | `RegisterInventoryInboundService` | `RegisterInventoryInboundUseCase` | `InventoryRepositoryPort`, `InventoryMovementRepositoryPort`, `ProductRepositoryPort`, `WarehouseRepositoryPort` | `AuthorizeWarehouseOperationService` |
-| Inventory  | `RegisterInventoryReturnService` | `RegisterInventoryReturnUseCase` | `InventoryRepositoryPort`, `InventoryMovementRepositoryPort` | `AuthorizeWarehouseOperationService` |
-| Inventory  | `AdjustInventoryService` | `AdjustInventoryUseCase` | `InventoryRepositoryPort`, `InventoryMovementRepositoryPort` | `AuthorizeWarehouseOperationService` |
-| Inventory  | `ReportDamagedInventoryService` | `ReportDamagedInventoryUseCase` | `InventoryRepositoryPort`, `InventoryMovementRepositoryPort` | `AuthorizeWarehouseOperationService` |
-| Inventory  | `ReleaseInventoryReservationService` | `ReleaseInventoryReservationUseCase` | `InventoryRepositoryPort`, `InventoryMovementRepositoryPort` | — |
-| Inventory  | `ConfirmInventoryOutboundService` | `ConfirmInventoryOutboundUseCase` | `InventoryRepositoryPort`, `InventoryMovementRepositoryPort` | — |
-| Carts      | `CreateShoppingCartService` | `CreateShoppingCartUseCase` | `CartRepositoryPort`, `UserRepositoryPort` | — |
-| Carts      | `AddCartLineService` | `AddCartLineUseCase` | `CartRepositoryPort`, `ProductRepositoryPort` | — |
-| Carts      | `UpdateCartLineQuantityService` | `UpdateCartLineQuantityUseCase` | `CartRepositoryPort` | — |
-| Carts      | `RemoveCartLineService` | `RemoveCartLineUseCase` | `CartRepositoryPort` | — |
-| Orders     | `ConfirmOrderService` | `ConfirmOrderUseCase` | `CartRepositoryPort`, `OrderRepositoryPort`, `ReserveInventoryService`, `ReleaseInventoryReservationUseCase` | `ValidateRoleAuthorizationService` (`BUYER`, `ADMINISTRATOR`), `AuthorizeCartAccessService` |
-| Orders     | `AdvanceOrderStatusService` | `AdvanceOrderStatusUseCase` | `OrderRepositoryPort`, `InvoiceRepositoryPort` | `ValidateRoleAuthorizationService` (`LOGISTICS_OPERATOR`, `ADMINISTRATOR`) |
-| Orders     | `CancelOrderService` | `CancelOrderUseCase` | `OrderRepositoryPort`, `ReleaseInventoryReservationUseCase` | `ValidateRoleAuthorizationService` (`BUYER`, `ADMINISTRATOR`), `AuthorizeOrderAccessService` |
-| Shipments  | `CreateShipmentService` | `CreateShipmentUseCase` | `ShipmentRepositoryPort`, `OrderRepositoryPort` | `ValidateRoleAuthorizationService` (`LOGISTICS_OPERATOR`, `ADMINISTRATOR`) |
-| Shipments  | `PackShipmentService` | `PackShipmentUseCase` | `ShipmentRepositoryPort` | `ValidateRoleAuthorizationService` (`LOGISTICS_OPERATOR`, `ADMINISTRATOR`) |
-| Shipments  | `DispatchShipmentService` | `DispatchShipmentUseCase` | `ShipmentRepositoryPort`, `OrderRepositoryPort`, `ConfirmInventoryOutboundUseCase` | `ValidateRoleAuthorizationService` (`LOGISTICS_OPERATOR`, `ADMINISTRATOR`) |
-| Shipments  | `ConfirmDeliveryService` | `ConfirmDeliveryUseCase` | `ShipmentRepositoryPort`, `OrderRepositoryPort` | `ValidateRoleAuthorizationService` (`LOGISTICS_OPERATOR`, `ADMINISTRATOR`) |
-| Returns    | `RequestReturnService` | `RequestReturnUseCase` | `ReturnRequestRepositoryPort`, `OrderRepositoryPort` | `ValidateRoleAuthorizationService` (`BUYER`), `AuthorizeOrderAccessService` |
-| Returns    | `ApproveReturnService` | `ApproveReturnUseCase` | `ReturnRequestRepositoryPort`, `RefundRepositoryPort`, `RegisterInventoryReturnUseCase` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`) |
-| Returns    | `RejectReturnService` | `RejectReturnUseCase` | `ReturnRequestRepositoryPort` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`) |
-| Returns    | `ProcessRefundService` | `ProcessRefundUseCase` | `RefundRepositoryPort` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`) |
+| Users      | `AuthenticateUserService` | `PublicAccessPort` | `UserRepositoryPort`, `PasswordHasherPort`, `TokenServicePort` | — |
+| Users      | `RegisterBuyerService` | `PublicAccessPort` | `UserRepositoryPort`, `PasswordHasherPort` | — |
+| Users      | `RegisterSellerService` | `AdministratorPort` | `UserRepositoryPort`, `PasswordHasherPort` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`) |
+| Users      | `RegisterLogisticsOperatorService` | `AdministratorPort` | `UserRepositoryPort`, `PasswordHasherPort` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`) |
+| Users      | `RegisterSupervisorService` | `AdministratorPort` | `UserRepositoryPort`, `PasswordHasherPort` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`) |
+| Users      | `UpdateUserStatusService` | `AdministratorPort` | `UserRepositoryPort` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`) |
+| Users      | `UpdateSellerStatusService` | `AdministratorPort` | `UserRepositoryPort` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`) |
+| Warehouses | `RegisterWarehouseService` | `AdministratorPort`, `SellerPort` | `WarehouseRepositoryPort`, `UserRepositoryPort` | `ValidateRoleAuthorizationService` (`SELLER`, `ADMINISTRATOR`) + own rule by role |
+| Warehouses | `DeactivateWarehouseService` | `AdministratorPort` | `WarehouseRepositoryPort` | `AuthorizeWarehouseOperationService` |
+| Catalog    | `PublishProductService` | `SellerPort` | `ProductRepositoryPort`, `UserRepositoryPort` | Own rule: the actor must be a `Seller` (it becomes the product's seller) |
+| Catalog    | `UpdateProductStatusService` | `SellerPort` | `ProductRepositoryPort` | `AuthorizeProductOwnershipService` |
+| Catalog    | `UpdateProductVariantsService` | `SellerPort` | `ProductRepositoryPort` | `AuthorizeProductOwnershipService` |
+| Inventory  | `RegisterInventoryInboundService` | `SellerPort` | `InventoryRepositoryPort`, `InventoryMovementRepositoryPort`, `ProductRepositoryPort`, `WarehouseRepositoryPort` | `AuthorizeWarehouseOperationService` |
+| Inventory  | `RegisterInventoryReturnService` | `LogisticsOperatorPort` | `InventoryRepositoryPort`, `InventoryMovementRepositoryPort` | `AuthorizeWarehouseOperationService` |
+| Inventory  | `AdjustInventoryService` | `SellerPort` | `InventoryRepositoryPort`, `InventoryMovementRepositoryPort` | `AuthorizeWarehouseOperationService` |
+| Inventory  | `ReportDamagedInventoryService` | `LogisticsOperatorPort` | `InventoryRepositoryPort`, `InventoryMovementRepositoryPort` | `AuthorizeWarehouseOperationService` |
+| Carts      | `CreateShoppingCartService` | `BuyerPort` | `CartRepositoryPort`, `UserRepositoryPort` | Own rule: the actor must be a `Buyer` (it becomes the cart's owner) |
+| Carts      | `AddCartLineService` | `BuyerPort` | `CartRepositoryPort`, `ProductRepositoryPort` | `ValidateRoleAuthorizationService` (`BUYER`), `AuthorizeCartAccessService` |
+| Carts      | `UpdateCartLineQuantityService` | `BuyerPort` | `CartRepositoryPort` | `ValidateRoleAuthorizationService` (`BUYER`), `AuthorizeCartAccessService` |
+| Carts      | `RemoveCartLineService` | `BuyerPort` | `CartRepositoryPort` | `ValidateRoleAuthorizationService` (`BUYER`), `AuthorizeCartAccessService` |
+| Orders     | `ConfirmOrderService` | `BuyerPort` | `CartRepositoryPort`, `OrderRepositoryPort`, `ReserveInventoryService`, `ReleaseInventoryReservationService` | `ValidateRoleAuthorizationService` (`BUYER`, `ADMINISTRATOR`), `AuthorizeCartAccessService` |
+| Orders     | `AdvanceOrderStatusService` | `LogisticsOperatorPort` | `OrderRepositoryPort`, `InvoiceRepositoryPort` | `ValidateRoleAuthorizationService` (`LOGISTICS_OPERATOR`, `ADMINISTRATOR`) |
+| Orders     | `CancelOrderService` | `BuyerPort` | `OrderRepositoryPort`, `ReleaseInventoryReservationService` | `ValidateRoleAuthorizationService` (`BUYER`, `ADMINISTRATOR`), `AuthorizeOrderAccessService` |
+| Shipments  | `CreateShipmentService` | `LogisticsOperatorPort` | `ShipmentRepositoryPort`, `OrderRepositoryPort` | `ValidateRoleAuthorizationService` (`LOGISTICS_OPERATOR`, `ADMINISTRATOR`) |
+| Shipments  | `PackShipmentService` | `LogisticsOperatorPort` | `ShipmentRepositoryPort` | `ValidateRoleAuthorizationService` (`LOGISTICS_OPERATOR`, `ADMINISTRATOR`) |
+| Shipments  | `DispatchShipmentService` | `LogisticsOperatorPort` | `ShipmentRepositoryPort`, `OrderRepositoryPort`, `ConfirmInventoryOutboundService` | `ValidateRoleAuthorizationService` (`LOGISTICS_OPERATOR`, `ADMINISTRATOR`) |
+| Shipments  | `ConfirmDeliveryService` | `LogisticsOperatorPort` | `ShipmentRepositoryPort`, `OrderRepositoryPort` | `ValidateRoleAuthorizationService` (`LOGISTICS_OPERATOR`, `ADMINISTRATOR`) |
+| Returns    | `RequestReturnService` | `BuyerPort` | `ReturnRequestRepositoryPort`, `OrderRepositoryPort` | `ValidateRoleAuthorizationService` (`BUYER`), `AuthorizeOrderAccessService` |
+| Returns    | `ApproveReturnService` | `AdministratorPort` | `ReturnRequestRepositoryPort`, `RefundRepositoryPort`, `RegisterInventoryReturnService` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`) |
+| Returns    | `RejectReturnService` | `AdministratorPort` | `ReturnRequestRepositoryPort` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`) |
+| Returns    | `ProcessRefundService` | `AdministratorPort` | `RefundRepositoryPort` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`) |
 | Internal   | `ReserveInventoryService` | — | `InventoryRepositoryPort`, `InventoryMovementRepositoryPort` | — |
+| Internal   | `ReleaseInventoryReservationService` | — | `InventoryRepositoryPort`, `InventoryMovementRepositoryPort` | — (no actor) |
+| Internal   | `ConfirmInventoryOutboundService` | — | `InventoryRepositoryPort`, `InventoryMovementRepositoryPort` | — (no actor) |
 | Internal   | `AuditOperationService` | — | `AuditLogPort` | — |
 | Internal   | `NotifyUserService` | — | `NotificationPort` | — |
 | Authorization | `ValidateUserAuthorizationStatusService` | — | — | — |
@@ -76,31 +79,31 @@ There are two kinds of services:
 
 # Queries
 
-Read-only use cases. Each input port declares a nested `Query` record (instead of a `Command`) and a single `execute(User actor, Query query)` method; the service authorizes the actor and never modifies data. Supervisors, a read-only role, are allowed wherever the rule below says so.
+Read-only operations. They follow the same conventions as every other service — `execute(User actor, …)` with domain model references — and never modify data. Supervisors, a read-only role, are allowed wherever the rule below says so.
 
-| Area       | Service | Input port | Output ports / dependencies | Authorization |
+| Area       | Service | Role ports | Output ports / dependencies | Authorization |
 | ---------- | ------- | ---------- | ---------------------------- | ------------- |
-| Catalog    | `ListPublishedProductsService` | `ListPublishedProductsUseCase` | `ProductRepositoryPort` | `ValidateUserAuthorizationStatusService` (any active user) |
-| Catalog    | `ConsultProductService` | `ConsultProductUseCase` | `ProductRepositoryPort` | `ValidateUserAuthorizationStatusService` (any active user); if not `PUBLISHED`, also `AuthorizeProductOwnershipService` |
-| Catalog    | `ListSellerProductsService` | `ListSellerProductsUseCase` | `ProductRepositoryPort` | `ValidateUserAuthorizationStatusService` + own rule: `Administrator`, `Supervisor`, or the `Seller` whose id is `sellerId` |
-| Carts      | `ConsultCartService` | `ConsultCartUseCase` | `CartRepositoryPort` | `AuthorizeCartAccessService` |
-| Orders     | `ConsultOrderService` | `ConsultOrderUseCase` | `OrderRepositoryPort` | `AuthorizeOrderAccessService` (supervisors allowed) |
-| Orders     | `ListBuyerOrdersService` | `ListBuyerOrdersUseCase` | `OrderRepositoryPort` | `ValidateUserAuthorizationStatusService` + own rule: `Administrator`, `Supervisor`, or the `Buyer` whose id is `buyerId` |
-| Inventory  | `ConsultInventoryService` | `ConsultInventoryUseCase` | `ProductRepositoryPort`, `InventoryRepositoryPort` | `Supervisor` / `LogisticsOperator`: `ValidateUserAuthorizationStatusService`; anyone else: `AuthorizeProductOwnershipService` (`Administrator` or owning `Seller`) |
-| Users      | `ConsultUserService` | `ConsultUserUseCase` | `UserRepositoryPort` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`, `SUPERVISOR`) |
+| Catalog    | `ListPublishedProductsService` | `BuyerPort`, `SupervisorPort` | `ProductRepositoryPort` | `ValidateUserAuthorizationStatusService` (any active user) |
+| Catalog    | `ConsultProductService` | `BuyerPort`, `SellerPort`, `SupervisorPort` | `ProductRepositoryPort` | `ValidateUserAuthorizationStatusService` (any active user); if not `PUBLISHED`, also `AuthorizeProductOwnershipService` |
+| Catalog    | `ListSellerProductsService` | `SellerPort` | `ProductRepositoryPort` | `ValidateUserAuthorizationStatusService` + own rule: `Administrator`, `Supervisor`, or the `Seller` itself |
+| Carts      | `ConsultCartService` | `BuyerPort` | `CartRepositoryPort` | `ValidateRoleAuthorizationService` (`BUYER`), `AuthorizeCartAccessService` |
+| Orders     | `ConsultOrderService` | `BuyerPort`, `LogisticsOperatorPort`, `SupervisorPort` | `OrderRepositoryPort` | `AuthorizeOrderAccessService` (administrators, supervisors, logistics operators, or the owning buyer) |
+| Orders     | `ListBuyerOrdersService` | `BuyerPort` | `OrderRepositoryPort` | `ValidateUserAuthorizationStatusService` + own rule: `Administrator`, `Supervisor`, or the `Buyer` itself |
+| Inventory  | `ConsultInventoryService` | `SellerPort`, `LogisticsOperatorPort`, `SupervisorPort` | `ProductRepositoryPort`, `InventoryRepositoryPort` | `Supervisor` / `LogisticsOperator`: `ValidateUserAuthorizationStatusService`; anyone else: `AuthorizeProductOwnershipService` (`Administrator` or owning `Seller`) |
+| Users      | `ConsultUserService` | `AdministratorPort`, `SupervisorPort` | `UserRepositoryPort` | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`, `SUPERVISOR`) |
 
-| Query | Query fields | Returns | Notes |
-| ----- | ------------ | ------- | ----- |
-| `ListPublishedProductsUseCase` | — | `List<Product>` | Only `PUBLISHED` products. |
-| `ConsultProductUseCase` | `productId` | `Product` | A `PUBLISHED` product is visible to any active user; a `SUSPENDED` or `DISCONTINUED` one only to an `Administrator` or its owning `Seller`. `EntityNotFoundException` if it does not exist. |
-| `ListSellerProductsUseCase` | `sellerId` | `List<Product>` | Every status. Empty if the seller has no products. |
-| `ConsultCartUseCase` | `cartId` | `ShoppingCart` | The cart is loaded first, then authorized. |
-| `ConsultOrderUseCase` | `orderId` | `Order` | The order is loaded first, then authorized. |
-| `ListBuyerOrdersUseCase` | `buyerId` | `List<Order>` | Most recent first. |
-| `ConsultInventoryUseCase` | `productId` | `List<InventoryItem>` | One item per warehouse holding the product. The product is loaded first, then authorized. |
-| `ConsultUserUseCase` | `userId` | `User` | Authorized by role before loading. |
+| Service | Parameters | Returns | Notes |
+| ------- | ---------- | ------- | ----- |
+| `ListPublishedProductsService` | `actor` | `List<Product>` | Only `PUBLISHED` products. |
+| `ConsultProductService` | `actor`, `Product productReference` | `Product` | A `PUBLISHED` product is visible to any active user; a `SUSPENDED` or `DISCONTINUED` one only to an `Administrator` or its owning `Seller`. `EntityNotFoundException` if it does not exist. |
+| `ListSellerProductsService` | `actor`, `Seller seller` (reference) | `List<Product>` | Every status. Empty if the seller has no products. |
+| `ConsultCartService` | `actor`, `ShoppingCart cartReference` | `ShoppingCart` | The role is checked first, then the cart is loaded and authorized: only its owning buyer can read it. |
+| `ConsultOrderService` | `actor`, `Order orderReference` | `Order` | The order is loaded first, then authorized. |
+| `ListBuyerOrdersService` | `actor`, `Buyer buyer` (reference) | `List<Order>` | Most recent first. |
+| `ConsultInventoryService` | `actor`, `Product productReference` | `List<InventoryItem>` | One item per warehouse holding the product. The product is loaded first, then authorized. |
+| `ConsultUserService` | `actor`, `User target` (reference) | `User` | Authorized by role before loading. `target` is the abstract `User`; see [Input Ports](Input-ports.md#abstract-user-parameters). |
 
-The "own rule" of `ListSellerProductsService` and `ListBuyerOrdersService` compares an ID from the query with the actor, not a loaded entity, so no existing authorization service fits; it is a private method of each service until another use case needs it.
+The "own rule" of `ListSellerProductsService` and `ListBuyerOrdersService` compares the identifier of the referenced seller or buyer with the actor, not a loaded entity, so no existing authorization service fits; it is a private method of each service until another service needs it.
 
 ---
 
@@ -114,12 +117,14 @@ The "own rule" of `ListSellerProductsService` and `ListBuyerOrdersService` compa
 
 Verifies a user's credentials and returns the authenticated `User` together with an access token issued for it.
 
-## Command
+## Parameters
 
-| Field    | Type   | Description |
-| -------- | ------ | ----------- |
-| email    | String | Email the user registered with. |
-| password | String | Plain password, checked with `PasswordHasherPort.matches`. It is never stored. |
+`execute(String email, String password)`
+
+| Parameter | Type   | Description |
+| --------- | ------ | ----------- |
+| email     | String | Email the user registered with. |
+| password  | String | Plain password, checked with `PasswordHasherPort.matches`. It is never stored. |
 
 **Returns:** `AuthenticationResult` (`user`, `token`)
 
@@ -148,17 +153,16 @@ Verifies a user's credentials and returns the authenticated `User` together with
 
 ## Description
 
-Registers a new `Buyer`. Buyers self-register.
+Registers a new `Buyer`. Buyers self-register, so there is no actor.
 
-## Command
+## Parameters
 
-| Field          | Type   | Description |
-| -------------- | ------ | ----------- |
-| identifier     | String | National ID or business tax ID. |
-| fullName       | String | Full name. |
-| email          | String | Primary email. |
-| primaryAddress | String | Default delivery address. |
-| password       | String | Plain password, hashed with `PasswordHasherPort.hash`. |
+`execute(Buyer buyer, String password)`
+
+| Parameter | Type   | Description |
+| --------- | ------ | ----------- |
+| buyer     | Buyer  | New model: `identifier` (national ID or business tax ID), `fullName`, `email`, `primaryAddress`. Its status fields are ignored. |
+| password  | String | Plain password, hashed with `PasswordHasherPort.hash`. |
 
 **Returns:** `Buyer`
 
@@ -181,21 +185,21 @@ Registers a new `Buyer`. Buyers self-register.
 
 Registers a new `Seller` on behalf of an `Administrator`.
 
-## Command
+## Parameters
 
-| Field           | Type   | Description |
-| --------------- | ------ | ----------- |
-| identifier      | String | Business tax ID. |
-| fullName        | String | Legal name. |
-| email           | String | Primary email. |
-| password        | String | Plain password, hashed with `PasswordHasherPort.hash`. |
-| administratorId | String | Administrator performing the registration. |
+`execute(User actor, Seller seller, String password)`
+
+| Parameter | Type   | Description |
+| --------- | ------ | ----------- |
+| actor     | User   | Administrator performing the registration. |
+| seller    | Seller | New model: `identifier` (business tax ID), `fullName` (legal name), `email`. Its status fields are ignored. |
+| password  | String | Plain password, hashed with `PasswordHasherPort.hash`. |
 
 **Returns:** `Seller`
 
 ## Business Rules
 
-* Sellers cannot self-register: `administratorId` must reference an existing `Administrator`.
+* Sellers cannot self-register: only an active `ADMINISTRATOR` can register them, checked with `ValidateRoleAuthorizationService` before anything else.
 * `identifier` and `email` must be unique across all users.
 * A new seller starts with `status = ACTIVE` and `sellerStatus = ACTIVE`.
 
@@ -203,7 +207,7 @@ Registers a new `Seller` on behalf of an `Administrator`.
 
 | Exception | When |
 | --------- | ---- |
-| `OperationNotAllowedException` | `administratorId` is missing or does not belong to an `Administrator`. |
+| `OperationNotAllowedException` | The actor is missing, not `ACTIVE`, or not an `ADMINISTRATOR`. |
 | `DuplicateResourceException` | The `identifier` or the `email` is already used by another user. |
 
 ---
@@ -212,21 +216,23 @@ Registers a new `Seller` on behalf of an `Administrator`.
 
 ## Description
 
-Register a new `LogisticsOperator` or `Supervisor`. Both services follow the same flow.
+Register a new `LogisticsOperator` or `Supervisor` on behalf of an `Administrator`. Both services follow the same flow.
 
-## Command
+## Parameters
 
-| Field      | Type   | Description |
-| ---------- | ------ | ----------- |
-| identifier | String | National ID. |
-| fullName   | String | Full name. |
-| email      | String | Primary email. |
-| password   | String | Plain password, hashed with `PasswordHasherPort.hash`. |
+`execute(User actor, LogisticsOperator logisticsOperator, String password)` / `execute(User actor, Supervisor supervisor, String password)`
+
+| Parameter | Type   | Description |
+| --------- | ------ | ----------- |
+| actor     | User   | Administrator performing the registration. |
+| logisticsOperator / supervisor | LogisticsOperator / Supervisor | New model: `identifier` (national ID), `fullName`, `email`. Its status is ignored. |
+| password  | String | Plain password, hashed with `PasswordHasherPort.hash`. |
 
 **Returns:** `LogisticsOperator` / `Supervisor`
 
 ## Business Rules
 
+* Only an active `ADMINISTRATOR` can register staff, checked with `ValidateRoleAuthorizationService` before anything else.
 * `identifier` and `email` must be unique across all users.
 * A new user starts with `status = ACTIVE`.
 
@@ -234,6 +240,7 @@ Register a new `LogisticsOperator` or `Supervisor`. Both services follow the sam
 
 | Exception | When |
 | --------- | ---- |
+| `OperationNotAllowedException` | The actor is not an active `ADMINISTRATOR`. |
 | `DuplicateResourceException` | The `identifier` or the `email` is already used by another user. |
 
 ---
@@ -244,12 +251,15 @@ Register a new `LogisticsOperator` or `Supervisor`. Both services follow the sam
 
 Changes the operational `UserStatus` of any user (e.g. blocks an account).
 
-## Command
+## Parameters
 
-| Field  | Type       | Description |
-| ------ | ---------- | ----------- |
-| userId | String     | User to update. |
-| status | UserStatus | New status. |
+`execute(User actor, User target, UserStatus status)`
+
+| Parameter | Type       | Description |
+| --------- | ---------- | ----------- |
+| actor     | User       | Administrator performing the change. |
+| target    | User       | Reference to the user to update. It is the abstract `User`; see [Input Ports](Input-ports.md#abstract-user-parameters). |
+| status    | UserStatus | New status. |
 
 **Returns:** `User`
 
@@ -257,7 +267,8 @@ Changes the operational `UserStatus` of any user (e.g. blocks an account).
 
 | Exception | When |
 | --------- | ---- |
-| `EntityNotFoundException` | No user exists with `userId`. |
+| `OperationNotAllowedException` | The actor is not an active `ADMINISTRATOR`. |
+| `EntityNotFoundException` | No user exists with the target's identifier. |
 
 ---
 
@@ -267,12 +278,15 @@ Changes the operational `UserStatus` of any user (e.g. blocks an account).
 
 Changes the commercial `SellerStatus` of a seller. It is independent from the `UserStatus`: a seller can be able to log in but not allowed to publish.
 
-## Command
+## Parameters
 
-| Field    | Type         | Description |
-| -------- | ------------ | ----------- |
-| sellerId | String       | Seller to update. |
-| status   | SellerStatus | New seller status. |
+`execute(User actor, Seller sellerReference, SellerStatus status)`
+
+| Parameter       | Type         | Description |
+| --------------- | ------------ | ----------- |
+| actor           | User         | Administrator performing the change. |
+| sellerReference | Seller       | Reference to the seller to update. |
+| status          | SellerStatus | New seller status. |
 
 **Returns:** `Seller`
 
@@ -280,7 +294,8 @@ Changes the commercial `SellerStatus` of a seller. It is independent from the `U
 
 | Exception | When |
 | --------- | ---- |
-| `EntityNotFoundException` | No user exists with `sellerId`, or the user is not a `Seller`. |
+| `OperationNotAllowedException` | The actor is not an active `ADMINISTRATOR`. |
+| `EntityNotFoundException` | No user exists with the seller's identifier, or the user is not a `Seller`. |
 
 ---
 
@@ -292,32 +307,37 @@ Changes the commercial `SellerStatus` of a seller. It is independent from the `U
 
 ## Description
 
-Registers a Marketplace-owned or Seller-owned warehouse.
+Registers a Marketplace-owned or Seller-owned warehouse. The kind of warehouse the actor may register depends on its role. It is reached from `AdministratorPort.registerMarketplaceWarehouse` and from `SellerPort.registerWarehouse`.
 
-## Command
+## Parameters
 
-| Field           | Type               | Description |
-| --------------- | ------------------ | ----------- |
-| identifier      | String             | Unique identifier of the warehouse. |
-| name            | String             | Warehouse name. |
-| address         | String             | Physical address. |
-| ownerType       | WarehouseOwnerType | `MARKETPLACE` or `SELLER`. |
-| sellerId        | String             | Owning seller. Required when `ownerType = SELLER`. |
-| administratorId | String             | Administrator performing the registration. Required when `ownerType = MARKETPLACE`. |
+`execute(User actor, Warehouse warehouse)`
+
+| Parameter | Type      | Description |
+| --------- | --------- | ----------- |
+| actor     | User      | Administrator or seller performing the registration. |
+| warehouse | Warehouse | New model: `identifier`, `name`, `address`, `ownerType` (`MARKETPLACE` or `SELLER`) and, optionally, `owner`. |
 
 **Returns:** `Warehouse`
+
+## Flow
+
+1. Authorize the actor as `SELLER` or `ADMINISTRATOR` with `ValidateRoleAuthorizationService`.
+2. If the actor is an `ADMINISTRATOR` and `ownerType = MARKETPLACE`, save the warehouse without owner.
+3. If the actor is a `SELLER`, `ownerType = SELLER`, and the warehouse has no owner or the actor as owner, load the actor as `Seller`, set it as `owner`, and save the warehouse.
+4. Any other combination is rejected.
 
 ## Business Rules
 
 * A Marketplace-owned warehouse can only be registered by an `Administrator`.
-* A Seller-owned warehouse must reference its owning `Seller`, which is set as the warehouse `owner`.
+* A Seller-owned warehouse can only be registered by its own `Seller`, who is always set as the `owner`: a seller cannot register a warehouse for another seller, and an administrator cannot register Seller-owned warehouses.
 
 ## Exceptions
 
 | Exception | When |
 | --------- | ---- |
-| `OperationNotAllowedException` | Marketplace-owned and `administratorId` is missing or not an `Administrator`; or Seller-owned and `sellerId` is missing. |
-| `EntityNotFoundException` | Seller-owned and `sellerId` does not belong to a `Seller`. |
+| `OperationNotAllowedException` | The actor is not an active `SELLER` or `ADMINISTRATOR`, or the role does not match the `ownerType` (or the owner is another seller). |
+| `EntityNotFoundException` | Seller-owned and the actor's identifier does not belong to a `Seller`. |
 
 ---
 
@@ -327,11 +347,14 @@ Registers a Marketplace-owned or Seller-owned warehouse.
 
 Marks a warehouse as inactive. An inactive warehouse cannot receive inbound stock and is skipped when reserving stock.
 
-## Command
+## Parameters
 
-| Field       | Type   | Description |
-| ----------- | ------ | ----------- |
-| warehouseId | String | Warehouse to deactivate. |
+`execute(User actor, Warehouse warehouseReference)`
+
+| Parameter          | Type      | Description |
+| ------------------ | --------- | ----------- |
+| actor              | User      | User performing the change, authorized on the loaded warehouse. |
+| warehouseReference | Warehouse | Reference to the warehouse to deactivate. |
 
 **Returns:** `Warehouse`
 
@@ -339,7 +362,8 @@ Marks a warehouse as inactive. An inactive warehouse cannot receive inbound stoc
 
 | Exception | When |
 | --------- | ---- |
-| `EntityNotFoundException` | No warehouse exists with `warehouseId`. |
+| `EntityNotFoundException` | No warehouse exists with the referenced identifier. |
+| `OperationNotAllowedException` | The actor may not operate on that warehouse (see `AuthorizeWarehouseOperationService`). |
 
 ---
 
@@ -353,28 +377,26 @@ Marks a warehouse as inactive. An inactive warehouse cannot receive inbound stoc
 
 Creates a product in the catalog and publishes it immediately (`status = PUBLISHED`).
 
-## Command
+## Parameters
 
-| Field       | Type                   | Description |
-| ----------- | ---------------------- | ----------- |
-| identifier  | String                 | Unique identifier of the product. |
-| name        | String                 | Product name. |
-| productType | ProductType            | `PHYSICAL` or `DIGITAL`. |
-| price       | BigDecimal             | Unit price. |
-| sellerId    | String                 | Seller publishing the product. |
-| variants    | List\<ProductVariant\> | Variants of the product (size, color, …). |
+`execute(User actor, Product product)`
+
+| Parameter | Type    | Description |
+| --------- | ------- | ----------- |
+| actor     | User    | Seller publishing the product. It is set as the product's `seller`. |
+| product   | Product | New model: `identifier`, `name`, `productType` (`PHYSICAL` or `DIGITAL`), `price`, `variants`. Its `status` and `seller` are ignored. |
 
 **Returns:** `Product`
 
 ## Business Rules
 
-* Only a `Seller` whose `sellerStatus` is `ACTIVE` can publish products.
+* Only a `Seller` whose `sellerStatus` is `ACTIVE` can publish products, and always as the product's seller: a product cannot be published for another seller.
 
 ## Exceptions
 
 | Exception | When |
 | --------- | ---- |
-| `EntityNotFoundException` | `sellerId` does not belong to a `Seller`. |
+| `EntityNotFoundException` | The actor's identifier does not belong to a `Seller`. |
 | `SellerNotAuthorizedException` | The seller's `sellerStatus` is not `ACTIVE`. |
 
 ---
@@ -385,12 +407,15 @@ Creates a product in the catalog and publishes it immediately (`status = PUBLISH
 
 Changes the `ProductStatus` of a product (e.g. withdraws it from sale). Only `PUBLISHED` products can be added to a cart or ordered.
 
-## Command
+## Parameters
 
-| Field     | Type          | Description |
-| --------- | ------------- | ----------- |
-| productId | String        | Product to update. |
-| status    | ProductStatus | New status. |
+`execute(User actor, Product productReference, ProductStatus status)`
+
+| Parameter        | Type          | Description |
+| ---------------- | ------------- | ----------- |
+| actor            | User          | Owning seller or administrator. |
+| productReference | Product       | Reference to the product to update. |
+| status           | ProductStatus | New status. |
 
 **Returns:** `Product`
 
@@ -398,7 +423,8 @@ Changes the `ProductStatus` of a product (e.g. withdraws it from sale). Only `PU
 
 | Exception | When |
 | --------- | ---- |
-| `EntityNotFoundException` | No product exists with `productId`. |
+| `EntityNotFoundException` | No product exists with the referenced identifier. |
+| `OperationNotAllowedException` | The actor is neither an active `Administrator` nor the seller who owns the product. |
 
 ---
 
@@ -408,12 +434,15 @@ Changes the `ProductStatus` of a product (e.g. withdraws it from sale). Only `PU
 
 Replaces the list of variants of a product.
 
-## Command
+## Parameters
 
-| Field     | Type                   | Description |
-| --------- | ---------------------- | ----------- |
-| productId | String                 | Product to update. |
-| variants  | List\<ProductVariant\> | New list of variants. It replaces the previous one. |
+`execute(User actor, Product productReference, List<ProductVariant> variants)`
+
+| Parameter        | Type                   | Description |
+| ---------------- | ---------------------- | ----------- |
+| actor            | User                   | Owning seller or administrator. |
+| productReference | Product                | Reference to the product to update. |
+| variants         | List\<ProductVariant\> | New list of variants. It replaces the previous one. |
 
 **Returns:** `Product`
 
@@ -421,13 +450,14 @@ Replaces the list of variants of a product.
 
 | Exception | When |
 | --------- | ---- |
-| `EntityNotFoundException` | No product exists with `productId`. |
+| `EntityNotFoundException` | No product exists with the referenced identifier. |
+| `OperationNotAllowedException` | The actor is neither an active `Administrator` nor the seller who owns the product. |
 
 ---
 
 # Inventory
 
-All inventory services act on the `InventoryItem` identified by `productId` + `warehouseId`, delegate the stock change to the entity, and record one `InventoryMovement`.
+All inventory services act on the `InventoryItem` identified by the referenced product and warehouse, delegate the stock change to the entity, and record one `InventoryMovement`.
 
 | Service | Entity method | Stock effect | Movement recorded |
 | ------- | ------------- | ------------ | ----------------- |
@@ -441,17 +471,18 @@ All inventory services act on the `InventoryItem` identified by `productId` + `w
 
 > A released reservation is recorded as a negative `RESERVATION` movement, and damaged units as a negative `ADJUSTMENT`, because `InventoryMovementType` has no dedicated type for them.
 
-## Common Command
+## Common Parameters
 
-Except for `AdjustInventoryUseCase`, every inventory use case receives:
+Except for `AdjustInventoryService`, every inventory service receives `execute(User actor, Product product, Warehouse warehouse, int quantity)`:
 
-| Field       | Type    | Description |
-| ----------- | ------- | ----------- |
-| productId   | String  | Product of the inventory record. |
-| warehouseId | String  | Warehouse of the inventory record. |
-| quantity    | int     | Units to move. Must be greater than zero. |
+| Parameter | Type      | Description |
+| --------- | --------- | ----------- |
+| actor     | User      | User performing the operation, authorized on the item's warehouse with `AuthorizeWarehouseOperationService`. |
+| product   | Product   | Reference to the product of the inventory record. |
+| warehouse | Warehouse | Reference to the warehouse of the inventory record. |
+| quantity  | int       | Units to move. Must be greater than zero. |
 
-`AdjustInventoryUseCase` receives `quantityDelta` (positive or negative) instead of `quantity`.
+`AdjustInventoryService` receives `int quantityDelta` (positive or negative) instead of `quantity`. The internal `ReleaseInventoryReservationService` and `ConfirmInventoryOutboundService` receive no actor: `execute(Product product, Warehouse warehouse, int quantity)`; the service that calls them has already authorized its own actor.
 
 **Returns:** `InventoryItem`
 
@@ -466,6 +497,7 @@ Except for `AdjustInventoryUseCase`, every inventory use case receives:
 | Exception | When |
 | --------- | ---- |
 | `EntityNotFoundException` | No `InventoryItem` exists for the product in that warehouse. |
+| `OperationNotAllowedException` | The actor may not operate on the item's warehouse (services with an actor only). |
 | `InsufficientStockException` | The operation needs more units than are available (or reserved, for release and outbound). |
 | `IllegalArgumentException` | `quantity` is zero or negative. |
 
@@ -548,14 +580,16 @@ Removes previously reserved units from the warehouse because they were sold and 
 
 ## Description
 
-Creates an empty `ShoppingCart` for a buyer.
+Creates an empty `ShoppingCart` for the buyer who asks for it.
 
-## Command
+## Parameters
 
-| Field   | Type   | Description |
-| ------- | ------ | ----------- |
-| cartId  | String | Identifier of the new cart. |
-| buyerId | String | Buyer owning the cart. |
+`execute(User actor, ShoppingCart cart)`
+
+| Parameter | Type         | Description |
+| --------- | ------------ | ----------- |
+| actor     | User         | Buyer owning the new cart. |
+| cart      | ShoppingCart | New model: only its `identifier` is used. Its buyer and lines are ignored. |
 
 **Returns:** `ShoppingCart`
 
@@ -563,7 +597,7 @@ Creates an empty `ShoppingCart` for a buyer.
 
 | Exception | When |
 | --------- | ---- |
-| `EntityNotFoundException` | `buyerId` does not belong to a `Buyer`. |
+| `EntityNotFoundException` | The actor's identifier does not belong to a `Buyer`. |
 
 ---
 
@@ -573,18 +607,22 @@ Creates an empty `ShoppingCart` for a buyer.
 
 Adds a product to a cart. If the cart already has a line for that product, the quantities are merged into that line instead of creating a second one.
 
-## Command
+## Parameters
 
-| Field     | Type   | Description |
-| --------- | ------ | ----------- |
-| cartId    | String | Cart to update. |
-| productId | String | Product to add. |
-| quantity  | int    | Units to add. |
+`execute(User actor, ShoppingCart cartReference, Product productReference, int quantity)`
+
+| Parameter        | Type         | Description |
+| ---------------- | ------------ | ----------- |
+| actor            | User         | Buyer owning the cart. |
+| cartReference    | ShoppingCart | Reference to the cart to update. |
+| productReference | Product      | Reference to the product to add. |
+| quantity         | int          | Units to add. |
 
 **Returns:** `ShoppingCart`
 
 ## Business Rules
 
+* Only the buyer who owns the cart can change it: the role is restricted to `BUYER` with `ValidateRoleAuthorizationService` before loading anything, and the loaded cart is checked with `AuthorizeCartAccessService`.
 * Only `PUBLISHED` products can be added to a cart.
 * A cart holds at most one line per product.
 * A cart carries no commercial commitment: no stock is reserved when adding lines.
@@ -593,6 +631,7 @@ Adds a product to a cart. If the cart already has a line for that product, the q
 
 | Exception | When |
 | --------- | ---- |
+| `OperationNotAllowedException` | The actor is not an active `BUYER`, or the cart belongs to another buyer. |
 | `EntityNotFoundException` | The cart or the product does not exist. |
 | `BusinessRuleViolationException` | The product is not `PUBLISHED`. |
 | `IllegalArgumentException` | The resulting quantity is not valid for `CartLine`. |
@@ -603,15 +642,18 @@ Adds a product to a cart. If the cart already has a line for that product, the q
 
 ## Description
 
-Replaces the quantity of an existing cart line.
+Replaces the quantity of an existing cart line. Like every cart change, it is restricted to the buyer who owns the cart (`BUYER` role, then `AuthorizeCartAccessService`).
 
-## Command
+## Parameters
 
-| Field     | Type   | Description |
-| --------- | ------ | ----------- |
-| cartId    | String | Cart to update. |
-| productId | String | Product of the line. |
-| quantity  | int    | New quantity. |
+`execute(User actor, ShoppingCart cartReference, Product productReference, int quantity)`
+
+| Parameter        | Type         | Description |
+| ---------------- | ------------ | ----------- |
+| actor            | User         | Buyer owning the cart. |
+| cartReference    | ShoppingCart | Reference to the cart to update. |
+| productReference | Product      | Reference to the product of the line. |
+| quantity         | int          | New quantity. |
 
 **Returns:** `ShoppingCart`
 
@@ -619,6 +661,7 @@ Replaces the quantity of an existing cart line.
 
 | Exception | When |
 | --------- | ---- |
+| `OperationNotAllowedException` | The actor is not an active `BUYER`, or the cart belongs to another buyer. |
 | `EntityNotFoundException` | The cart does not exist, or it has no line for the product. |
 | `IllegalArgumentException` | The quantity is not valid for `CartLine`. |
 
@@ -628,14 +671,17 @@ Replaces the quantity of an existing cart line.
 
 ## Description
 
-Removes the line of a product from a cart.
+Removes the line of a product from a cart. Restricted to the buyer who owns the cart (`BUYER` role, then `AuthorizeCartAccessService`).
 
-## Command
+## Parameters
 
-| Field     | Type   | Description |
-| --------- | ------ | ----------- |
-| cartId    | String | Cart to update. |
-| productId | String | Product whose line is removed. |
+`execute(User actor, ShoppingCart cartReference, Product productReference)`
+
+| Parameter        | Type         | Description |
+| ---------------- | ------------ | ----------- |
+| actor            | User         | Buyer owning the cart. |
+| cartReference    | ShoppingCart | Reference to the cart to update. |
+| productReference | Product      | Reference to the product whose line is removed. |
 
 **Returns:** `ShoppingCart`
 
@@ -643,6 +689,7 @@ Removes the line of a product from a cart.
 
 | Exception | When |
 | --------- | ---- |
+| `OperationNotAllowedException` | The actor is not an active `BUYER`, or the cart belongs to another buyer. |
 | `EntityNotFoundException` | The cart does not exist, or it has no line for the product. |
 
 ---
@@ -657,22 +704,25 @@ Removes the line of a product from a cart.
 
 Converts a shopping cart into an `Order` in `PENDING_PAYMENT`, reserving stock for every line. This is the point where the provisional selection becomes a commercial commitment.
 
-## Command
+## Parameters
 
-| Field   | Type   | Description |
-| ------- | ------ | ----------- |
-| cartId  | String | Cart to confirm. |
-| orderId | String | Identifier of the new order. |
+`execute(User actor, ShoppingCart cartReference, Order newOrder)`
+
+| Parameter     | Type         | Description |
+| ------------- | ------------ | ----------- |
+| actor         | User         | Buyer owning the cart, or an administrator. |
+| cartReference | ShoppingCart | Reference to the cart to confirm. |
+| newOrder      | Order        | New model: only its `identifier` is used. |
 
 **Returns:** `Order`
 
 ## Flow
 
-1. Load the cart.
+1. Authorize the actor as `BUYER` or `ADMINISTRATOR`, load the cart, and check it with `AuthorizeCartAccessService`.
 2. Check that the buyer can purchase (`status = ACTIVE` and `commercialStatus = ENABLED`).
 3. Check that the cart is not empty and that every product is `PUBLISHED`.
 4. For each cart line, reserve stock with `ReserveInventoryService` and build an `OrderLine` that freezes `productName` and `unitPrice` and records the `warehouse` the stock was reserved from.
-5. If any reservation fails, release the reservations already made (through `ReleaseInventoryReservationUseCase`) and rethrow the error. No order is created.
+5. If any reservation fails, release the reservations already made (through `ReleaseInventoryReservationService`) and rethrow the error. No order is created.
 6. Save the order and delete the cart.
 
 ## Business Rules
@@ -699,12 +749,15 @@ Converts a shopping cart into an `Order` in `PENDING_PAYMENT`, reserving stock f
 
 Confirms the payment of an order, moving it from `PENDING_PAYMENT` to `PAID`, and issues its `Invoice`. The later steps of the lifecycle (`SHIPPED`, `DELIVERED`) are not reached through this service but through the [shipment lifecycle](#shipments).
 
-## Command
+## Parameters
 
-| Field        | Type        | Description |
-| ------------ | ----------- | ----------- |
-| orderId      | String      | Order to update. |
-| targetStatus | OrderStatus | Next status. In practice `PAID`: `SHIPPED` and `DELIVERED` are rejected. |
+`execute(User actor, Order orderReference, OrderStatus targetStatus)`
+
+| Parameter      | Type        | Description |
+| -------------- | ----------- | ----------- |
+| actor          | User        | Logistics operator or administrator. |
+| orderReference | Order       | Reference to the order to update. |
+| targetStatus   | OrderStatus | Next status. In practice `PAID`: `SHIPPED` and `DELIVERED` are rejected. |
 
 **Returns:** `Order`
 
@@ -721,7 +774,7 @@ Confirms the payment of an order, moving it from `PENDING_PAYMENT` to `PAID`, an
 * `SHIPPED` and `DELIVERED` can only be reached through `DispatchShipmentService` and `ConfirmDeliveryService`, so an order cannot be marked as shipped without a shipment, or without its stock leaving the warehouse.
 * `CANCELLED` cannot be reached by advancing; use `CancelOrderService`.
 * A `DELIVERED` or `CANCELLED` order can never be modified.
-* The invoice is issued automatically when the order becomes `PAID`; it has no use case of its own. Its `totalAmount` is the sum of `quantity × unitPrice` over the order lines (the prices frozen at confirmation), its `buyer` is the order's buyer, and its identifier is `INV-<orderId>`: an order is paid once, so it has exactly one invoice.
+* The invoice is issued automatically when the order becomes `PAID`; it has no operation of its own. Its `totalAmount` is the sum of `quantity × unitPrice` over the order lines (the prices frozen at confirmation), its `buyer` is the order's buyer, and its identifier is `INV-<order identifier>`: an order is paid once, so it has exactly one invoice.
 
 ## Exceptions
 
@@ -739,18 +792,21 @@ Confirms the payment of an order, moving it from `PENDING_PAYMENT` to `PAID`, an
 
 Cancels an order and releases the stock reserved for each line.
 
-## Command
+## Parameters
 
-| Field   | Type   | Description |
-| ------- | ------ | ----------- |
-| orderId | String | Order to cancel. |
+`execute(User actor, Order orderReference)`
+
+| Parameter      | Type  | Description |
+| -------------- | ----- | ----------- |
+| actor          | User  | Buyer who placed the order, or an administrator. |
+| orderReference | Order | Reference to the order to cancel. |
 
 **Returns:** `Order`
 
 ## Flow
 
-1. Load the order and call `Order.cancel()`.
-2. Release the reservation of every line through `ReleaseInventoryReservationUseCase`.
+1. Authorize the actor as `BUYER` or `ADMINISTRATOR`, load the order, and check it with `AuthorizeOrderAccessService`.
+2. Call `Order.cancel()` and release the reservation of every line through `ReleaseInventoryReservationService`.
 3. Save the order.
 
 ## Business Rules
@@ -800,18 +856,20 @@ A paid order is delivered through a `Shipment`, whose lifecycle drives the last 
 
 Registers the shipment of a paid order, in `CREATED`.
 
-## Command
+## Parameters
 
-| Field      | Type   | Description |
-| ---------- | ------ | ----------- |
-| shipmentId | String | Identifier of the new shipment. |
-| orderId    | String | Order to ship. |
+`execute(User actor, Shipment shipment)`
+
+| Parameter | Type     | Description |
+| --------- | -------- | ----------- |
+| actor     | User     | Logistics operator or administrator. |
+| shipment  | Shipment | New model: its `identifier` and a reference to the `order` to ship. |
 
 **Returns:** `Shipment`
 
 ## Flow
 
-1. Check that no shipment with `shipmentId` exists.
+1. Check that no shipment with that identifier exists.
 2. Load the order and check that it is `PAID`.
 3. Check that the order has no shipment yet.
 4. Create the shipment (`CREATED`, `createdAt` = now) and save it.
@@ -827,7 +885,7 @@ In addition to the common exceptions:
 
 | Exception | When |
 | --------- | ---- |
-| `DuplicateResourceException` | `shipmentId` is already used, or the order already has a shipment. |
+| `DuplicateResourceException` | The shipment identifier is already used, or the order already has a shipment. |
 | `BusinessRuleViolationException` | The order is not `PAID`. |
 
 ---
@@ -838,11 +896,14 @@ In addition to the common exceptions:
 
 Marks the goods of a shipment as packed (`CREATED` → `PACKED`). The order is not affected.
 
-## Command
+## Parameters
 
-| Field      | Type   | Description |
-| ---------- | ------ | ----------- |
-| shipmentId | String | Shipment to pack. |
+`execute(User actor, Shipment shipmentReference)`
+
+| Parameter         | Type     | Description |
+| ----------------- | -------- | ----------- |
+| actor             | User     | Logistics operator or administrator. |
+| shipmentReference | Shipment | Reference to the shipment to pack. |
 
 **Returns:** `Shipment`
 
@@ -854,11 +915,14 @@ Marks the goods of a shipment as packed (`CREATED` → `PACKED`). The order is n
 
 Dispatches a packed shipment (`PACKED` → `DISPATCHED`): the stock reserved for each order line leaves its warehouse, and the order moves to `SHIPPED`.
 
-## Command
+## Parameters
 
-| Field      | Type   | Description |
-| ---------- | ------ | ----------- |
-| shipmentId | String | Shipment to dispatch. |
+`execute(User actor, Shipment shipmentReference)`
+
+| Parameter         | Type     | Description |
+| ----------------- | -------- | ----------- |
+| actor             | User     | Logistics operator or administrator. |
+| shipmentReference | Shipment | Reference to the shipment to dispatch. |
 
 **Returns:** `Shipment`
 
@@ -866,7 +930,7 @@ Dispatches a packed shipment (`PACKED` → `DISPATCHED`): the stock reserved for
 
 1. Load the shipment; its order comes with it.
 2. Call `Shipment.dispatch()` and `Order.advanceTo(SHIPPED)`. Both transitions are validated before any stock is touched.
-3. Confirm the outbound of every order line through `ConfirmInventoryOutboundUseCase`.
+3. Confirm the outbound of every order line through `ConfirmInventoryOutboundService`.
 4. Save the order and the shipment.
 
 ## Exceptions
@@ -886,11 +950,14 @@ In addition to the common exceptions:
 
 Confirms that a dispatched shipment reached the buyer (`DISPATCHED` → `DELIVERED`), and moves its order to `DELIVERED`.
 
-## Command
+## Parameters
 
-| Field      | Type   | Description |
-| ---------- | ------ | ----------- |
-| shipmentId | String | Shipment delivered. |
+`execute(User actor, Shipment shipmentReference)`
+
+| Parameter         | Type     | Description |
+| ----------------- | -------- | ----------- |
+| actor             | User     | Logistics operator or administrator. |
+| shipmentReference | Shipment | Reference to the shipment delivered. |
 
 **Returns:** `Shipment`
 
@@ -942,13 +1009,14 @@ A buyer can ask to return a delivered order through a `ReturnRequest`. Approving
 
 Lets a buyer request the return of one of its delivered orders.
 
-## Command
+## Parameters
 
-| Field           | Type   | Description |
-| --------------- | ------ | ----------- |
-| returnRequestId | String | Identifier of the new return request. |
-| orderId         | String | Order to return. |
-| reason          | String | Reason given by the buyer. |
+`execute(User actor, ReturnRequest returnRequest)`
+
+| Parameter     | Type          | Description |
+| ------------- | ------------- | ----------- |
+| actor         | User          | Buyer who placed the order. |
+| returnRequest | ReturnRequest | New model: its `identifier`, a reference to the `order` to return, and the `reason` given by the buyer. |
 
 **Returns:** `ReturnRequest`
 
@@ -956,7 +1024,7 @@ Lets a buyer request the return of one of its delivered orders.
 
 1. Authorize the actor as `BUYER`.
 2. Load the order and check, through `AuthorizeOrderAccessService`, that it belongs to the actor.
-3. Check that the order is `DELIVERED`, that `returnRequestId` is not used, and that the order has no return request yet.
+3. Check that the order is `DELIVERED`, that the return request identifier is not used, and that the order has no return request yet.
 4. Create the return request (`REQUESTED`, `requestedAt` = now, `buyer` = the order's buyer) and save it.
 
 ## Business Rules
@@ -973,7 +1041,7 @@ In addition to the common exceptions:
 | --------- | ---- |
 | `OperationNotAllowedException` | The order belongs to another buyer. |
 | `BusinessRuleViolationException` | The order is not `DELIVERED`. |
-| `DuplicateResourceException` | `returnRequestId` is already used, or the order already has a return request. |
+| `DuplicateResourceException` | The return request identifier is already used, or the order already has a return request. |
 
 ---
 
@@ -983,11 +1051,14 @@ In addition to the common exceptions:
 
 Approves a return request: every order line goes back to the warehouse it was shipped from, and a `PENDING` refund for the order total is created.
 
-## Command
+## Parameters
 
-| Field           | Type   | Description |
-| --------------- | ------ | ----------- |
-| returnRequestId | String | Return request to approve. |
+`execute(User actor, ReturnRequest returnRequestReference)`
+
+| Parameter              | Type          | Description |
+| ---------------------- | ------------- | ----------- |
+| actor                  | User          | Administrator. |
+| returnRequestReference | ReturnRequest | Reference to the return request to approve. |
 
 **Returns:** `ReturnRequest`
 
@@ -995,9 +1066,9 @@ Approves a return request: every order line goes back to the warehouse it was sh
 
 1. Authorize the actor as `ADMINISTRATOR`.
 2. Load the return request and call `ReturnRequest.approve(actor)`, validated before any stock is touched.
-3. For every order line, register the return of its quantity to its warehouse through `RegisterInventoryReturnUseCase`.
+3. For every order line, register the return of its quantity to its warehouse through `RegisterInventoryReturnService`, with the same actor.
 4. Save the return request.
-5. Create the refund (`PENDING`, identifier `REF-<returnRequestId>`, amount = the order total) and save it through `RefundRepositoryPort`.
+5. Create the refund (`PENDING`, identifier `REF-<return request identifier>`, amount = the order total) and save it through `RefundRepositoryPort`.
 
 ## Business Rules
 
@@ -1013,11 +1084,14 @@ Approves a return request: every order line goes back to the warehouse it was sh
 
 Rejects a return request. Stock and refunds are not affected.
 
-## Command
+## Parameters
 
-| Field           | Type   | Description |
-| --------------- | ------ | ----------- |
-| returnRequestId | String | Return request to reject. |
+`execute(User actor, ReturnRequest returnRequestReference)`
+
+| Parameter              | Type          | Description |
+| ---------------------- | ------------- | ----------- |
+| actor                  | User          | Administrator. |
+| returnRequestReference | ReturnRequest | Reference to the return request to reject. |
 
 **Returns:** `ReturnRequest`
 
@@ -1033,11 +1107,14 @@ Rejects a return request. Stock and refunds are not affected.
 
 Pays a pending refund back to the buyer.
 
-## Command
+## Parameters
 
-| Field    | Type   | Description |
-| -------- | ------ | ----------- |
-| refundId | String | Refund to process. |
+`execute(User actor, Refund refundReference)`
+
+| Parameter       | Type   | Description |
+| --------------- | ------ | ----------- |
+| actor           | User   | Administrator. |
+| refundReference | Refund | Reference to the refund to process. |
 
 **Returns:** `Refund`
 
@@ -1093,7 +1170,7 @@ Records which authenticated user performed which operation, with the current tim
 
 ## Business Rules
 
-* Every authenticated operation must be traceable to the `User` who performed it. The security layer (`infrastructure/security`) calls this service for every authenticated request, so traceability does not depend on each use case remembering to call it.
+* Every authenticated operation must be traceable to the `User` who performed it. The security layer (`infrastructure/security`) calls this service for every authenticated request, so traceability does not depend on each service remembering to call it.
 
 ---
 
@@ -1107,7 +1184,7 @@ Sends a message to a user through a `NotificationChannel`, via `NotificationPort
 
 `void notify(String userId, NotificationChannel channel, String message)`
 
-> **Note:** no service uses it yet, and the adapter that implements `NotificationPort` is not yet defined.
+> **Note:** no service uses it yet. `NotificationPort` is backed by `LoggingNotificationAdapter`, which only logs the message (see [Persistence](../Adapters/Persistence.md)).
 
 ---
 
@@ -1115,7 +1192,7 @@ Sends a message to a user through a `NotificationChannel`, via `NotificationPort
 
 ## Description
 
-`domain/services/authorization/` holds internal services with a single purpose each: deciding whether the authenticated `User` (the *actor*) may perform an operation. Like every other domain service they are plain classes with a manual constructor and no framework annotations; they are wired as beans in `infrastructure/config`.
+`domain/services/authorization/` holds internal services with a single purpose each: deciding whether the authenticated `User` (the *actor*) may perform an operation. Unlike the operation services, they are plain classes with a manual constructor and no framework annotations; they are registered as beans in `infrastructure/config/AuthorizationBeanConfiguration`.
 
 Each one exposes an `execute(...)` method that returns normally when the actor is authorized and throws `OperationNotAllowedException` otherwise. Authentication (who the actor is) happens in the security layer; these services only decide what an authenticated actor may do, so the rules live in the domain and are testable without Spring.
 
@@ -1124,19 +1201,35 @@ Each one exposes an `execute(...)` method that returns normally when the actor i
 | Service | Operation | Allows | Used by |
 | ------- | --------- | ------ | ------- |
 | `ValidateUserAuthorizationStatusService` | `execute(User actor)` | A present (non-`null`) actor whose `status` is `ACTIVE`. | Every other authorization service; `ListPublishedProductsService`, `ConsultProductService`, `ListSellerProductsService`, `ListBuyerOrdersService`, `ConsultInventoryService`. |
-| `ValidateRoleAuthorizationService` | `execute(User actor, SystemRole... allowedRoles)` | An active actor whose role is one of `allowedRoles`. | `UpdateUserStatusService`, `UpdateSellerStatusService` (`ADMINISTRATOR`); `AdvanceOrderStatusService`, `CreateShipmentService`, `PackShipmentService`, `DispatchShipmentService`, `ConfirmDeliveryService` (`LOGISTICS_OPERATOR`, `ADMINISTRATOR`); `ConfirmOrderService`, `CancelOrderService` (`BUYER`, `ADMINISTRATOR`); `ConsultUserService` (`ADMINISTRATOR`, `SUPERVISOR`); `RequestReturnService` (`BUYER`); `ApproveReturnService`, `RejectReturnService`, `ProcessRefundService` (`ADMINISTRATOR`). |
-| `AuthorizeOrderAccessService` | `execute(User actor, Order order)` | An active `Administrator` or `Supervisor`, or the `Buyer` who placed the order. | `CancelOrderService`, `ConsultOrderService`, `RequestReturnService`. |
+| `ValidateRoleAuthorizationService` | `execute(User actor, SystemRole... allowedRoles)` | An active actor whose role is one of `allowedRoles`. | `RegisterSellerService`, `RegisterLogisticsOperatorService`, `RegisterSupervisorService`, `UpdateUserStatusService`, `UpdateSellerStatusService` (`ADMINISTRATOR`); `RegisterWarehouseService` (`SELLER`, `ADMINISTRATOR`); `AddCartLineService`, `UpdateCartLineQuantityService`, `RemoveCartLineService`, `ConsultCartService` (`BUYER`); `AdvanceOrderStatusService`, `CreateShipmentService`, `PackShipmentService`, `DispatchShipmentService`, `ConfirmDeliveryService` (`LOGISTICS_OPERATOR`, `ADMINISTRATOR`); `ConfirmOrderService`, `CancelOrderService` (`BUYER`, `ADMINISTRATOR`); `ConsultUserService` (`ADMINISTRATOR`, `SUPERVISOR`); `RequestReturnService` (`BUYER`); `ApproveReturnService`, `RejectReturnService`, `ProcessRefundService` (`ADMINISTRATOR`). |
+| `AuthorizeOrderAccessService` | `execute(User actor, Order order)` | An active `Administrator`, `Supervisor` or `LogisticsOperator`, or the `Buyer` who placed the order. | `CancelOrderService`, `ConsultOrderService`, `RequestReturnService`. |
 | `AuthorizeProductOwnershipService` | `execute(User actor, Product product)` | An active `Administrator`, or the `Seller` who owns the product. | `UpdateProductStatusService`, `UpdateProductVariantsService`, `ConsultProductService` (non-published products only), `ConsultInventoryService`. |
 | `AuthorizeWarehouseOperationService` | `execute(User actor, Warehouse warehouse)` | An active `Administrator` or `LogisticsOperator` on any warehouse, or the `Seller` who owns a Seller-owned warehouse. | `DeactivateWarehouseService`, `RegisterInventoryInboundService`, `RegisterInventoryReturnService`, `AdjustInventoryService`, `ReportDamagedInventoryService`. |
-| `AuthorizeCartAccessService` | `execute(User actor, ShoppingCart cart)` | An active `Administrator` or `Supervisor`, or the `Buyer` who owns the cart. | `ConfirmOrderService`, `ConsultCartService`. |
+| `AuthorizeCartAccessService` | `execute(User actor, ShoppingCart cart)` | An active `Administrator` or `Supervisor`, or the `Buyer` who owns the cart. | `ConfirmOrderService`, `ConsultCartService`, `AddCartLineService`, `UpdateCartLineQuantityService`, `RemoveCartLineService`. |
 
 ## Business Rules
 
 * **The status check comes first.** Every authorization service calls `ValidateUserAuthorizationStatusService` before its own rule, so a missing, `BLOCKED` or `INACTIVE` actor is never authorized.
 * **When authorization happens.** A service that authorizes by role alone does it before loading anything. A service that authorizes on an entity (order, cart, product, warehouse) loads that entity first — the rule needs it — and authorizes before changing anything. Inventory services authorize on the warehouse of the affected `InventoryItem`.
 * **Ownership is compared by identifier** (`order.getBuyer()`, `cart.getBuyer()`, `product.getSeller()`, `warehouse.getOwner()` against the actor). A missing owner (e.g. a Marketplace-owned warehouse, which has no owning seller) is never matched, so only the roles allowed regardless of ownership get through.
-* **Supervisors consult, never change.** The access services allow `Supervisor` so that read operations can reuse them. Use cases that modify an order or a cart (`CancelOrderService`, `ConfirmOrderService`) first restrict the role to `BUYER` / `ADMINISTRATOR` with `ValidateRoleAuthorizationService`, and then apply the access service, which at that point only lets administrators and the owning buyer through.
+* **Restrict the role first, then check access.** The access services allow `Supervisor` (and, for orders, `LogisticsOperator`) so that read operations can reuse them. Services that need a narrower rule first restrict the role with `ValidateRoleAuthorizationService` and then apply the access service, which at that point only lets through the roles left: `CancelOrderService` and `ConfirmOrderService` (`BUYER`, `ADMINISTRATOR`: administrators and the owning buyer), `RequestReturnService` and every cart service (`BUYER`: only the owning buyer).
+* **Carts belong to their buyer.** Every cart operation except confirming an order — `AddCartLineService`, `UpdateCartLineQuantityService`, `RemoveCartLineService` and `ConsultCartService` — is restricted to `BUYER`, so neither administrators nor supervisors can read or change a cart. `CreateShoppingCartService` already requires the actor to be a `Buyer`. `ConfirmOrderService` keeps allowing `ADMINISTRATOR`.
 * **A buyer cannot advance its own order.** `AdvanceOrderStatusService` is restricted to `LOGISTICS_OPERATOR` and `ADMINISTRATOR`.
+* **Logistics operators can consult orders.** `AuthorizeOrderAccessService` allows `LogisticsOperator` so that `ConsultOrderService` can serve `LogisticsOperatorPort.consultOrder`. This is a deliberate, scoped exception: no other rule of that service changed, and since `CancelOrderService` and `RequestReturnService` restrict the role before calling it, in practice it only affects `ConsultOrderService`.
+
+## Authorization Changes in the Role-Based Refactor
+
+Moving to one input port per role (see [Input Ports](Input-ports.md)) also tightened or adjusted these rules:
+
+| Service | Before | After |
+| ------- | ------ | ----- |
+| `RegisterSellerService` | `administratorId` in the command had to reference an `Administrator`; the administrator's `status` was not checked. | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`): the actor must be an active administrator. |
+| `RegisterSupervisorService`, `RegisterLogisticsOperatorService` | No authorization. | `ValidateRoleAuthorizationService` (`ADMINISTRATOR`). |
+| `RegisterWarehouseService` | `ownerType`, `sellerId` and `administratorId` in the command decided the owner. | `ValidateRoleAuthorizationService` (`SELLER`, `ADMINISTRATOR`), then by role: administrators register Marketplace-owned warehouses; sellers register Seller-owned warehouses owned by themselves. |
+| `AddCartLineService`, `UpdateCartLineQuantityService`, `RemoveCartLineService` | No authorization. | `ValidateRoleAuthorizationService` (`BUYER`), then `AuthorizeCartAccessService`. |
+| `ConsultCartService` | `AuthorizeCartAccessService` (administrators, supervisors, owning buyer). | `ValidateRoleAuthorizationService` (`BUYER`), then `AuthorizeCartAccessService`: only the owning buyer. |
+| `AuthorizeOrderAccessService` | Administrators, supervisors, owning buyer. | Also `LogisticsOperator`, so `ConsultOrderService` serves `LogisticsOperatorPort`. Scoped exception; no other rule changed. |
+| `PublishProductService`, `CreateShoppingCartService` | `sellerId` / `buyerId` in the command named the owner. | The actor is the owner: it must be a `Seller` / `Buyer`. |
 
 ## Exceptions
 
@@ -1151,20 +1244,20 @@ Each one exposes an `execute(...)` method that returns normally when the actor i
 ```text
 ConfirmOrderService
    ├── ReserveInventoryService ──────────────> reserve stock for each line
-   └── ReleaseInventoryReservationUseCase ───> undo partial reservations on failure
+   └── ReleaseInventoryReservationService ───> undo partial reservations on failure
 
 AdvanceOrderStatusService
    └── InvoiceRepositoryPort ────────────────> issue the invoice when the order becomes PAID
 
 DispatchShipmentService
-   └── ConfirmInventoryOutboundUseCase ──────> every line, when the order becomes SHIPPED
+   └── ConfirmInventoryOutboundService ──────> every line, when the order becomes SHIPPED
 
 ApproveReturnService
-   ├── RegisterInventoryReturnUseCase ───────> every line back to its warehouse
+   ├── RegisterInventoryReturnService ───────> every line back to its warehouse
    └── RefundRepositoryPort ─────────────────> create the PENDING refund
 
 CancelOrderService
-   └── ReleaseInventoryReservationUseCase ───> release every line
+   └── ReleaseInventoryReservationService ───> release every line
 
 Security layer (infrastructure/security)
    └── AuditOperationService ────────────────> every authenticated request

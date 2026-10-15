@@ -41,10 +41,15 @@ Ejecutar desde `Application/`:
 - **Lote 5 — hecho.** Borradas las 41 interfaces antiguas `*UseCase` (una por operación, con su record `Command`)
   de `domain/ports/in`, tras confirmar con grep que no quedaba ninguna referencia en `src/main` ni `src/test`.
   Compila y el contexto de Spring carga.
-- **Lote 6 — pendiente.** No empezar sin confirmación explícita del usuario.
-
-Los documentos `SDD/Domain/Domain Services.md` y `SDD/Software Architecture/Software Architecture.md` todavía
-mencionan las interfaces `*UseCase` borradas.
+- **Lote 6 — hecho.** Documentación SDD alineada con la arquitectura por roles:
+  - Nuevos: `SDD/Domain/Input-ports.md` (principios Role Isolation y Domain Model Parameters, definición de los 6
+    puertos, nota sobre `User` abstracto) y `SDD/Adapters/Use-cases-adapters.md` (rol de la capa, flujo, tabla
+    puerto → impl → servicios, ejemplo).
+  - Actualizados: `Software Architecture.md` (árbol de paquetes, flujo de dependencias, restricciones 11 y 12,
+    config sin `*BeanConfiguration` de casos de uso, tabla de puertos), `Domain Services.md` (servicios concretos
+    con modelos de dominio, sección "Parameters" en lugar de "Command", cambios de autorización del refactor) y una
+    línea de `Persistence.md`.
+  - Verificado con grep: no queda ninguna referencia a las interfaces `*UseCase` en `SDD/`.
 
 ## Decisiones tomadas
 

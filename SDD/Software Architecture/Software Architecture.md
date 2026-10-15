@@ -52,7 +52,10 @@ src/
             │   │       ├── controllers/
             │   │       ├── requests/
             │   │       ├── responses/
-            │   │       └── mappers/
+            │   │       ├── mappers/
+            │   │       └── exception/
+            │   │
+            │   ├── useCases/
             │   │
             │   └── out/
             │       └── persistence/
@@ -67,6 +70,7 @@ src/
             │   ├── valueobjects/
             │   ├── enums/
             │   ├── services/
+            │   │   └── authorization/
             │   ├── exceptions/
             │   └── ports/
             │       ├── in/
@@ -90,7 +94,7 @@ Root package. Contains the entry point and holds all architectural components to
 
 - Spring Boot entry point (`@SpringBootApplication`).
 - Initializes the application and starts the REST server.
-- Dependency injection of the domain is **not** configured here: domain services are plain classes (no Spring annotations), so they are registered as beans in `infrastructure/config` (see [Infrastructure](#infrastructure)).
+- Its `@SpringBootApplication` component scan covers the whole `nexussMarket` package: Domain Services (`@Service`), use case adapters (`@Service`) and output adapters are found there. Only the authorization services and three internal services are registered explicitly, in `infrastructure/config` (see [Infrastructure](#infrastructure)).
 
 ---
 
@@ -102,12 +106,12 @@ Adapters translate external requests into domain operations, and domain results 
 
 - Receive HTTP requests.
 - Validate incoming data.
-- Convert Request DTOs into the use case `Command` records defined by each input port.
-- Execute application use cases (input ports).
+- Convert Request DTOs into the domain models each port method receives.
+- Call the input port of the authenticated user's role, passing that user as the actor.
 - Convert domain results into Response DTOs.
 
 ### Controllers
-Expose REST endpoints and delegate execution to the domain. Controllers must never contain business rules.
+Expose REST endpoints and delegate execution to a role input port (`BuyerPort`, `SellerPort`, …). Controllers depend only on role ports, never on use case adapters or Domain Services, and must never contain business rules. No controller exists yet; the package only documents this design.
 
 ### Requests
 Represent incoming HTTP payloads. Perform structural/input validation only — never business validation.
@@ -116,7 +120,11 @@ Represent incoming HTTP payloads. Perform structural/input validation only — n
 Represent outgoing HTTP payloads. Hide internal domain implementation and standardize API responses.
 
 ### Mappers
-Convert Request DTO → use case `Command` and Domain Model → Response DTO, so the domain never depends on transport objects.
+Convert Request DTO → Domain Model and Domain Model → Response DTO, so the domain never depends on transport objects.
+
+## Use Case Adapters — `adapters/useCases`
+
+One class per role input port (`BuyerUseCaseImpl implements BuyerPort`, …). Each method only delegates to the corresponding Domain Service: no business rules, validations or branching. See [Use Case Adapters](../Adapters/Use-cases-adapters.md).
 
 ## Output Adapters — `adapters/out/persistence/mongodb`
 
@@ -145,29 +153,32 @@ Immutable business concepts compared by value: `SystemRole`, `UserStatus`, `Cust
 Fixed technical values without business metadata: `VariantAttributeType`, `NotificationChannel`.
 
 ## Services
-Business logic that does not naturally belong to a single entity. Each input port has one service that implements it (`<Name>UseCase` → `<Name>Service`). In addition, three internal services are not exposed as use cases:
-- `ReserveInventoryService` — reserves stock from the first active warehouse with enough available units (used by `ConfirmOrderService`).
-- `AuditOperationService` — records which authenticated user performed which operation, through `AuditLogPort`.
-- `NotifyUserService` — sends notifications through `NotificationPort`.
+Business logic that does not naturally belong to a single entity. Each operation has one concrete service class, `<Name>Service`, annotated `@Service`, with a single `execute(...)` method that receives the actor and domain models. Services implement no interface; the role input ports reach them through the use case adapters. Besides the operation services there are:
+- **Authorization services** (`domain/services/authorization`) — decide whether the actor may perform an operation.
+- **Internal services**, used by other services or by the security layer:
+  - `ReserveInventoryService` — reserves stock from the first active warehouse with enough available units (used by `ConfirmOrderService`).
+  - `ReleaseInventoryReservationService` and `ConfirmInventoryOutboundService` — release or dispatch reserved stock (used by `ConfirmOrderService`, `CancelOrderService` and `DispatchShipmentService`).
+  - `AuditOperationService` — records which authenticated user performed which operation, through `AuditLogPort`.
+  - `NotifyUserService` — sends notifications through `NotificationPort`.
 
-When a service needs another use case (e.g. `CancelOrderService` releasing reservations), it depends on the input port interface, not on the concrete service.
+When a service needs another one (e.g. `CancelOrderService` releasing reservations), it injects the concrete service. See [Domain Services](../Domain/Domain%20Services.md).
 
 ## Ports
 
 Ports define the communication contracts owned by the domain.
 
-### Input Ports (use cases)
+### Input Ports (one per role)
 
-Each use case is an interface with a nested `Command` record (its input) and a single `execute(Command)` method.
+Each role has one input port listing every operation it can execute. Parameters are domain models, and every port except `PublicAccessPort` receives the authenticated `User` first. See [Input Ports](../Domain/Input-ports.md).
 
-| Area       | Use cases |
-| ---------- | --------- |
-| Users      | `AuthenticateUserUseCase`, `RegisterBuyerUseCase`, `RegisterSellerUseCase`, `RegisterLogisticsOperatorUseCase`, `RegisterSupervisorUseCase`, `UpdateUserStatusUseCase`, `UpdateSellerStatusUseCase` |
-| Warehouses | `RegisterWarehouseUseCase`, `DeactivateWarehouseUseCase` |
-| Catalog    | `PublishProductUseCase`, `UpdateProductStatusUseCase`, `UpdateProductVariantsUseCase` |
-| Inventory  | `RegisterInventoryInboundUseCase`, `RegisterInventoryReturnUseCase`, `AdjustInventoryUseCase`, `ReportDamagedInventoryUseCase`, `ReleaseInventoryReservationUseCase`, `ConfirmInventoryOutboundUseCase` |
-| Carts      | `CreateShoppingCartUseCase`, `AddCartLineUseCase`, `UpdateCartLineQuantityUseCase`, `RemoveCartLineUseCase` |
-| Orders     | `ConfirmOrderUseCase`, `AdvanceOrderStatusUseCase`, `CancelOrderUseCase` |
+| Port | Role | Implemented by | Operations |
+| ---- | ---- | -------------- | ---------- |
+| `PublicAccessPort` | No authenticated user | `PublicAccessUseCaseImpl` | `authenticate`, `registerBuyer` |
+| `BuyerPort` | `BUYER` | `BuyerUseCaseImpl` | `createShoppingCart`, `addCartLine`, `updateCartLineQuantity`, `removeCartLine`, `consultCart`, `confirmOrder`, `cancelOrder`, `consultOrder`, `listBuyerOrders`, `listPublishedProducts`, `consultProduct`, `requestReturn` |
+| `SellerPort` | `SELLER` | `SellerUseCaseImpl` | `publishProduct`, `updateProductStatus`, `updateProductVariants`, `listSellerProducts`, `consultProduct`, `registerWarehouse`, `registerInventoryInbound`, `adjustInventory`, `consultInventory` |
+| `AdministratorPort` | `ADMINISTRATOR` | `AdministratorUseCaseImpl` | `registerSeller`, `registerSupervisor`, `registerLogisticsOperator`, `updateSellerStatus`, `updateUserStatus`, `registerMarketplaceWarehouse`, `deactivateWarehouse`, `approveReturn`, `rejectReturn`, `processRefund`, `consultUser` |
+| `LogisticsOperatorPort` | `LOGISTICS_OPERATOR` | `LogisticsOperatorUseCaseImpl` | `consultOrder`, `advanceOrderStatus`, `createShipment`, `packShipment`, `dispatchShipment`, `confirmDelivery`, `reportDamagedInventory`, `registerInventoryReturn`, `consultInventory` |
+| `SupervisorPort` | `SUPERVISOR` | `SupervisorUseCaseImpl` | `consultOrder`, `consultInventory`, `consultProduct`, `consultUser`, `listPublishedProducts` |
 
 ### Output Ports (dependencies)
 
@@ -180,10 +191,14 @@ Each use case is an interface with a nested `Command` record (its input) and a s
 | `InventoryMovementRepositoryPort`  | MongoDB adapter |
 | `CartRepositoryPort`               | MongoDB adapter |
 | `OrderRepositoryPort`              | MongoDB adapter |
+| `ShipmentRepositoryPort`           | MongoDB adapter |
+| `InvoiceRepositoryPort`            | MongoDB adapter |
+| `ReturnRequestRepositoryPort`      | MongoDB adapter |
+| `RefundRepositoryPort`             | MongoDB adapter |
 | `AuditLogPort`                     | MongoDB adapter |
 | `PasswordHasherPort`               | Security adapter (`infrastructure/security`) |
 | `TokenServicePort`                 | Security adapter (`infrastructure/security`, JWT) |
-| `NotificationPort`                 | Notification adapter (not yet defined) |
+| `NotificationPort`                 | `LoggingNotificationAdapter` (logs the message; no real channel yet) |
 
 ## Exceptions
 Business exceptions belong exclusively to the domain: `EntityNotFoundException`, `DuplicateResourceException`, `InsufficientStockException`, `InvalidOrderStatusTransitionException`, `InvalidShipmentStatusTransitionException`, `SellerNotAuthorizedException`, `OperationNotAllowedException`, `BusinessRuleViolationException`, `InvalidCredentialsException`. All of them extend `DomainException`.
@@ -195,7 +210,9 @@ Business exceptions belong exclusively to the domain: `EntityNotFoundException`,
 Technical configuration required by the application. No business logic.
 
 ## Config
-REST configuration, serialization, environment configuration, and **domain wiring**: a configuration class registers every domain service as a Spring bean, injecting the adapters that implement its output ports. This is the only place where the domain meets Spring, and it can only be completed once the output adapters exist.
+REST configuration, serialization, environment configuration, and the part of the domain wiring that component scan does not cover. There are no per-use-case `*BeanConfiguration` classes: Domain Services and use case adapters are `@Service` classes found by component scan. Only two configuration classes remain:
+- `AuthorizationBeanConfiguration` — registers the six authorization services, which are plain classes.
+- `InternalServiceBeanConfiguration` — registers `ReserveInventoryService`, `AuditOperationService` and `NotifyUserService`, which are plain classes as well.
 
 ## Database
 MongoDB connection configuration (connection URI, database name), client initialization, and index configuration.
@@ -249,7 +266,10 @@ When implementing `documents/` in the MongoDB adapter, an `Order` document conta
 REST Controller
         │
         ▼
-Input Port
+Role Input Port
+        │
+        ▼
+UseCaseImpl (adapters/useCases)
         │
         ▼
 Domain Service
@@ -264,7 +284,7 @@ MongoDB Persistence Adapter
 Database
 ```
 
-The domain never depends on adapters or infrastructure; all dependencies point inward, toward the domain.
+The domain never depends on adapters or infrastructure; all dependencies point inward, toward the domain. The controller knows only the role input port; the use case adapter implements that port and calls the Domain Service, which reaches persistence only through output ports.
 
 ---
 
@@ -280,3 +300,5 @@ The domain never depends on adapters or infrastructure; all dependencies point i
 8. Every dependency must point toward the Domain.
 9. Business entities must remain framework-independent.
 10. The Domain must be fully testable without requiring infrastructure components.
+11. Controllers depend only on role input ports (`BuyerPort`, `SellerPort`, …), never on use case adapters or Domain Services.
+12. Use case adapters (`*UseCaseImpl`) contain no logic: each method only delegates to one Domain Service.
