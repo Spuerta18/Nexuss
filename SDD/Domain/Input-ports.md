@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Input ports are the contracts through which the outside world (REST controllers, today only planned) asks the domain to do something. NexusMarket defines **one input port per role**: each port lists every operation that role can execute, and nothing else.
+Input ports are the contracts through which the outside world (the REST controllers, see [REST API Endpoints](../Adapters/Api-rest-endpoints.md)) asks the domain to do something. NexusMarket defines **one input port per role**: each port lists every operation that role can execute, and nothing else.
 
 The ports live in `domain/ports/in`. Each one is implemented by a single class in `adapters/useCases` that only delegates to the Domain Services (see [Use Case Adapters](../Adapters/Use-cases-adapters.md)), where the business rules and authorization checks live (see [Domain Services](Domain%20Services.md)).
 
@@ -214,6 +214,6 @@ public interface SupervisorPort {
 
 These operations work on any role, so the port cannot narrow the type. The service only reads `target.getIdentifier()` and loads the real user, so any subclass works as a reference. But a REST request usually carries only the user identifier, and **the mapper of a future controller cannot build a `User` from an identifier alone without knowing which subclass to instantiate**.
 
-Before those controllers are written, a way to build that reference must be decided (for example, a dedicated reference subtype of `User`). Until then, these three operations cannot be exposed through REST from an identifier alone.
+The REST adapter solves it without changing the ports: the client sends the role of the target user (in the request body, or as a `role` query parameter for `GET`), and the mapper builds a reference of that subtype. The services only read the identifier, so a wrong role still acts on the right user. See [REST Adapters](../Adapters/Rest-adapters.md#abstract-user-references) for this limitation.
 
 The other operations do not have this problem: when the parameter is a concrete role (`Seller seller`, `Buyer buyer`), the mapper knows which class to build.

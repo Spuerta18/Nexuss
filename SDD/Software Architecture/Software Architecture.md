@@ -111,17 +111,22 @@ Adapters translate external requests into domain operations, and domain results 
 - Call the input port of the authenticated user's role, passing that user as the actor.
 - Convert domain results into Response DTOs.
 
+See [REST Adapters](../Adapters/Rest-adapters.md) and the full list of [REST API Endpoints](../Adapters/Api-rest-endpoints.md).
+
 ### Controllers
-Expose REST endpoints and delegate execution to a role input port (`BuyerPort`, `SellerPort`, …). Controllers depend only on role ports, never on use case adapters or Domain Services, and must never contain business rules. No controller exists yet; the package only documents this design.
+One controller per role input port: `AuthRestController` (`PublicAccessPort`), `BuyerRestController`, `SellerRestController`, `AdministratorRestController`, `LogisticsOperatorRestController` and `SupervisorRestController`. Each injects only its role port, never use case adapters or Domain Services, is restricted to its role with `@PreAuthorize` at class level, and contains no business rules. The actor is the authenticated user, read from the security context.
 
 ### Requests
-Represent incoming HTTP payloads. Perform structural/input validation only — never business validation.
+Represent incoming HTTP payloads as records. Perform structural/input validation only, with Jakarta Validation (`@Valid`) — never business validation. See [REST Validation](../Adapters/Rest-validation.md).
 
 ### Responses
-Represent outgoing HTTP payloads. Hide internal domain implementation and standardize API responses.
+Represent outgoing HTTP payloads as records. Hide internal domain implementation (related entities appear by identifier, never a password hash) and standardize API responses, including the uniform `ErrorResponse`.
 
 ### Mappers
-Convert Request DTO → Domain Model and Domain Model → Response DTO, so the domain never depends on transport objects.
+Convert Request DTO → Domain Model and Domain Model → Response DTO, so the domain never depends on transport objects. `DomainReferences` builds references from identifiers; for the abstract `User`, the subtype comes from the role sent by the client.
+
+### Exception
+`GlobalExceptionHandler` maps domain and framework exceptions to HTTP statuses with the uniform `ErrorResponse` body. See [Global Exception Handler](../Adapters/Global-exception-handler.md).
 
 ## Use Case Adapters — `adapters/useCases`
 
@@ -225,9 +230,11 @@ Data the application needs before anyone can use it. Every seeder is idempotent.
 - `InitialAdministratorSeeder` (an `ApplicationRunner`) creates the first `Administrator` when no administrator exists and both `NEXUS_ADMIN_EMAIL` and `NEXUS_ADMIN_PASSWORD` are set (bound to `nexus.seed.admin.*`). Without them it creates nothing and logs it, without querying the database. The password is hashed through `PasswordHasherPort` (BCrypt) and never logged. It works through the output ports (`UserRepositoryPort`, `PasswordHasherPort`), not through a Domain Service, because every registration service requires an administrator actor, which does not exist yet.
 
 ## Security
-Authentication and authorization configuration (e.g. JWT configuration, authentication filters). It also contains:
-- The adapter implementing `PasswordHasherPort` (e.g. with a Spring Security `PasswordEncoder`). The domain only stores `User.passwordHash` and never knows the algorithm.
-- The filter/interceptor that calls `AuditOperationService` for every authenticated request, so every operation is traceable to its `User`.
+Authentication, authorization and CORS configuration (see [REST Security and CORS](../Adapters/Rest-security-cors.md)):
+- `SecurityConfig`: stateless filter chain, public routes (login, buyer registration), `401` / `403` with the uniform error body, method security for `@PreAuthorize`, and CORS for the origins in `NEXUS_CORS_ORIGINS`.
+- `JwtProvider` and `JwtTokenServiceAdapter` (implements `TokenServicePort`): HMAC-signed tokens (HS256/HS384/HS512, chosen by the key length) carrying the user identifier, role and email.
+- `JwtAuthenticationFilter`: validates the token, reloads the user from the database and rejects it if it is not `ACTIVE` or its stored role differs from the token; it also calls `AuditOperationService` for every authenticated request, so every operation is traceable to its `User`.
+- The adapter implementing `PasswordHasherPort` (`BCryptPasswordHasherAdapter`). The domain only stores `User.passwordHash` and never knows the algorithm.
 
 ---
 

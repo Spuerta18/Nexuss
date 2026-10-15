@@ -18,15 +18,21 @@ import io.jsonwebtoken.security.Keys;
 import nexussMarket.domain.models.User;
 
 /**
- * Issues and validates the HS256-signed JWTs used to authenticate requests.
+ * Issues and validates the HMAC-signed JWTs used to authenticate requests. The
+ * algorithm follows the key length: HS256 for a 32-byte key, HS384 for 48 bytes,
+ * HS512 for 64 bytes or more.
  * Tokens carry the user identifier as {@code sub}, the {@code SystemRole}
- * code as {@code role}, and the {@code iat} / {@code exp} timestamps.
+ * code as {@code role}, the {@code email}, and the {@code iat} / {@code exp}
+ * timestamps: enough to rebuild the right {@code User} subtype, which the
+ * authentication filter then reloads from the database (see
+ * {@link JwtAuthenticationFilter}).
  */
 @Component
 public class JwtProvider {
 
     private static final Logger log = LoggerFactory.getLogger(JwtProvider.class);
     private static final String ROLE_CLAIM = "role";
+    private static final String EMAIL_CLAIM = "email";
 
     private final SecretKey signingKey;
     private final JwtProperties properties;
@@ -47,6 +53,7 @@ public class JwtProvider {
         return Jwts.builder()
                 .subject(user.getIdentifier())
                 .claim(ROLE_CLAIM, user.getRole().getCode())
+                .claim(EMAIL_CLAIM, user.getEmail())
                 .issuedAt(Date.from(issuedAt))
                 .expiration(Date.from(issuedAt.plus(properties.expiration())))
                 .signWith(signingKey)
@@ -65,7 +72,8 @@ public class JwtProvider {
                 return Optional.empty();
             }
             return Optional.of(new JwtClaims(claims.getSubject(), claims.get(ROLE_CLAIM, String.class),
-                    toInstant(claims.getIssuedAt()), claims.getExpiration().toInstant()));
+                    claims.get(EMAIL_CLAIM, String.class), toInstant(claims.getIssuedAt()),
+                    claims.getExpiration().toInstant()));
         } catch (JwtException | IllegalArgumentException e) {
             log.debug("Rejected JWT: {}", e.getMessage());
             return Optional.empty();
@@ -77,6 +85,6 @@ public class JwtProvider {
     }
 
     /** Validated content of a token. */
-    public record JwtClaims(String userId, String role, Instant issuedAt, Instant expiresAt) {
+    public record JwtClaims(String userId, String role, String email, Instant issuedAt, Instant expiresAt) {
     }
 }

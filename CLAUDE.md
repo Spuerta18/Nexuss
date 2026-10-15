@@ -27,6 +27,7 @@ Run from `Application/`:
 | `NEXUS_JWT_SECRET` | Yes | Base64 HMAC key, at least 32 bytes. Without it the application does not start. |
 | `NEXUS_MONGO_URI` | No | MongoDB URI; defaults to `mongodb://localhost:27017/nexusmarket`. |
 | `NEXUS_ADMIN_EMAIL`, `NEXUS_ADMIN_PASSWORD` | No | Initial administrator, created at startup only when no administrator exists. |
+| `NEXUS_CORS_ORIGINS` | No | Comma-separated origins allowed by CORS; defaults to `http://localhost:3000,http://localhost:5173`. |
 
 The application creates the MongoDB indexes at startup (`spring.data.mongodb.auto-index-creation=true`), so it needs
 a reachable MongoDB server to start.
@@ -44,7 +45,10 @@ a reachable MongoDB server to start.
 - `adapters/useCases`: one `*UseCaseImpl` class per port (`@Service` + `@RequiredArgsConstructor`). Each method
   **only delegates** to the corresponding Domain Service: no `if`, no validations, no logic.
 - `domain/ports/out` + `adapters/out/persistence`: MongoDB persistence.
-- `adapters/in/rest`: REST controllers, mappers and DTOs.
+- `adapters/in/rest`: REST layer (see `SDD/Adapters/Rest-adapters.md`): one controller per role port, each injecting
+  only its port, `@PreAuthorize` by role at class level; request/response records with Jakarta Validation; static
+  mappers (`DomainReferences` builds references from identifiers); `GlobalExceptionHandler` with the uniform
+  `ErrorResponse`.
 - `infrastructure/config`, `infrastructure/security`: bean configuration and JWT security.
 
 ## Status of the `domain/ports/in` Refactor
@@ -94,6 +98,15 @@ a reachable MongoDB server to start.
 - **Unit tests** (no MongoDB needed): `UserMapperTest`, `InventoryItemMapperTest`, `MoneyMapperTest`, `MoneyTest`,
   `ShoppingCartTest`, `OrderTest`, `UserTest`, `InitialAdministratorSeederTest`.
 
+## Status of the REST Layer
+
+- **Done.** Six controllers (`AuthRestController` + one per role) covering every port method, plus `GET /api/me`.
+  Endpoints in `SDD/Adapters/Api-rest-endpoints.md`; security in `Rest-security-cors.md`; validation in
+  `Rest-validation.md`; errors in `Global-exception-handler.md`.
+- **Tests** (no MongoDB needed): one `*RestControllerTest` per controller, all extending `RestControllerTestSupport`
+  (full context, real security, every role port mocked plus `UserRepositoryPort` and `AuditLogPort`, so a single
+  cached context serves all of them), and `RestMappersTest`.
+
 ## Decisions
 
 - **Carts, `BUYER` only:** `AddCartLineService`, `UpdateCartLineQuantityService`, `RemoveCartLineService` and
@@ -119,6 +132,14 @@ a reachable MongoDB server to start.
   confirmation. Reviewed: `Buyer.setCarts` / `setOrders` and `Seller.setWarehouses` / `setProducts` can attach
   entities owned by someone else; the other setters break no business rule. (`User.setIdentifier` and
   `User.setEmail`, which could bypass the uniqueness rule, were removed in Batch E.)
+
+- **JWT and fresh state:** the token carries `sub`, `role` and `email`, but `JwtAuthenticationFilter` reloads the user
+  from the database on every request and rejects it if it is not `ACTIVE` or its stored role differs from the token.
+- **Abstract `User` targets in REST:** the client sends the target user's role (body of `PATCH /users/{id}/status`,
+  `?role=` on `GET /users/{id}`) and the mapper builds that subtype. The services only read the identifier.
+- **Login errors:** a wrong email and a wrong password both answer `401` with `"Invalid email or password"`.
+- **Passwords:** 8 to 72 characters in `RegisterBuyerRequest` and `RegisterStaffRequest`. Passwords and tokens never
+  appear in logs or in `ErrorResponse` (records mask them in `toString`; validation errors omit rejected values).
 
 ## Working Rules
 

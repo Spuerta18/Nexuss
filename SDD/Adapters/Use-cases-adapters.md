@@ -30,7 +30,7 @@ adapters/useCases/
 # Request Flow
 
 ```text
-REST Controller            adapters/in/rest/controllers (planned)
+REST Controller            adapters/in/rest/controllers
    │  Request DTO → domain models (mappers), authenticated User from the security layer
    ▼
 Role Input Port            domain/ports/in          e.g. BuyerPort.cancelOrder(user, order)

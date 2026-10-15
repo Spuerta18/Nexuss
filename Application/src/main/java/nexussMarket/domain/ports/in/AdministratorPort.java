@@ -17,8 +17,8 @@ import nexussMarket.domain.valueobjects.UserStatus;
  *
  * <p>{@code target} parameters are typed as the abstract {@link User}: a caller
  * that only knows a user identifier cannot build a reference from it without
- * knowing the concrete role, so REST adapters will need a way to build user
- * references once they exist.</p>
+ * knowing the concrete role, so the REST adapter asks the client for the role
+ * of the target user and builds a reference of that subtype.</p>
  */
 public interface AdministratorPort {
 

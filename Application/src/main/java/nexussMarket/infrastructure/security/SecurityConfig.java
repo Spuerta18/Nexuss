@@ -1,32 +1,41 @@
 package nexussMarket.infrastructure.security;
 
+import java.util.List;
+
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import nexussMarket.adapters.in.rest.exception.RestErrors;
 import nexussMarket.domain.services.AuditOperationService;
 
 /**
  * Stateless JWT security: no HTTP session, no form login, no HTTP Basic and
  * no CSRF (tokens travel in the {@code Authorization} header, not in
  * cookies). Only login and buyer self-registration are public; every other
- * route requires a valid token. Unauthenticated requests get {@code 401};
- * role checks are left to {@code @PreAuthorize} on each endpoint.
+ * route requires a valid token. Unauthenticated requests get {@code 401} and
+ * requests rejected by a role check get {@code 403}, both with the uniform
+ * error body; role checks are declared with {@code @PreAuthorize} on each
+ * controller. CORS allows the origins configured in {@link CorsProperties}.
  */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, CorsProperties.class})
 public class SecurityConfig {
 
     /** Public endpoint where users exchange their credentials for a token. */
@@ -44,9 +53,13 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
+                .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(exceptions ->
-                        exceptions.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, ex) -> RestErrors.write(response,
+                                HttpStatus.UNAUTHORIZED, "Authentication required", request))
+                        .accessDeniedHandler((request, response, ex) -> RestErrors.write(response,
+                                HttpStatus.FORBIDDEN, "Access denied", request)))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, LOGIN_PATH, BUYER_REGISTRATION_PATH).permitAll()
                         // Lets Spring's error page answer with the real status instead of a 401.
@@ -55,5 +68,25 @@ public class SecurityConfig {
                 .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, userDetailsService, auditOperationService),
                         UsernamePasswordAuthenticationFilter.class);
         return http.build();
+    }
+
+    /**
+     * Browsers may call the API from the configured origins. The token travels
+     * in the {@code Authorization} header, so credentials (cookies) are not
+     * allowed.
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(CorsProperties properties) {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(properties.allowedOrigins());
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE,
+                RestErrors.REQUEST_ID_HEADER));
+        configuration.setExposedHeaders(List.of(RestErrors.REQUEST_ID_HEADER));
+        configuration.setAllowCredentials(false);
+        configuration.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", configuration);
+        return source;
     }
 }
