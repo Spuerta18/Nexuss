@@ -79,7 +79,8 @@ src/
             └── infrastructure/
                 ├── config/
                 ├── database/
-                └── security/
+                ├── security/
+                └── seed/
 ```
 
 ---
@@ -214,8 +215,14 @@ REST configuration, serialization, environment configuration, and the part of th
 - `AuthorizationBeanConfiguration` — registers the six authorization services, which are plain classes.
 - `InternalServiceBeanConfiguration` — registers `ReserveInventoryService`, `AuditOperationService` and `NotifyUserService`, which are plain classes as well.
 
+The startup seeders have their own configuration class, `SeedConfiguration`, in `infrastructure/seed` (see [Seed](#seed)).
+
 ## Database
-MongoDB connection configuration (connection URI, database name), client initialization, and index configuration.
+MongoDB connection configuration (connection URI, database name), client initialization, and index configuration. No class is needed today: Spring Boot's auto-configuration builds the client from `spring.mongodb.uri` (`NEXUS_MONGO_URI`), and the indexes declared on the documents are created at startup because `application.properties` sets `spring.data.mongodb.auto-index-creation=true`. In Spring Boot 4.1.1 this property stays under `spring.data.mongodb` (it is defined by `spring-boot-data-mongodb`), while the connection properties moved to `spring.mongodb`. The tests set it to `false`, since they run without a MongoDB server. The package is kept for configuration that auto-configuration cannot express.
+
+## Seed
+Data the application needs before anyone can use it. Every seeder is idempotent.
+- `InitialAdministratorSeeder` (an `ApplicationRunner`) creates the first `Administrator` when no administrator exists and both `NEXUS_ADMIN_EMAIL` and `NEXUS_ADMIN_PASSWORD` are set (bound to `nexus.seed.admin.*`). Without them it creates nothing and logs it, without querying the database. The password is hashed through `PasswordHasherPort` (BCrypt) and never logged. It works through the output ports (`UserRepositoryPort`, `PasswordHasherPort`), not through a Domain Service, because every registration service requires an administrator actor, which does not exist yet.
 
 ## Security
 Authentication and authorization configuration (e.g. JWT configuration, authentication filters). It also contains:

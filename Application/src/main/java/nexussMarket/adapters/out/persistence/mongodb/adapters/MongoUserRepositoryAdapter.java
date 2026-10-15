@@ -8,6 +8,7 @@ import nexussMarket.adapters.out.persistence.mongodb.mappers.UserMapper;
 import nexussMarket.adapters.out.persistence.mongodb.repositories.UserMongoRepository;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
+import nexussMarket.domain.valueobjects.SystemRole;
 
 /** Implements {@link UserRepositoryPort} on the {@code users} collection. */
 @Repository
@@ -43,5 +44,10 @@ public class MongoUserRepositoryAdapter implements UserRepositoryPort {
     @Override
     public boolean existsByEmail(String email) {
         return userRepository.existsByEmail(email);
+    }
+
+    @Override
+    public boolean existsByRole(SystemRole role) {
+        return userRepository.existsByUserType(role.getCode());
     }
 }

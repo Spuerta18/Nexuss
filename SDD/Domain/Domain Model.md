@@ -147,7 +147,8 @@ This class cannot be instantiated directly.
 * A user cannot manage information outside the scope of their role (RG-03).
 * `identifier` and `email` must be unique across the platform.
 * Only users whose `status` is `ACTIVE` can authenticate.
-* The `role` is fixed by the concrete subclass when the user is created (e.g. a `Buyer` is always `BUYER`) and can never be changed afterwards: `User` has no role setter.
+* The `role` is fixed by the concrete subclass when the user is created (e.g. a `Buyer` is always `BUYER`) and can never be changed afterwards.
+* `identifier`, `email` and `role` have no setters: they are fixed when the user is created, so the uniqueness checked at registration cannot be bypassed later.
 
 ---
 

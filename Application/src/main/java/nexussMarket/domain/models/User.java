@@ -10,12 +10,16 @@ import nexussMarket.domain.valueobjects.UserStatus;
  *
  * <p>Each user has exactly one role. This class cannot be instantiated
  * directly.</p>
+ *
+ * <p>{@code identifier}, {@code email} and {@code role} are fixed when the
+ * user is created and have no setters: their uniqueness is checked at
+ * registration, so changing them later would bypass that check.</p>
  */
 public abstract class User {
 
-    private String identifier;
+    private final String identifier;
     private String fullName;
-    private String email;
+    private final String email;
     private final SystemRole role;
     private UserStatus status;
     private String passwordHash;
@@ -33,10 +37,6 @@ public abstract class User {
         return identifier;
     }
 
-    public void setIdentifier(String identifier) {
-        this.identifier = identifier;
-    }
-
     /** Full name of the person or legal name of the business. */
     public String getFullName() {
         return fullName;
@@ -49,10 +49,6 @@ public abstract class User {
     /** Primary email address, unique across the platform. */
     public String getEmail() {
         return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
     }
 
     /** Business role defining the user's responsibilities within the system. */

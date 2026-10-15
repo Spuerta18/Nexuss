@@ -17,7 +17,19 @@ Run from `Application/`:
 
 `ApplicationTests.contextLoads` starts the full context without a running MongoDB: the driver logs
 `MongoSocketOpenException` in its monitor thread, but the context still loads. The test JWT secret is in
-`src/test/resources/application.properties`.
+`src/test/resources/application.properties`, which also sets `spring.data.mongodb.auto-index-creation=false`
+(index creation at startup needs a MongoDB server). That file shadows the main `application.properties` in tests.
+
+## Environment Variables
+
+| Variable | Required | Purpose |
+| -------- | -------- | ------- |
+| `NEXUS_JWT_SECRET` | Yes | Base64 HMAC key, at least 32 bytes. Without it the application does not start. |
+| `NEXUS_MONGO_URI` | No | MongoDB URI; defaults to `mongodb://localhost:27017/nexusmarket`. |
+| `NEXUS_ADMIN_EMAIL`, `NEXUS_ADMIN_PASSWORD` | No | Initial administrator, created at startup only when no administrator exists. |
+
+The application creates the MongoDB indexes at startup (`spring.data.mongodb.auto-index-creation=true`), so it needs
+a reachable MongoDB server to start.
 
 ## Architecture (hexagonal, aligned with the professor's architecture)
 
@@ -71,8 +83,16 @@ Run from `Application/`:
   Unused setters were removed and mappers rebuild entities through constructors.
 - **Batch D — done.** `Domain Model.md`, `Domain Value Objects.md`, `Domain Services.md` and `Persistence.md`
   updated (Money, Currency, entity behavior, `AuthenticationResult`).
+- **Batch E — done.**
+  - Removed `User.setIdentifier` and `User.setEmail`: identifier, email and role are fixed by the constructor.
+  - Indexes are created at startup with `spring.data.mongodb.auto-index-creation=true`. Verified in the
+    `spring-boot-data-mongodb-4.1.1` metadata: unlike the connection URI (`spring.mongodb.*`), this property keeps
+    the `spring.data.mongodb` prefix.
+  - `infrastructure/seed/InitialAdministratorSeeder` creates the first administrator from `NEXUS_ADMIN_EMAIL` /
+    `NEXUS_ADMIN_PASSWORD` (identifier `INITIAL-ADMIN`), idempotently; without the variables it only logs.
+    `UserRepositoryPort.existsByRole` was added for it.
 - **Unit tests** (no MongoDB needed): `UserMapperTest`, `InventoryItemMapperTest`, `MoneyMapperTest`, `MoneyTest`,
-  `ShoppingCartTest`, `OrderTest`.
+  `ShoppingCartTest`, `OrderTest`, `UserTest`, `InitialAdministratorSeederTest`.
 
 ## Decisions
 
@@ -96,9 +116,9 @@ Run from `Application/`:
 - **Price required:** `PublishProductService` requires a price that is not null and greater than zero.
 - **No data migration** for the new money format: documents stored before Batch B cannot be read.
 - **Remaining setters** in `User`, `Buyer` and `Seller` are kept for now; do not remove them without the user's
-  confirmation. Reviewed: `User.setIdentifier` and `User.setEmail` can bypass the uniqueness rule (checked only at
-  registration), and `Buyer.setCarts` / `setOrders` and `Seller.setWarehouses` / `setProducts` can attach entities
-  owned by someone else. The other setters break no business rule.
+  confirmation. Reviewed: `Buyer.setCarts` / `setOrders` and `Seller.setWarehouses` / `setProducts` can attach
+  entities owned by someone else; the other setters break no business rule. (`User.setIdentifier` and
+  `User.setEmail`, which could bypass the uniqueness rule, were removed in Batch E.)
 
 ## Working Rules
 

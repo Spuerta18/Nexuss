@@ -70,7 +70,7 @@ The embed-vs-reference decisions are exactly those of the [Persistence Strategy]
 }
 ```
 
-Indexes: unique on `email`. See [User Hierarchy](#user-hierarchy).
+Indexes: unique on `email`. `UserRepositoryPort.existsByRole` queries by `userType` (used once at startup by the initial administrator seeder). See [User Hierarchy](#user-hierarchy).
 
 ### `warehouses`
 
@@ -261,9 +261,18 @@ There is no real notification channel yet ([Domain Services](../Domain/Domain%20
 
 ---
 
+# Index Creation
+
+The indexes declared on the documents (`@Indexed`, `@CompoundIndex`) are created at startup: `application.properties` sets `spring.data.mongodb.auto-index-creation=true`. In Spring Boot 4.1.1 the property is defined by `spring-boot-data-mongodb` (`DataMongoProperties.autoIndexCreation`), which scans the `@Document` classes and enables index creation on the mapping context, so the indexes of all twelve collections are created when the application starts.
+
+* Startup therefore needs a reachable MongoDB server: without one, index creation fails after the driver's server selection timeout and the application does not start.
+* The tests set the property to `false`, since they run without a MongoDB server.
+* Creating an index that already exists is a no-op, so restarts are safe. Changing the definition of an existing index (e.g. making it unique) fails at startup until the old index is dropped by hand.
+
+---
+
 # Known Gaps
 
-* **Index creation is not enabled yet.** Indexes are declared on the documents (`@Indexed`, `@CompoundIndex`), but Spring Data MongoDB does not create them automatically unless `spring.data.mongodb.auto-index-creation=true` or they are created explicitly in `infrastructure/database`. Until then the unique `email` index is not enforced by the database (the services still check duplicates), and neither are the unique `orderId` / `returnRequestId` indexes of `shipments`, `invoices`, `return_requests` and `refunds` (the services check them with `findByOrderId` before creating, which two concurrent requests can both pass).
 * **No multi-document transactions.** `ConfirmOrderService` reserves stock in several `inventory_items`, saves the order and deletes the cart as separate writes. The same applies to `AdvanceOrderStatusService` (order, then invoice), `DispatchShipmentService` (stock of every line, order, shipment) and `ApproveReturnService` (stock of every line, return request, refund). MongoDB transactions require a replica set and a `MongoTransactionManager`, to be decided in `infrastructure/`.
 * **No optimistic locking on stock.** Two concurrent reservations on the same `InventoryItem` can overwrite each other (last write wins). Adding `@Version` needs the version to travel with the domain object, which the current domain model does not carry.
 * **`_class` type hints.** Spring Data writes a `_class` field on every document. It is harmless (the `userType` discriminator does not depend on it) and can be disabled with a custom `MappingMongoConverter` in `infrastructure/database`.
