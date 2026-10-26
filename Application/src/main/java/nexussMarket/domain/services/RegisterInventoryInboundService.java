@@ -6,6 +6,7 @@ import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.InventoryItem;
 import nexussMarket.domain.models.InventoryMovement;
+import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
@@ -14,7 +15,9 @@ import nexussMarket.domain.ports.out.InventoryRepositoryPort;
 import nexussMarket.domain.ports.out.ProductRepositoryPort;
 import nexussMarket.domain.ports.out.WarehouseRepositoryPort;
 import nexussMarket.domain.services.authorization.AuthorizeWarehouseOperationService;
+import nexussMarket.domain.valueobjects.AffectedEntityType;
 import nexussMarket.domain.valueobjects.InventoryMovementType;
+import nexussMarket.domain.valueobjects.OperationType;
 import nexussMarket.domain.valueobjects.ProductType;
 
 /**
@@ -30,17 +33,20 @@ public class RegisterInventoryInboundService {
     private final ProductRepositoryPort productRepositoryPort;
     private final WarehouseRepositoryPort warehouseRepositoryPort;
     private final AuthorizeWarehouseOperationService authorizeWarehouseOperationService;
+    private final RegisterOperationAndAuditService registerOperationAndAuditService;
 
     public RegisterInventoryInboundService(InventoryRepositoryPort inventoryRepositoryPort,
                                            InventoryMovementRepositoryPort inventoryMovementRepositoryPort,
                                            ProductRepositoryPort productRepositoryPort,
                                            WarehouseRepositoryPort warehouseRepositoryPort,
-                                           AuthorizeWarehouseOperationService authorizeWarehouseOperationService) {
+                                           AuthorizeWarehouseOperationService authorizeWarehouseOperationService,
+                                           RegisterOperationAndAuditService registerOperationAndAuditService) {
         this.inventoryRepositoryPort = inventoryRepositoryPort;
         this.inventoryMovementRepositoryPort = inventoryMovementRepositoryPort;
         this.productRepositoryPort = productRepositoryPort;
         this.warehouseRepositoryPort = warehouseRepositoryPort;
         this.authorizeWarehouseOperationService = authorizeWarehouseOperationService;
+        this.registerOperationAndAuditService = registerOperationAndAuditService;
     }
 
     public InventoryItem execute(User actor, Product product, Warehouse warehouse, int quantity) {
@@ -54,10 +60,16 @@ public class RegisterInventoryInboundService {
             throw new BusinessRuleViolationException(
                     "Warehouse " + warehouseId + " is inactive and cannot receive stock");
         }
+        int previousAvailable = item.getAvailableQuantity();
         item.receive(quantity);
         InventoryItem saved = inventoryRepositoryPort.save(item);
         inventoryMovementRepositoryPort.save(
                 InventoryMovement.of(item, InventoryMovementType.INBOUND, quantity));
+        registerOperationAndAuditService.execute(
+                Operation.of(OperationType.INVENTORY_INBOUND, actor, AffectedEntityType.INVENTORY_ITEM, item.getIdentifier()),
+                AuditDetails.of("productId", productId, "warehouseId", warehouseId,
+                        "quantity", quantity, "previousAvailableQuantity", previousAvailable,
+                        "newAvailableQuantity", item.getAvailableQuantity()));
         return saved;
     }
 

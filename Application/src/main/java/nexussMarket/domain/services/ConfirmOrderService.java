@@ -10,6 +10,7 @@ import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.Buyer;
 import nexussMarket.domain.models.CartLine;
 import nexussMarket.domain.models.InventoryItem;
+import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.OrderLine;
 import nexussMarket.domain.models.Product;
@@ -19,7 +20,9 @@ import nexussMarket.domain.ports.out.CartRepositoryPort;
 import nexussMarket.domain.ports.out.OrderRepositoryPort;
 import nexussMarket.domain.services.authorization.AuthorizeCartAccessService;
 import nexussMarket.domain.services.authorization.ValidateRoleAuthorizationService;
+import nexussMarket.domain.valueobjects.AffectedEntityType;
 import nexussMarket.domain.valueobjects.CustomerStatus;
+import nexussMarket.domain.valueobjects.OperationType;
 import nexussMarket.domain.valueobjects.OrderStatus;
 import nexussMarket.domain.valueobjects.ProductStatus;
 import nexussMarket.domain.valueobjects.SystemRole;
@@ -40,19 +43,22 @@ public class ConfirmOrderService {
     private final ReserveInventoryService reserveInventoryService;
     private final ReleaseInventoryReservationService releaseInventoryReservationService;
     private final ValidateRoleAuthorizationService validateRoleAuthorizationService;
+    private final RegisterOperationAndAuditService registerOperationAndAuditService;
     private final AuthorizeCartAccessService authorizeCartAccessService;
 
     public ConfirmOrderService(CartRepositoryPort cartRepositoryPort, OrderRepositoryPort orderRepositoryPort,
                                 ReserveInventoryService reserveInventoryService,
                                 ReleaseInventoryReservationService releaseInventoryReservationService,
                                 ValidateRoleAuthorizationService validateRoleAuthorizationService,
-                                AuthorizeCartAccessService authorizeCartAccessService) {
+                                AuthorizeCartAccessService authorizeCartAccessService,
+                                RegisterOperationAndAuditService registerOperationAndAuditService) {
         this.cartRepositoryPort = cartRepositoryPort;
         this.orderRepositoryPort = orderRepositoryPort;
         this.reserveInventoryService = reserveInventoryService;
         this.releaseInventoryReservationService = releaseInventoryReservationService;
         this.validateRoleAuthorizationService = validateRoleAuthorizationService;
         this.authorizeCartAccessService = authorizeCartAccessService;
+        this.registerOperationAndAuditService = registerOperationAndAuditService;
     }
 
     public Order execute(User actor, ShoppingCart cartReference, Order newOrder) {
@@ -74,6 +80,10 @@ public class ConfirmOrderService {
                 reserveLines(cart));
         Order saved = orderRepositoryPort.save(order);
         cartRepositoryPort.deleteById(cart.getIdentifier());
+        registerOperationAndAuditService.execute(
+                Operation.of(OperationType.ORDER_CONFIRMATION, actor, AffectedEntityType.ORDER, order.getIdentifier()),
+                AuditDetails.of("cartId", cartId, "newStatus", order.getStatus().getCode(),
+                        "lineCount", order.getLines().size()));
         return saved;
     }
 

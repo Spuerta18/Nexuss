@@ -5,12 +5,15 @@ import org.springframework.stereotype.Service;
 import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
+import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Shipment;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.out.OrderRepositoryPort;
 import nexussMarket.domain.ports.out.ShipmentRepositoryPort;
 import nexussMarket.domain.services.authorization.ValidateRoleAuthorizationService;
+import nexussMarket.domain.valueobjects.AffectedEntityType;
+import nexussMarket.domain.valueobjects.OperationType;
 import nexussMarket.domain.valueobjects.OrderStatus;
 import nexussMarket.domain.valueobjects.SystemRole;
 
@@ -21,12 +24,15 @@ public class CreateShipmentService {
     private final ShipmentRepositoryPort shipmentRepositoryPort;
     private final OrderRepositoryPort orderRepositoryPort;
     private final ValidateRoleAuthorizationService validateRoleAuthorizationService;
+    private final RegisterOperationAndAuditService registerOperationAndAuditService;
 
     public CreateShipmentService(ShipmentRepositoryPort shipmentRepositoryPort, OrderRepositoryPort orderRepositoryPort,
-                                 ValidateRoleAuthorizationService validateRoleAuthorizationService) {
+                                 ValidateRoleAuthorizationService validateRoleAuthorizationService,
+                                 RegisterOperationAndAuditService registerOperationAndAuditService) {
         this.shipmentRepositoryPort = shipmentRepositoryPort;
         this.orderRepositoryPort = orderRepositoryPort;
         this.validateRoleAuthorizationService = validateRoleAuthorizationService;
+        this.registerOperationAndAuditService = registerOperationAndAuditService;
     }
 
     public Shipment execute(User actor, Shipment shipment) {
@@ -45,6 +51,10 @@ public class CreateShipmentService {
         if (shipmentRepositoryPort.findByOrderId(order.getIdentifier()).isPresent()) {
             throw new DuplicateResourceException("Order " + order.getIdentifier() + " already has a shipment");
         }
-        return shipmentRepositoryPort.save(new Shipment(shipmentId, order));
+        Shipment saved = shipmentRepositoryPort.save(new Shipment(shipmentId, order));
+        registerOperationAndAuditService.execute(
+                Operation.of(OperationType.SHIPMENT_CREATION, actor, AffectedEntityType.SHIPMENT, shipmentId),
+                AuditDetails.of("orderId", order.getIdentifier(), "newStatus", saved.getStatus().getCode()));
+        return saved;
     }
 }

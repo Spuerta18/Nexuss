@@ -23,7 +23,6 @@ import nexussMarket.domain.ports.in.LogisticsOperatorPort;
 import nexussMarket.domain.ports.in.PublicAccessPort;
 import nexussMarket.domain.ports.in.SellerPort;
 import nexussMarket.domain.ports.in.SupervisorPort;
-import nexussMarket.domain.ports.out.AuditLogPort;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
 import nexussMarket.domain.valueobjects.CustomerStatus;
 import nexussMarket.domain.valueobjects.SellerStatus;
@@ -34,9 +33,9 @@ import nexussMarket.infrastructure.security.JwtProvider;
  * Shared setup of the REST controller tests: the full application context
  * with the real security (JWT filter, {@code @PreAuthorize}, CORS) and the
  * real controllers, mappers and exception handler, but with every role port
- * mocked. {@link UserRepositoryPort} is mocked so the JWT filter reloads the
- * users these tests define, and {@link AuditLogPort} so no audit record
- * reaches MongoDB. No MongoDB server is needed.
+ * mocked, so no Domain Service runs and nothing is audited.
+ * {@link UserRepositoryPort} is mocked so the JWT filter reloads the users
+ * these tests define. No MongoDB server is needed.
  *
  * <p>Every test class extends this one with the same mocks, so Spring reuses
  * a single application context for all of them.</p>
@@ -71,9 +70,6 @@ abstract class RestControllerTestSupport {
 
     @MockitoBean
     protected UserRepositoryPort userRepositoryPort;
-
-    @MockitoBean
-    protected AuditLogPort auditLogPort;
 
     protected static Buyer buyer() {
         Buyer buyer = new Buyer("B-1", "Ana Buyer", "buyer@example.com", UserStatus.ACTIVE, CustomerStatus.ENABLED);

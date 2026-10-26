@@ -21,7 +21,6 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import nexussMarket.adapters.in.rest.exception.RestErrors;
-import nexussMarket.domain.services.AuditOperationService;
 
 /**
  * Stateless JWT security: no HTTP session, no form login, no HTTP Basic and
@@ -56,8 +55,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtProvider jwtProvider,
-                                                   NexusUserDetailsService userDetailsService,
-                                                   AuditOperationService auditOperationService) throws Exception {
+                                                   NexusUserDetailsService userDetailsService) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -76,7 +74,7 @@ public class SecurityConfig {
                         // Lets Spring's error page answer with the real status instead of a 401.
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, userDetailsService, auditOperationService),
+                .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, userDetailsService),
                         UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

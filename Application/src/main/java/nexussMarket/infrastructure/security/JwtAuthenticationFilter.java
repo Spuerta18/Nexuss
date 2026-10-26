@@ -14,17 +14,16 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import nexussMarket.domain.services.AuditOperationService;
 import nexussMarket.infrastructure.security.JwtProvider.JwtClaims;
 
 /**
  * Authenticates requests carrying {@code Authorization: Bearer <jwt>}. A
  * valid token whose user still exists, is {@code ACTIVE} (never
  * {@code BLOCKED}) and still has the role the token was issued for puts an
- * {@link AuthenticatedUserPrincipal} in the {@link SecurityContext}, and the
- * request is recorded through {@link AuditOperationService} as
- * {@code "<METHOD> <path>"}. The principal wraps the reloaded domain user, so
- * it is always the right {@code User} subtype with its current state.
+ * {@link AuthenticatedUserPrincipal} in the {@link SecurityContext}. The
+ * principal wraps the reloaded domain user, so it is always the right
+ * {@code User} subtype with its current state. Auditing is not done here:
+ * each state-changing Domain Service records its own operation.
  *
  * <p>Requests without a valid token continue unauthenticated; the security
  * configuration then rejects them on protected routes with {@code 401}. The
@@ -41,13 +40,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
     private final NexusUserDetailsService userDetailsService;
-    private final AuditOperationService auditOperationService;
 
-    public JwtAuthenticationFilter(JwtProvider jwtProvider, NexusUserDetailsService userDetailsService,
-                                   AuditOperationService auditOperationService) {
+    public JwtAuthenticationFilter(JwtProvider jwtProvider, NexusUserDetailsService userDetailsService) {
         this.jwtProvider = jwtProvider;
         this.userDetailsService = userDetailsService;
-        this.auditOperationService = auditOperationService;
     }
 
     @Override
@@ -78,8 +74,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);
-        // The query string is left out on purpose: it may carry sensitive values.
-        auditOperationService.record(principal.getUserId(), request.getMethod() + " " + request.getRequestURI());
     }
 
     private static Optional<String> bearerToken(HttpServletRequest request) {

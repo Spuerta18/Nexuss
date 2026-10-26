@@ -1,7 +1,11 @@
 package nexussMarket.domain.ports.in;
 
+import java.util.List;
+
 import nexussMarket.domain.models.Administrator;
+import nexussMarket.domain.models.AuditLog;
 import nexussMarket.domain.models.LogisticsOperator;
+import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Refund;
 import nexussMarket.domain.models.ReturnRequest;
 import nexussMarket.domain.models.Seller;
@@ -44,4 +48,10 @@ public interface AdministratorPort {
     Refund processRefund(User user, Refund refund);
 
     User consultUser(User user, User target);
+
+    /** The operation history, most recent first. */
+    List<Operation> consultOperations(User user);
+
+    /** The audit trail, most recent first. */
+    List<AuditLog> consultAuditLogs(User user);
 }

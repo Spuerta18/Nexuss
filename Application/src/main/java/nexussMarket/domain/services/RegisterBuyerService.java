@@ -4,20 +4,26 @@ import org.springframework.stereotype.Service;
 
 import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.models.Buyer;
+import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.ports.out.PasswordHasherPort;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
+import nexussMarket.domain.valueobjects.AffectedEntityType;
 import nexussMarket.domain.valueobjects.CustomerStatus;
+import nexussMarket.domain.valueobjects.OperationType;
 import nexussMarket.domain.valueobjects.UserStatus;
 
 @Service
 public class RegisterBuyerService {
 
     private final UserRepositoryPort userRepositoryPort;
+    private final RegisterOperationAndAuditService registerOperationAndAuditService;
     private final PasswordHasherPort passwordHasherPort;
 
-    public RegisterBuyerService(UserRepositoryPort userRepositoryPort, PasswordHasherPort passwordHasherPort) {
+    public RegisterBuyerService(UserRepositoryPort userRepositoryPort, PasswordHasherPort passwordHasherPort,
+                                RegisterOperationAndAuditService registerOperationAndAuditService) {
         this.userRepositoryPort = userRepositoryPort;
         this.passwordHasherPort = passwordHasherPort;
+        this.registerOperationAndAuditService = registerOperationAndAuditService;
     }
 
     public Buyer execute(Buyer buyer, String password) {
@@ -31,6 +37,11 @@ public class RegisterBuyerService {
                 UserStatus.ACTIVE, CustomerStatus.ENABLED);
         newBuyer.setPrimaryAddress(buyer.getPrimaryAddress());
         newBuyer.setPasswordHash(passwordHasherPort.hash(password));
-        return (Buyer) userRepositoryPort.save(newBuyer);
+        Buyer saved = (Buyer) userRepositoryPort.save(newBuyer);
+        // Self-registration: the new buyer is the one who performs it.
+        registerOperationAndAuditService.execute(
+                Operation.of(OperationType.BUYER_REGISTRATION, saved, AffectedEntityType.USER, saved.getIdentifier()),
+                AuditDetails.of("newStatus", saved.getStatus().getCode()));
+        return saved;
     }
 }

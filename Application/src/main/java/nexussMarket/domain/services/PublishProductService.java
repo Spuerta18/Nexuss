@@ -5,11 +5,14 @@ import org.springframework.stereotype.Service;
 import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.exceptions.SellerNotAuthorizedException;
+import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.out.ProductRepositoryPort;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
+import nexussMarket.domain.valueobjects.AffectedEntityType;
+import nexussMarket.domain.valueobjects.OperationType;
 import nexussMarket.domain.valueobjects.ProductStatus;
 import nexussMarket.domain.valueobjects.SellerStatus;
 
@@ -17,11 +20,14 @@ import nexussMarket.domain.valueobjects.SellerStatus;
 public class PublishProductService {
 
     private final ProductRepositoryPort productRepositoryPort;
+    private final RegisterOperationAndAuditService registerOperationAndAuditService;
     private final UserRepositoryPort userRepositoryPort;
 
-    public PublishProductService(ProductRepositoryPort productRepositoryPort, UserRepositoryPort userRepositoryPort) {
+    public PublishProductService(ProductRepositoryPort productRepositoryPort, UserRepositoryPort userRepositoryPort,
+                                 RegisterOperationAndAuditService registerOperationAndAuditService) {
         this.productRepositoryPort = productRepositoryPort;
         this.userRepositoryPort = userRepositoryPort;
+        this.registerOperationAndAuditService = registerOperationAndAuditService;
     }
 
     public Product execute(User actor, Product product) {
@@ -35,7 +41,13 @@ public class PublishProductService {
         }
         Product newProduct = new Product(product.getIdentifier(), product.getName(), product.getProductType(),
                 ProductStatus.PUBLISHED, seller, product.getPrice(), product.getVariants());
-        return productRepositoryPort.save(newProduct);
+        Product saved = productRepositoryPort.save(newProduct);
+        registerOperationAndAuditService.execute(
+                Operation.of(OperationType.PRODUCT_PUBLICATION, actor, AffectedEntityType.PRODUCT, newProduct.getIdentifier()),
+                AuditDetails.of("newStatus", newProduct.getStatus().getCode(),
+                        "price", newProduct.getPrice().getAmount().toPlainString(),
+                        "currency", newProduct.getPrice().getCurrency().getCode()));
+        return saved;
     }
 
     private Seller findSeller(String sellerId) {

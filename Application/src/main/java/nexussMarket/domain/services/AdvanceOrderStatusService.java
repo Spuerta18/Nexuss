@@ -7,11 +7,14 @@ import org.springframework.stereotype.Service;
 import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.models.Invoice;
+import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.out.InvoiceRepositoryPort;
 import nexussMarket.domain.ports.out.OrderRepositoryPort;
 import nexussMarket.domain.services.authorization.ValidateRoleAuthorizationService;
+import nexussMarket.domain.valueobjects.AffectedEntityType;
+import nexussMarket.domain.valueobjects.OperationType;
 import nexussMarket.domain.valueobjects.OrderStatus;
 import nexussMarket.domain.valueobjects.SystemRole;
 
@@ -29,13 +32,16 @@ public class AdvanceOrderStatusService {
     private final OrderRepositoryPort orderRepositoryPort;
     private final InvoiceRepositoryPort invoiceRepositoryPort;
     private final ValidateRoleAuthorizationService validateRoleAuthorizationService;
+    private final RegisterOperationAndAuditService registerOperationAndAuditService;
 
     public AdvanceOrderStatusService(OrderRepositoryPort orderRepositoryPort,
                                      InvoiceRepositoryPort invoiceRepositoryPort,
-                                     ValidateRoleAuthorizationService validateRoleAuthorizationService) {
+                                     ValidateRoleAuthorizationService validateRoleAuthorizationService,
+                                     RegisterOperationAndAuditService registerOperationAndAuditService) {
         this.orderRepositoryPort = orderRepositoryPort;
         this.invoiceRepositoryPort = invoiceRepositoryPort;
         this.validateRoleAuthorizationService = validateRoleAuthorizationService;
+        this.registerOperationAndAuditService = registerOperationAndAuditService;
     }
 
     public Order execute(User actor, Order orderReference, OrderStatus targetStatus) {
@@ -47,11 +53,17 @@ public class AdvanceOrderStatusService {
         }
         Order order = orderRepositoryPort.findById(orderId)
                 .orElseThrow(() -> new EntityNotFoundException("No order found with id " + orderId));
+        OrderStatus previousStatus = order.getStatus();
         order.advanceTo(targetStatus);
         Order saved = orderRepositoryPort.save(order);
+        String invoiceId = null;
         if (order.getStatus() == OrderStatus.PAID) {
-            invoiceRepositoryPort.save(invoiceFor(order));
+            invoiceId = invoiceRepositoryPort.save(invoiceFor(order)).getIdentifier();
         }
+        registerOperationAndAuditService.execute(
+                Operation.of(OperationType.ORDER_STATUS_ADVANCE, actor, AffectedEntityType.ORDER, orderId),
+                AuditDetails.of("previousStatus", previousStatus.getCode(),
+                        "newStatus", order.getStatus().getCode(), "invoiceId", invoiceId));
         return saved;
     }
 

@@ -1,5 +1,7 @@
 package nexussMarket.adapters.in.rest.controllers;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import nexussMarket.adapters.in.rest.mappers.AuditRestMapper;
 import nexussMarket.adapters.in.rest.mappers.DomainReferences;
 import nexussMarket.adapters.in.rest.mappers.ReturnRestMapper;
 import nexussMarket.adapters.in.rest.mappers.UserRestMapper;
@@ -23,6 +26,8 @@ import nexussMarket.adapters.in.rest.requests.RegisterStaffRequest;
 import nexussMarket.adapters.in.rest.requests.RegisterWarehouseRequest;
 import nexussMarket.adapters.in.rest.requests.SellerStatusRequest;
 import nexussMarket.adapters.in.rest.requests.UserStatusRequest;
+import nexussMarket.adapters.in.rest.responses.AuditLogResponse;
+import nexussMarket.adapters.in.rest.responses.OperationResponse;
 import nexussMarket.adapters.in.rest.responses.RefundResponse;
 import nexussMarket.adapters.in.rest.responses.ReturnRequestResponse;
 import nexussMarket.adapters.in.rest.responses.UserResponse;
@@ -127,5 +132,15 @@ public class AdministratorRestController {
     public RefundResponse processRefund(@AuthenticationPrincipal(expression = "user") User actor,
                                         @PathVariable String refundId) {
         return ReturnRestMapper.toResponse(administratorPort.processRefund(actor, DomainReferences.refund(refundId)));
+    }
+
+    @GetMapping("/operations")
+    public List<OperationResponse> consultOperations(@AuthenticationPrincipal(expression = "user") User actor) {
+        return AuditRestMapper.toOperationResponses(administratorPort.consultOperations(actor));
+    }
+
+    @GetMapping("/audit-logs")
+    public List<AuditLogResponse> consultAuditLogs(@AuthenticationPrincipal(expression = "user") User actor) {
+        return AuditRestMapper.toAuditLogResponses(administratorPort.consultAuditLogs(actor));
     }
 }

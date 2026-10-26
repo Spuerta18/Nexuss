@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
+import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.ReturnRequest;
 import nexussMarket.domain.models.User;
@@ -12,6 +13,8 @@ import nexussMarket.domain.ports.out.OrderRepositoryPort;
 import nexussMarket.domain.ports.out.ReturnRequestRepositoryPort;
 import nexussMarket.domain.services.authorization.AuthorizeOrderAccessService;
 import nexussMarket.domain.services.authorization.ValidateRoleAuthorizationService;
+import nexussMarket.domain.valueobjects.AffectedEntityType;
+import nexussMarket.domain.valueobjects.OperationType;
 import nexussMarket.domain.valueobjects.OrderStatus;
 import nexussMarket.domain.valueobjects.SystemRole;
 
@@ -25,16 +28,19 @@ public class RequestReturnService {
     private final ReturnRequestRepositoryPort returnRequestRepositoryPort;
     private final OrderRepositoryPort orderRepositoryPort;
     private final ValidateRoleAuthorizationService validateRoleAuthorizationService;
+    private final RegisterOperationAndAuditService registerOperationAndAuditService;
     private final AuthorizeOrderAccessService authorizeOrderAccessService;
 
     public RequestReturnService(ReturnRequestRepositoryPort returnRequestRepositoryPort,
                                 OrderRepositoryPort orderRepositoryPort,
                                 ValidateRoleAuthorizationService validateRoleAuthorizationService,
-                                AuthorizeOrderAccessService authorizeOrderAccessService) {
+                                AuthorizeOrderAccessService authorizeOrderAccessService,
+                                RegisterOperationAndAuditService registerOperationAndAuditService) {
         this.returnRequestRepositoryPort = returnRequestRepositoryPort;
         this.orderRepositoryPort = orderRepositoryPort;
         this.validateRoleAuthorizationService = validateRoleAuthorizationService;
         this.authorizeOrderAccessService = authorizeOrderAccessService;
+        this.registerOperationAndAuditService = registerOperationAndAuditService;
     }
 
     public ReturnRequest execute(User actor, ReturnRequest returnRequest) {
@@ -56,7 +62,11 @@ public class RequestReturnService {
         if (returnRequestRepositoryPort.findByOrderId(order.getIdentifier()).isPresent()) {
             throw new DuplicateResourceException("Order " + order.getIdentifier() + " already has a return request");
         }
-        return returnRequestRepositoryPort.save(
+        ReturnRequest saved = returnRequestRepositoryPort.save(
                 new ReturnRequest(returnRequestId, order, order.getBuyer(), returnRequest.getReason()));
+        registerOperationAndAuditService.execute(
+                Operation.of(OperationType.RETURN_REQUEST, actor, AffectedEntityType.RETURN_REQUEST, returnRequestId),
+                AuditDetails.of("orderId", order.getIdentifier(), "newStatus", saved.getStatus().getCode()));
+        return saved;
     }
 }

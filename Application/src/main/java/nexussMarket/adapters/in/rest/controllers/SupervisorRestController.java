@@ -11,12 +11,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import lombok.RequiredArgsConstructor;
+import nexussMarket.adapters.in.rest.mappers.AuditRestMapper;
 import nexussMarket.adapters.in.rest.mappers.CatalogRestMapper;
 import nexussMarket.adapters.in.rest.mappers.DomainReferences;
 import nexussMarket.adapters.in.rest.mappers.InventoryRestMapper;
 import nexussMarket.adapters.in.rest.mappers.OrderRestMapper;
 import nexussMarket.adapters.in.rest.mappers.UserRestMapper;
+import nexussMarket.adapters.in.rest.responses.AuditLogResponse;
 import nexussMarket.adapters.in.rest.responses.InventoryItemResponse;
+import nexussMarket.adapters.in.rest.responses.OperationResponse;
 import nexussMarket.adapters.in.rest.responses.OrderResponse;
 import nexussMarket.adapters.in.rest.responses.ProductResponse;
 import nexussMarket.adapters.in.rest.responses.UserResponse;
@@ -62,5 +65,15 @@ public class SupervisorRestController {
                                     @PathVariable String userId, @RequestParam String role) {
         return UserRestMapper.toResponse(
                 supervisorPort.consultUser(actor, DomainReferences.user(userId, UserRestMapper.role(role))));
+    }
+
+    @GetMapping("/operations")
+    public List<OperationResponse> consultOperations(@AuthenticationPrincipal(expression = "user") User actor) {
+        return AuditRestMapper.toOperationResponses(supervisorPort.consultOperations(actor));
+    }
+
+    @GetMapping("/audit-logs")
+    public List<AuditLogResponse> consultAuditLogs(@AuthenticationPrincipal(expression = "user") User actor) {
+        return AuditRestMapper.toAuditLogResponses(supervisorPort.consultAuditLogs(actor));
     }
 }

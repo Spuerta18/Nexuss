@@ -1,6 +1,7 @@
 package nexussMarket.domain.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -11,23 +12,27 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import nexussMarket.domain.exceptions.InvalidCredentialsException;
+import nexussMarket.domain.models.AuditLog;
 import nexussMarket.domain.models.AuthenticationResult;
 import nexussMarket.domain.models.Buyer;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.out.PasswordHasherPort;
 import nexussMarket.domain.ports.out.TokenServicePort;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
+import nexussMarket.domain.valueobjects.AffectedEntityType;
 import nexussMarket.domain.valueobjects.CustomerStatus;
+import nexussMarket.domain.valueobjects.OperationType;
 import nexussMarket.domain.valueobjects.SystemRole;
 import nexussMarket.domain.valueobjects.UserStatus;
 
-class AuthenticateUserServiceTest {
+class AuthenticateUserServiceTest extends AuditedServiceTestSupport {
 
     private static final String PASSWORD = "Correct-Pass-1";
 
     private final InMemoryUsers users = new InMemoryUsers();
     private final CountingTokens tokens = new CountingTokens();
-    private final AuthenticateUserService service = new AuthenticateUserService(users, new PlainHasher(), tokens);
+    private final AuthenticateUserService service = new AuthenticateUserService(users, new PlainHasher(), tokens,
+            audit);
 
     @Test
     void activeUserWithTheRightPasswordGetsAToken() {
@@ -38,6 +43,8 @@ class AuthenticateUserServiceTest {
 
         assertSame(buyer, result.getUser());
         assertEquals("token-for-B-1", result.getToken());
+        AuditLog entry = assertAudited(OperationType.USER_LOGIN, buyer, AffectedEntityType.USER, "B-1");
+        assertFalse(entry.getDetails().containsValue("token-for-B-1"), "the token is never audited");
     }
 
     @Test
@@ -58,6 +65,7 @@ class AuthenticateUserServiceTest {
         assertEquals(unknownEmail, blocked);
         assertEquals(unknownEmail, inactive);
         assertEquals(0, tokens.issued, "no token may be issued for a failed login");
+        assertNothingAudited();
     }
 
     private String failure(String email, String password) {

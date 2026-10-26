@@ -1,10 +1,13 @@
 package nexussMarket.adapters.useCases;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
-
+import nexussMarket.domain.models.AuditLog;
 import nexussMarket.domain.models.LogisticsOperator;
+import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Refund;
 import nexussMarket.domain.models.ReturnRequest;
 import nexussMarket.domain.models.Seller;
@@ -13,6 +16,8 @@ import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
 import nexussMarket.domain.ports.in.AdministratorPort;
 import nexussMarket.domain.services.ApproveReturnService;
+import nexussMarket.domain.services.ConsultAuditLogsService;
+import nexussMarket.domain.services.ConsultOperationsService;
 import nexussMarket.domain.services.ConsultUserService;
 import nexussMarket.domain.services.DeactivateWarehouseService;
 import nexussMarket.domain.services.ProcessRefundService;
@@ -42,6 +47,8 @@ public class AdministratorUseCaseImpl implements AdministratorPort {
     private final RejectReturnService rejectReturnService;
     private final ProcessRefundService processRefundService;
     private final ConsultUserService consultUserService;
+    private final ConsultOperationsService consultOperationsService;
+    private final ConsultAuditLogsService consultAuditLogsService;
 
     @Override
     public Seller registerSeller(User user, Seller seller, String password) {
@@ -96,5 +103,15 @@ public class AdministratorUseCaseImpl implements AdministratorPort {
     @Override
     public User consultUser(User user, User target) {
         return consultUserService.execute(user, target);
+    }
+
+    @Override
+    public List<Operation> consultOperations(User user) {
+        return consultOperationsService.execute(user);
+    }
+
+    @Override
+    public List<AuditLog> consultAuditLogs(User user) {
+        return consultAuditLogsService.execute(user);
     }
 }

@@ -2,7 +2,9 @@ package nexussMarket.domain.ports.in;
 
 import java.util.List;
 
+import nexussMarket.domain.models.AuditLog;
 import nexussMarket.domain.models.InventoryItem;
+import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.Supervisor;
@@ -28,4 +30,10 @@ public interface SupervisorPort {
     User consultUser(User user, User target);
 
     List<Product> listPublishedProducts(User user);
+
+    /** The operation history, most recent first. */
+    List<Operation> consultOperations(User user);
+
+    /** The audit trail, most recent first. */
+    List<AuditLog> consultAuditLogs(User user);
 }

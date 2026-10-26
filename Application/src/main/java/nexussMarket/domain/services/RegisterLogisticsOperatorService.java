@@ -4,10 +4,13 @@ import org.springframework.stereotype.Service;
 
 import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.models.LogisticsOperator;
+import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.out.PasswordHasherPort;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
 import nexussMarket.domain.services.authorization.ValidateRoleAuthorizationService;
+import nexussMarket.domain.valueobjects.AffectedEntityType;
+import nexussMarket.domain.valueobjects.OperationType;
 import nexussMarket.domain.valueobjects.SystemRole;
 import nexussMarket.domain.valueobjects.UserStatus;
 
@@ -17,12 +20,15 @@ public class RegisterLogisticsOperatorService {
     private final UserRepositoryPort userRepositoryPort;
     private final PasswordHasherPort passwordHasherPort;
     private final ValidateRoleAuthorizationService validateRoleAuthorizationService;
+    private final RegisterOperationAndAuditService registerOperationAndAuditService;
 
     public RegisterLogisticsOperatorService(UserRepositoryPort userRepositoryPort, PasswordHasherPort passwordHasherPort,
-            ValidateRoleAuthorizationService validateRoleAuthorizationService) {
+            ValidateRoleAuthorizationService validateRoleAuthorizationService,
+            RegisterOperationAndAuditService registerOperationAndAuditService) {
         this.userRepositoryPort = userRepositoryPort;
         this.passwordHasherPort = passwordHasherPort;
         this.validateRoleAuthorizationService = validateRoleAuthorizationService;
+        this.registerOperationAndAuditService = registerOperationAndAuditService;
     }
 
     public LogisticsOperator execute(User actor, LogisticsOperator logisticsOperator, String password) {
@@ -36,6 +42,10 @@ public class RegisterLogisticsOperatorService {
         LogisticsOperator newLogisticsOperator = new LogisticsOperator(logisticsOperator.getIdentifier(), logisticsOperator.getFullName(),
                 logisticsOperator.getEmail(), UserStatus.ACTIVE);
         newLogisticsOperator.setPasswordHash(passwordHasherPort.hash(password));
-        return (LogisticsOperator) userRepositoryPort.save(newLogisticsOperator);
+        LogisticsOperator saved = (LogisticsOperator) userRepositoryPort.save(newLogisticsOperator);
+        registerOperationAndAuditService.execute(
+                Operation.of(OperationType.LOGISTICS_OPERATOR_REGISTRATION, actor, AffectedEntityType.USER, saved.getIdentifier()),
+                AuditDetails.of("newStatus", saved.getStatus().getCode()));
+        return saved;
     }
 }

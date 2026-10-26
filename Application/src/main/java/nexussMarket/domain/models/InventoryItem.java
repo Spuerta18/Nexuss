@@ -41,6 +41,14 @@ public class InventoryItem {
         return value;
     }
 
+    /**
+     * Identifier of this record, {@code productId:warehouseId}: a product has
+     * at most one inventory record per warehouse.
+     */
+    public String getIdentifier() {
+        return product.getIdentifier() + ":" + warehouse.getIdentifier();
+    }
+
     /** Product this inventory record belongs to. */
     public Product getProduct() {
         return product;

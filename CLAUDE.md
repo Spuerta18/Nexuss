@@ -110,8 +110,36 @@ a reachable MongoDB server to start.
   the `bearerAuth` scheme for the Authorize button and removes it from login and registration. Documented in
   `SDD/Adapters/Rest-adapters.md`; tested by `ApiDocumentationTest`.
 - **Tests** (no MongoDB needed): one `*RestControllerTest` per controller, all extending `RestControllerTestSupport`
-  (full context, real security, every role port mocked plus `UserRepositoryPort` and `AuditLogPort`, so a single
-  cached context serves all of them), `ApiDocumentationTest` on the same context, and `RestMappersTest`.
+  (full context, real security, every role port mocked plus `UserRepositoryPort`, so a single cached context serves
+  all of them), `ApiDocumentationTest` and `AuditRestControllerTest` on the same context, and `RestMappersTest`.
+
+## Status of the Alignment with the Professor's Business Model
+
+Run as one execution in 3 blocks (each compiled, tested, recorded here and committed locally; pushed at the end).
+
+- **Block 1 — domain auditing, done.**
+  - Models `Operation` (identifier, `OperationType`, executionDate, performedBy, `AffectedEntityType` + affected
+    entity id) and `AuditLog` (auditId, operationType, operationDate, performedBy, userRole, affected entity,
+    `details`). Value Objects `OperationType` (33 codes, one per state-changing operation) and `AffectedEntityType`.
+    `AuditLog` rejects detail keys naming a password, hash, token or secret. `InventoryItem.getIdentifier()` is
+    `productId:warehouseId`.
+  - Internal services (wired in `InternalServiceBeanConfiguration`): `RegisterOperationService`,
+    `RegisterAuditLogService`, `RegisterOperationAndAuditService.execute(Operation, Map details)`; package-private
+    helper `AuditDetails.of(...)` keeps detail order and drops null values. Every state-changing service (31) calls
+    it after saving, with `previousStatus` / `newStatus` where they apply. Successful logins are audited, failed
+    ones are not. The internal stock services (`ReserveInventoryService`, `ReleaseInventoryReservationService`,
+    `ConfirmInventoryOutboundService`) are covered by their calling operation; `ApproveReturnService` also produces
+    one `INVENTORY_RETURN` per line through `RegisterInventoryReturnService`.
+  - `ConsultOperationsService` / `ConsultAuditLogsService` (`ADMINISTRATOR`, `SUPERVISOR`), on `AdministratorPort` and
+    `SupervisorPort`: `GET /api/admin|supervisor/operations` and `/audit-logs`, most recent first, no pagination.
+  - Output ports `OperationRepositoryPort` and `AuditLogRepositoryPort` replace `AuditLogPort`. Mongo collections
+    `operations` and `audit_logs` are append-only: the Spring Data repositories extend the bare `Repository` and
+    declare only `insert` and reads. Indexes on type, date, performer + date and affected entity. Legacy
+    `audit_logs` entries (no `operationType`) are skipped when reading.
+  - Removed: per-request auditing in `JwtAuthenticationFilter`, `AuditOperationService`, `AuditLogPort`,
+    `MongoAuditLogAdapter`.
+  - Tests: one audit assertion per state-changing service (`*AuditTest` classes on `AuditedServiceTestSupport`),
+    `AuditServicesTest`, `AuditMappersTest`, `AuditRestControllerTest`. 156 tests green.
 
 ## Documentation and Delivery
 
