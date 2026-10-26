@@ -60,7 +60,7 @@ The cost is one lookup by identifier per request.
 * An authenticated user with another role gets `403` (`"Access denied"`) before the port is called.
 * **Order of checks.** Request body validation (`@Valid`) runs while Spring MVC resolves the controller arguments, before the controller method and its `@PreAuthorize` proxy are invoked. A user with the wrong role who sends an *invalid* body therefore gets `400` instead of `403`. The port is never called in either case; the only thing revealed is the shape of the expected body, which is public in the API documentation.
 * The Domain Services still authorize the actor on each operation (ownership, status); a domain refusal also answers `403` (see [Global Exception Handler](Global-exception-handler.md)). The `@PreAuthorize` role check is the first barrier, not the only one.
-* Public routes: `POST /api/auth/login`, `POST /api/auth/register` and `/error`. `GET /api/me` needs any valid token.
+* Public routes: `POST /api/auth/login`, `POST /api/auth/register`, `/error`, and `GET` on the API documentation (`/swagger-ui.html`, `/swagger-ui/**`, `/v3/api-docs/**`; see [REST Adapters](Rest-adapters.md#api-documentation-swagger-ui)). `GET /api/me` needs any valid token.
 
 ---
 

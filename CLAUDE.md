@@ -103,9 +103,15 @@ a reachable MongoDB server to start.
 - **Done.** Six controllers (`AuthRestController` + one per role) covering every port method, plus `GET /api/me`.
   Endpoints in `SDD/Adapters/Api-rest-endpoints.md`; security in `Rest-security-cors.md`; validation in
   `Rest-validation.md`; errors in `Global-exception-handler.md`.
+- **Swagger UI — done.** springdoc-openapi `springdoc-openapi-starter-webmvc-ui` 3.1.1 (built on Spring Boot 4.1.0;
+  checked on Maven Central before adding it; 3.2.0 targets 4.1.2 but was only two days old). UI at `/swagger-ui.html`,
+  document at `/v3/api-docs`. `SecurityConfig.API_DOCUMENTATION_PATHS` permits only `GET` on `/swagger-ui.html` (the
+  redirect into the UI), `/swagger-ui/**` and `/v3/api-docs/**`. `infrastructure/config/OpenApiConfiguration` declares
+  the `bearerAuth` scheme for the Authorize button and removes it from login and registration. Documented in
+  `SDD/Adapters/Rest-adapters.md`; tested by `ApiDocumentationTest`.
 - **Tests** (no MongoDB needed): one `*RestControllerTest` per controller, all extending `RestControllerTestSupport`
   (full context, real security, every role port mocked plus `UserRepositoryPort` and `AuditLogPort`, so a single
-  cached context serves all of them), and `RestMappersTest`.
+  cached context serves all of them), `ApiDocumentationTest` on the same context, and `RestMappersTest`.
 
 ## Documentation and Delivery
 

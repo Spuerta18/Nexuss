@@ -79,6 +79,8 @@ NEXUS_JWT_SECRET="<base64 key>" docker compose up --build
 
 Then log in with `POST /api/auth/login` and send the returned token as `Authorization: Bearer <token>`.
 
+The Swagger UI is at `http://localhost:8080/swagger-ui.html` (no token needed to open it; use **Authorize** with the `accessToken` to call protected endpoints). The OpenAPI document is at `/v3/api-docs`.
+
 ## Documentation
 
 | Area | Documents |

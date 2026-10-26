@@ -14,6 +14,7 @@ flowchart LR
     subgraph config["infrastructure.config"]
         ABC["AuthorizationBeanConfiguration<br/>6 authorization services"]
         ISC["InternalServiceBeanConfiguration<br/>ReserveInventoryService, AuditOperationService,<br/>NotifyUserService"]
+        OAC["OpenApiConfiguration<br/>OpenAPI document, bearerAuth scheme"]
     end
     subgraph database["infrastructure.database"]
         DBP["application.properties<br/>spring.mongodb.uri = NEXUS_MONGO_URI<br/>spring.data.mongodb.auto-index-creation = true"]

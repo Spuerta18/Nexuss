@@ -26,8 +26,9 @@ import nexussMarket.domain.services.AuditOperationService;
 /**
  * Stateless JWT security: no HTTP session, no form login, no HTTP Basic and
  * no CSRF (tokens travel in the {@code Authorization} header, not in
- * cookies). Only login and buyer self-registration are public; every other
- * route requires a valid token. Unauthenticated requests get {@code 401} and
+ * cookies). Only login, buyer self-registration and the API documentation
+ * ({@link #API_DOCUMENTATION_PATHS}) are public; every other route requires a
+ * valid token. Unauthenticated requests get {@code 401} and
  * requests rejected by a role check get {@code 403}, both with the uniform
  * error body; role checks are declared with {@code @PreAuthorize} on each
  * controller. CORS allows the origins configured in {@link CorsProperties}.
@@ -43,6 +44,15 @@ public class SecurityConfig {
 
     /** Public endpoint where buyers register themselves. */
     public static final String BUYER_REGISTRATION_PATH = "/api/auth/register";
+
+    /**
+     * Public, read-only API documentation: the Swagger UI, its
+     * {@code /swagger-ui.html} entry point (a redirect into
+     * {@code /swagger-ui/}) and the OpenAPI document. Calling an endpoint
+     * from the UI still needs a token (the Authorize button).
+     */
+    public static final String[] API_DOCUMENTATION_PATHS = {
+            "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"};
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtProvider jwtProvider,
@@ -62,6 +72,7 @@ public class SecurityConfig {
                                 HttpStatus.FORBIDDEN, "Access denied", request)))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, LOGIN_PATH, BUYER_REGISTRATION_PATH).permitAll()
+                        .requestMatchers(HttpMethod.GET, API_DOCUMENTATION_PATHS).permitAll()
                         // Lets Spring's error page answer with the real status instead of a 401.
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())

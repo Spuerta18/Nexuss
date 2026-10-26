@@ -216,9 +216,10 @@ Business exceptions belong exclusively to the domain: `EntityNotFoundException`,
 Technical configuration required by the application. No business logic.
 
 ## Config
-REST configuration, serialization, environment configuration, and the part of the domain wiring that component scan does not cover. There are no per-use-case `*BeanConfiguration` classes: Domain Services and use case adapters are `@Service` classes found by component scan. Only two configuration classes remain:
+REST configuration, serialization, environment configuration, and the part of the domain wiring that component scan does not cover. There are no per-use-case `*BeanConfiguration` classes: Domain Services and use case adapters are `@Service` classes found by component scan. Two configuration classes take part in that wiring, and a third one describes the API:
 - `AuthorizationBeanConfiguration` — registers the six authorization services, which are plain classes.
 - `InternalServiceBeanConfiguration` — registers `ReserveInventoryService`, `AuditOperationService` and `NotifyUserService`, which are plain classes as well.
+- `OpenApiConfiguration` — the OpenAPI document behind the Swagger UI and its Bearer JWT scheme (see [REST Adapters](../Adapters/Rest-adapters.md#api-documentation-swagger-ui)).
 
 The startup seeders have their own configuration class, `SeedConfiguration`, in `infrastructure/seed` (see [Seed](#seed)).
 
@@ -231,7 +232,7 @@ Data the application needs before anyone can use it. Every seeder is idempotent.
 
 ## Security
 Authentication, authorization and CORS configuration (see [REST Security and CORS](../Adapters/Rest-security-cors.md)):
-- `SecurityConfig`: stateless filter chain, public routes (login, buyer registration), `401` / `403` with the uniform error body, method security for `@PreAuthorize`, and CORS for the origins in `NEXUS_CORS_ORIGINS`.
+- `SecurityConfig`: stateless filter chain, public routes (login, buyer registration, API documentation), `401` / `403` with the uniform error body, method security for `@PreAuthorize`, and CORS for the origins in `NEXUS_CORS_ORIGINS`.
 - `JwtProvider` and `JwtTokenServiceAdapter` (implements `TokenServicePort`): HMAC-signed tokens (HS256/HS384/HS512, chosen by the key length) carrying the user identifier, role and email.
 - `JwtAuthenticationFilter`: validates the token, reloads the user from the database and rejects it if it is not `ACTIVE` or its stored role differs from the token; it also calls `AuditOperationService` for every authenticated request, so every operation is traceable to its `User`.
 - The adapter implementing `PasswordHasherPort` (`BCryptPasswordHasherAdapter`). The domain only stores `User.passwordHash` and never knows the algorithm.
