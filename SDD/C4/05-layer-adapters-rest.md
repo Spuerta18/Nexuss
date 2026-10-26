@@ -18,9 +18,9 @@ flowchart LR
             logistics["LogisticsOperatorRestController<br/>/api/logistics — LOGISTICS_OPERATOR"]
             supervisor["SupervisorRestController<br/>/api/supervisor — SUPERVISOR"]
         end
-        requests["requests<br/>20 records + Jakarta Validation"]
-        responses["responses<br/>15 records incl. ErrorResponse"]
-        mappers["mappers<br/>DomainReferences, UserRestMapper, CatalogRestMapper,<br/>CartRestMapper, OrderRestMapper, WarehouseRestMapper,<br/>InventoryRestMapper, ShipmentRestMapper, ReturnRestMapper, RestCodes"]
+        requests["requests<br/>21 records incl. ChangePasswordRequest + Jakarta Validation"]
+        responses["responses<br/>17 records incl. OperationResponse, AuditLogResponse, ErrorResponse"]
+        mappers["mappers<br/>DomainReferences, UserRestMapper, CatalogRestMapper,<br/>CartRestMapper, OrderRestMapper, WarehouseRestMapper,<br/>InventoryRestMapper, ShipmentRestMapper, ReturnRestMapper,<br/>AuditRestMapper, RestCodes"]
         exception["exception<br/>GlobalExceptionHandler, RestErrors,<br/>InvalidRequestException"]
     end
 
@@ -50,13 +50,15 @@ flowchart LR
 | Controller | Port | `@PreAuthorize` | Endpoints |
 | ---------- | ---- | --------------- | --------- |
 | `AuthRestController` | `PublicAccessPort` | none (login and register are public; `/api/me` needs any token) | 3 |
-| `BuyerRestController` | `BuyerPort` | `hasRole('BUYER')` | 12 |
-| `SellerRestController` | `SellerPort` | `hasRole('SELLER')` | 9 |
-| `AdministratorRestController` | `AdministratorPort` | `hasRole('ADMINISTRATOR')` | 11 |
-| `LogisticsOperatorRestController` | `LogisticsOperatorPort` | `hasRole('LOGISTICS_OPERATOR')` | 9 |
-| `SupervisorRestController` | `SupervisorPort` | `hasRole('SUPERVISOR')` | 5 |
+| `BuyerRestController` | `BuyerPort` | `hasRole('BUYER')` | 14 |
+| `SellerRestController` | `SellerPort` | `hasRole('SELLER')` | 11 |
+| `AdministratorRestController` | `AdministratorPort` | `hasRole('ADMINISTRATOR')` | 15 |
+| `LogisticsOperatorRestController` | `LogisticsOperatorPort` | `hasRole('LOGISTICS_OPERATOR')` | 11 |
+| `SupervisorRestController` | `SupervisorPort` | `hasRole('SUPERVISOR')` | 9 |
 
 * **Each controller injects only its port** (`@RequiredArgsConstructor`, one `private final *Port` field) and gets the actor with `@AuthenticationPrincipal(expression = "user") User actor`.
+* **Session endpoints.** Every role controller exposes `POST /logout` and `POST /password` (`ChangePasswordRequest`), both answering `204` with no body; after either one, every earlier token of the caller gets `401`. `SecurityConfig.SESSION_PATHS` (`/api/*/logout`, `/api/*/password`) only requires a valid token; the controller's `@PreAuthorize` still checks the role.
+* **Audit consultation.** `AdministratorRestController` and `SupervisorRestController` expose `GET /operations` and `GET /audit-logs` (`OperationResponse[]`, `AuditLogResponse[]`, most recent first, no pagination), mapped by `AuditRestMapper`.
 * **Mappers** are `final` classes with static methods. `DomainReferences` builds references from identifiers; `DomainReferences.user(id, role)` builds the `User` subtype from the role sent by the client (abstract `User` targets).
 * **Codes** (status, type, role, currency, variant attribute) are resolved in the mappers; an unknown code throws `InvalidRequestException` → `400`.
 * **Errors** always use `ErrorResponse` (`timestamp`, `status`, `error`, `message`, `path`, `requestId`, `fieldErrors`). The security chain writes the same body through `RestErrors.write`.

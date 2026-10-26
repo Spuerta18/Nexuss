@@ -10,7 +10,7 @@ Part of the [Domain Services](../Domain%20Services.md) catalog, which holds the 
 
 # Carts
 
-The cart rules live in `ShoppingCart` (see [Domain Model](../Domain%20Model.md#shoppingcart)): one line per product, only `PUBLISHED` products, a single currency, positive quantities. The cart services only authorize the actor, load the cart (and the product), call the cart method and save the cart:
+The cart rules live in `ShoppingCart` (see [Domain Model](../Domain%20Model.md#shoppingcart)): one line per product, only `PUBLISHED` products, a single currency, positive quantities. The cart services only authorize the actor, load the cart (and the product), call the cart method, save the cart and record the operation:
 
 | Service | Cart method |
 | ------- | ----------- |
@@ -36,6 +36,14 @@ Creates an empty `ShoppingCart` for the buyer who asks for it.
 | cart      | ShoppingCart | New model: only its `identifier` is used. Its buyer and lines are ignored. |
 
 **Returns:** `ShoppingCart`
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `CART_CREATION` | `SHOPPING_CART` — the new cart | `buyerId` |
 
 ## Exceptions
 
@@ -79,14 +87,23 @@ Adds a product to a cart. If the cart already has a line for that product, the q
   * **Single currency:** every product in the cart must be priced in the same `Currency`; a product priced in another currency, or without a price, is rejected.
 * A cart carries no commercial commitment: no stock is reserved when adding lines.
 
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `CART_LINE_ADDITION` | `SHOPPING_CART` — the cart | `productId`, `quantity` (units added) |
+
 ## Exceptions
 
 | Exception | When |
 | --------- | ---- |
 | `OperationNotAllowedException` | The actor is not an active `BUYER`, or the cart belongs to another buyer. |
 | `EntityNotFoundException` | The cart or the product does not exist. |
-| `BusinessRuleViolationException` | The product is not `PUBLISHED`, has no price, or is priced in another currency than the products already in the cart. |
-| `IllegalArgumentException` | The resulting quantity is not valid for `CartLine`. |
+| `ProductNotPurchasableException` | The product is not `PUBLISHED`, or has no price. |
+| `CurrencyMismatchException` | The product is priced in another currency than the products already in the cart. |
+| `InvalidQuantityException` | The resulting quantity is not positive. |
 
 ---
 
@@ -109,13 +126,21 @@ Replaces the quantity of an existing cart line through `ShoppingCart.updateLineQ
 
 **Returns:** `ShoppingCart`
 
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `CART_LINE_QUANTITY_UPDATE` | `SHOPPING_CART` — the cart | `productId`, `newQuantity` |
+
 ## Exceptions
 
 | Exception | When |
 | --------- | ---- |
 | `OperationNotAllowedException` | The actor is not an active `BUYER`, or the cart belongs to another buyer. |
 | `EntityNotFoundException` | The cart does not exist, or it has no line for the product. |
-| `IllegalArgumentException` | The quantity is not valid for `CartLine`. |
+| `InvalidQuantityException` | The quantity is not positive. |
 
 ---
 
@@ -136,6 +161,14 @@ Removes the line of a product from a cart through `ShoppingCart.removeLine`. Res
 | productReference | Product      | Reference to the product whose line is removed. |
 
 **Returns:** `ShoppingCart`
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `CART_LINE_REMOVAL` | `SHOPPING_CART` — the cart | `productId` |
 
 ## Exceptions
 
@@ -175,7 +208,7 @@ Converts a shopping cart into an `Order` in `PENDING_PAYMENT`, reserving stock f
 3. Check that the cart is not empty and that every product is `PUBLISHED`.
 4. For each cart line, reserve stock with `ReserveInventoryService` and build an immutable `OrderLine` that freezes `productName` and `unitPrice` (`Money`) and records the `warehouse` the stock was reserved from. The order is created with all its lines at once; they cannot be changed afterwards.
 5. If any reservation fails, release the reservations already made (through `ReleaseInventoryReservationService`) and rethrow the error. No order is created.
-6. Save the order and delete the cart.
+6. Save the order, delete the cart and record the confirmation (`ORDER_CONFIRMATION`). The reservations are covered by this operation; `ReserveInventoryService` records none of its own.
 
 ## Business Rules
 
@@ -185,12 +218,23 @@ Converts a shopping cart into an `Order` in `PENDING_PAYMENT`, reserving stock f
 * Either every line is reserved or none is: no stock is left reserved for an order that was never created.
 * The order keeps the name and price of each product at the time of purchase, even if the product changes later.
 
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `ORDER_CONFIRMATION` | `ORDER` — the new order | `cartId`, `newStatus`, `lineCount` |
+
 ## Exceptions
 
 | Exception | When |
 | --------- | ---- |
 | `EntityNotFoundException` | The cart does not exist. |
-| `BusinessRuleViolationException` | The buyer is not active or is suspended from purchasing; the cart is empty; or a product is not `PUBLISHED`. |
+| `OperationNotAllowedException` | The actor is not an active `BUYER` or `ADMINISTRATOR`, or the cart belongs to another buyer. |
+| `BuyerNotEnabledException` | The buyer is not `ACTIVE`, or is suspended from purchasing (`commercialStatus` is not `ENABLED`). |
+| `EmptyCartException` | The cart has no lines. |
+| `ProductNotPurchasableException` | A product of the cart is not `PUBLISHED`. |
 | `InsufficientStockException` | No active warehouse has enough available stock for a line. |
 
 ---
@@ -219,6 +263,7 @@ Confirms the payment of an order, moving it from `PENDING_PAYMENT` to `PAID`, an
 2. Reject `SHIPPED` and `DELIVERED` as targets.
 3. Load the order, call `Order.advanceTo(targetStatus)` and save it.
 4. If the order is now `PAID`, issue its `Invoice` and save it through `InvoiceRepositoryPort`.
+5. Record the change (`ORDER_STATUS_ADVANCE`).
 
 ## Business Rules
 
@@ -228,13 +273,23 @@ Confirms the payment of an order, moving it from `PENDING_PAYMENT` to `PAID`, an
 * A `DELIVERED` or `CANCELLED` order can never be modified.
 * The invoice is issued automatically when the order becomes `PAID`; it has no operation of its own. Its `totalAmount` is a `Money`: the sum of `quantity × unitPrice` over the order lines (the prices frozen at confirmation, all in the same currency because the cart allows only one), its `buyer` is the order's buyer, and its identifier is `INV-<order identifier>`: an order is paid once, so it has exactly one invoice.
 
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `ORDER_STATUS_ADVANCE` | `ORDER` — the order | `previousStatus`, `newStatus`, `invoiceId` (only when the invoice is issued) |
+
 ## Exceptions
 
 | Exception | When |
 | --------- | ---- |
-| `BusinessRuleViolationException` | The target is `SHIPPED` or `DELIVERED`. |
+| `OperationNotAllowedException` | The actor is not an active `LOGISTICS_OPERATOR` or `ADMINISTRATOR`. |
+| `OrderStatusRequiresShipmentException` | The target is `SHIPPED` or `DELIVERED`. |
 | `EntityNotFoundException` | The order does not exist. |
 | `InvalidOrderStatusTransitionException` | The target is not the next step, is `CANCELLED`, or the order is already `DELIVERED` / `CANCELLED`. |
+| `EmptyOrderException` | The order has no lines, so its invoice cannot be totalled. |
 
 ---
 
@@ -259,12 +314,20 @@ Cancels an order and releases the stock reserved for each line.
 
 1. Authorize the actor as `BUYER` or `ADMINISTRATOR`, load the order, and check it with `AuthorizeOrderAccessService`.
 2. Call `Order.cancel()` and release the reservation of every line through `ReleaseInventoryReservationService`.
-3. Save the order.
+3. Save the order and record the cancellation (`ORDER_CANCELLATION`).
 
 ## Business Rules
 
 * An order can only be cancelled from `CART` or `PENDING_PAYMENT`, that is, before payment is confirmed.
 * Once `CANCELLED`, the order cannot move to any other status.
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `ORDER_CANCELLATION` | `ORDER` — the order | `previousStatus`, `newStatus` |
 
 ## Exceptions
 

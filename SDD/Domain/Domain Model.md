@@ -16,6 +16,7 @@ The model distinguishes between:
 * **Inventory**, which represents the stock of a product distributed across warehouses.
 * **Shopping Carts**, which represent a buyer's provisional product selection.
 * **Orders**, which represent a confirmed commercial commitment and its fulfillment lifecycle.
+* **Operations and audit logs**, which record every state-changing operation, who performed it and on which entity.
 
 > **Scope note:** the source specification only details the business rules and attributes for the domains **Users, Buyers, Sellers, Warehouses, Catalog, Inventory, and Orders**. Objectives referring to Invoicing, Shipping/Logistics execution, Returns/Refunds, and Administrative Reporting are named in the specification's objectives list but are not developed with attributes or rules in the source document. `Shipment`, `Invoice`, `ReturnRequest` and `Refund` were added in a later iteration with the attributes and rules defined below, which are this project's own design, not the source specification's. Administrative Reporting remains **out of scope**.
 
@@ -52,6 +53,9 @@ Invoice
 
 ReturnRequest
 └── Refund
+
+Operation
+└── AuditLog (one per operation)
 
 AuthenticationResult (result of a login, not persisted)
 ```
@@ -105,6 +109,10 @@ Invoice ─── bills ─────────────────> Ord
 ReturnRequest ── returns ──────────> Order, Buyer
    └── decided by ───────────────> User
 Refund ──── refunds ───────────────> ReturnRequest
+
+Operation ── performed by ─────────> User
+   └── affects ──────────────────> any entity (by type + identifier)
+AuditLog ─── traces ───────────────> Operation
 ```
 
 `Shipment`, `Invoice`, `ReturnRequest` and `Refund` point to the entity they belong to; the referenced entity (`Order`, `ReturnRequest`) does not hold them back.
@@ -135,6 +143,7 @@ This class cannot be instantiated directly.
 | role           | SystemRole | Business role that defines the user's responsibilities within the system.     |
 | status         | UserStatus | Current operational status of the user (Active, Blocked, etc.).               |
 | passwordHash   | String     | Hashed credential used for authentication. The domain never handles the plain password nor the hashing algorithm (see `PasswordHasherPort`). |
+| authTokenVersion | int      | Version of the user's access tokens. Starts at `0`; every token carries the version it was issued with, and only tokens of the current version are accepted. |
 
 ## Relationships
 
@@ -149,6 +158,7 @@ This class cannot be instantiated directly.
 * Only users whose `status` is `ACTIVE` can authenticate.
 * The `role` is fixed by the concrete subclass when the user is created (e.g. a `Buyer` is always `BUYER`) and can never be changed afterwards.
 * `identifier`, `email` and `role` have no setters: they are fixed when the user is created, so the uniqueness checked at registration cannot be bypassed later.
+* `authTokenVersion` has no setter. Logging out and changing the password call `bumpAuthTokenVersion()`, which raises it by one and so revokes every access token issued before. `restoreAuthTokenVersion(int)` is only for mappers rebuilding the user from persistence (stored in `users.authTokenVersion`; absent means `0`) and rejects a negative version with `IllegalArgumentException`.
 
 ---
 
@@ -210,7 +220,7 @@ Sellers cannot self-register; they are incorporated into the platform by an `Adm
 
 * A seller owns zero or more `Warehouse` instances.
 * A seller publishes zero or more `Product` instances.
-* A seller is registered by exactly one `Administrator` (recorded as an audit/operational fact, not as a persistent domain reference).
+* A seller is registered by exactly one `Administrator` (recorded as a `SELLER_REGISTRATION` operation and audit log, not as a persistent domain reference).
 
 ## Business Rules
 
@@ -364,6 +374,8 @@ Represents the distributed stock of a specific product held in a specific wareho
 | reservedQuantity    | Integer       | Quantity reserved by open orders. Must never be negative.           |
 | damagedQuantity     | Integer       | Quantity marked as damaged. Never available for reservation. Must never be negative. |
 
+`getIdentifier()` returns `productId:warehouseId`: a product has at most one inventory record per warehouse, so the pair identifies it. It is the `affectedEntityId` of the operations that change the item.
+
 ## Relationships
 
 * An `InventoryItem` references exactly one `Product` and exactly one `Warehouse`.
@@ -375,7 +387,7 @@ Represents the distributed stock of a specific product held in a specific wareho
 * Negative stock is not permitted under any circumstance.
 * Inventory that is nonexistent or marked as damaged cannot be reserved. Damaged units are moved from `availableQuantity` to `damagedQuantity`, so reservations (which only consume `availableQuantity`) never touch them.
 * Recognized movement types are: Inbound (`INBOUND`), Reservation (`RESERVATION`), Sale Outbound (`SALE_OUTBOUND`), Adjustment (`ADJUSTMENT`), and Return (`RETURN`). Each movement must be traceable to the `InventoryItem` it affects, and is recorded as an `InventoryMovement`.
-* The quantities only change through the behavior methods below; there are no quantity setters. The initial quantities given to the constructor must not be negative.
+* The quantities only change through the behavior methods below; there are no quantity setters. The initial quantities given to the constructor must not be negative, and the `amount` given to `receive`, `reserve`, `releaseReservation`, `confirmOutbound` and `markDamaged` must be greater than zero; otherwise `InvalidQuantityException` is thrown (`adjust` takes a signed `quantityDelta`). Operations that need more units than there are fail with `InsufficientStockException`.
 
 ## Behavior
 
@@ -458,8 +470,8 @@ Represents a buyer's provisional selection of products prior to confirming an or
 
 | Method | Effect |
 | ------ | ------ |
-| `addLine(Product, quantity)` | Adds the product, or merges the quantity into its existing line. Fails with `BusinessRuleViolationException` if the product is not `PUBLISHED`, has no price, or is priced in another currency than the cart; with `IllegalArgumentException` if the resulting quantity is not positive. |
-| `updateLineQuantity(Product, quantity)` | Replaces the quantity of the product's line. Fails with `EntityNotFoundException` if the cart has no line for it, or `IllegalArgumentException` if the quantity is not positive. |
+| `addLine(Product, quantity)` | Adds the product, or merges the quantity into its existing line. Fails with `ProductNotPurchasableException` if the product is not `PUBLISHED` or has no price; with `CurrencyMismatchException` if it is priced in another currency than the cart; with `InvalidQuantityException` if the resulting quantity is not positive. |
+| `updateLineQuantity(Product, quantity)` | Replaces the quantity of the product's line. Fails with `EntityNotFoundException` if the cart has no line for it, or `InvalidQuantityException` if the quantity is not positive. |
 | `removeLine(Product)` | Removes the product's line. Fails with `EntityNotFoundException` if the cart has no line for it. |
 
 ---
@@ -477,7 +489,7 @@ Represents a single product selection, with quantity, inside a shopping cart.
 | product     | Product  | Selected product.                        |
 | quantity    | Integer  | Quantity selected. Must be greater than zero. |
 
-The quantity only changes through its `ShoppingCart`; the product is fixed.
+The quantity only changes through its `ShoppingCart`; the product is fixed. A quantity that is not greater than zero fails with `InvalidQuantityException`.
 
 ---
 
@@ -536,7 +548,7 @@ Represents a single confirmed product line within an order, fixing the quantity 
 > * `productName` freezes the name shown to the buyer, just like `unitPrice` freezes the price, so the order is not altered if the product is renamed later.
 > * `warehouse` is needed to release a reservation (when the order is cancelled) or to confirm the outbound (when it ships): `InventoryItem` is keyed by `product` + `warehouse`, so the product alone does not identify the stock to act on.
 
-An `OrderLine` is immutable: every attribute is fixed by the constructor, which rejects a quantity that is not greater than zero.
+An `OrderLine` is immutable: every attribute is fixed by the constructor, which rejects a quantity that is not greater than zero with `InvalidQuantityException`.
 
 ---
 
@@ -623,7 +635,7 @@ Represents a buyer's request to return an order, and the decision taken on it.
 ## Business Rules
 
 * A return request is created `REQUESTED` and is decided exactly once, through `approve(decider)` or `reject(decider)`, which record who decided and when.
-* Deciding a request that is no longer `REQUESTED` fails with `BusinessRuleViolationException`. `APPROVED` and `REJECTED` are final.
+* Deciding a request that is no longer `REQUESTED` fails with `ReturnAlreadyDecidedException`. `APPROVED` and `REJECTED` are final.
 
 ---
 
@@ -651,7 +663,69 @@ Represents the money paid back to a buyer for a return request.
 ## Business Rules
 
 * A refund is created `PENDING` and is processed exactly once, through `process()`, which records when.
-* Processing a refund that is no longer `PENDING` fails with `BusinessRuleViolationException`. `PROCESSED` is final.
+* Processing a refund that is no longer `PENDING` fails with `RefundAlreadyProcessedException`. `PROCESSED` is final.
+
+---
+
+# Operation
+
+## Description
+
+Represents a state-changing business operation: what was done, when, by whom, and on which entity. Every Domain Service that changes state records one, together with its `AuditLog`, after saving its change (see [Audit](services/audit.md)). Reads are never recorded.
+
+## Attributes
+
+| Attribute          | Type               | Description |
+| ------------------ | ------------------ | ----------- |
+| identifier         | String             | Unique identifier of the operation (a UUID when built with `Operation.of`). |
+| operationType      | OperationType      | What was done (e.g. `ORDER_CONFIRMATION`). |
+| executionDate      | LocalDateTime      | When it was done. |
+| performedBy        | User               | The user who performed the operation. |
+| affectedEntityType | AffectedEntityType | Kind of entity the operation changed. |
+| affectedEntityId   | String             | Identifier of the entity the operation changed (`productId:warehouseId` for an `InventoryItem`). |
+
+## Relationships
+
+* An `Operation` references the `User` who performed it, and identifies the affected entity by `affectedEntityType` + `affectedEntityId` rather than by an object reference, since it can point to an entity of any kind.
+* Every `Operation` has one `AuditLog` built from it.
+
+## Business Rules
+
+* Immutable and append-only: every attribute is fixed by the constructor, and operations are never updated nor deleted.
+* `identifier`, `operationType`, `executionDate`, `affectedEntityType` and `affectedEntityId` are required.
+* `Operation.of(operationType, performedBy, affectedEntityType, affectedEntityId)` creates an operation executed now, with a generated UUID identifier.
+
+---
+
+# AuditLog
+
+## Description
+
+Represents the audit trail entry of an `Operation`: who performed it, with which role at that moment, on which entity, and the facts worth tracing (`details`).
+
+## Attributes
+
+| Attribute          | Type                  | Description |
+| ------------------ | --------------------- | ----------- |
+| auditId            | String                | Unique identifier of the audit entry. |
+| operationType      | OperationType         | What was done; the same as its operation's. |
+| operationDate      | LocalDateTime         | When the audit entry was recorded. |
+| performedBy        | User                  | The user who performed the operation. |
+| userRole           | SystemRole            | Role of `performedBy` when the operation was performed; `null` if unknown. |
+| affectedEntityType | AffectedEntityType    | Kind of entity the operation changed. |
+| affectedEntityId   | String                | Identifier of the entity the operation changed. |
+| details            | Map\<String, Object\> | Facts of the operation, such as `previousStatus` and `newStatus`. Read-only; never `null` (empty when none are given). |
+
+## Relationships
+
+* An `AuditLog` is built from exactly one `Operation` (by `RegisterOperationAndAuditService`) and references the `User` who performed it.
+
+## Business Rules
+
+* Immutable and append-only: every attribute is fixed by the constructor, `details` is copied and exposed read-only, and entries are never updated nor deleted.
+* `userRole` keeps the role at the moment of the operation, so the trail stays meaningful even if the user changes later.
+* **No credentials:** `details` never holds credentials. A key containing `password`, `hash`, `token` or `secret` (case-insensitive) is rejected with `IllegalArgumentException`, a programming guard.
+* `auditId`, `operationType`, `operationDate`, `affectedEntityType` and `affectedEntityId` are required.
 
 ---
 
@@ -666,7 +740,7 @@ The outcome of a successful login: the authenticated user and the access token i
 | Attribute | Type   | Description                                                        |
 | --------- | ------ | ------------------------------------------------------------------ |
 | user      | User   | The authenticated user, already checked to be `ACTIVE`.            |
-| token     | String | Access token issued through `TokenServicePort`. The domain never knows its format (JWT, in `infrastructure/security`). |
+| token     | String | Access token issued through `TokenServicePort`. The domain never knows its format (JWT, in `infrastructure/security`); it carries the user's current `authTokenVersion`. |
 
 ## Business Rules
 
@@ -699,7 +773,7 @@ The outcome of a successful login: the authenticated user and the access token i
 ## Carts and Orders
 
 * A `ShoppingCart` is provisional and carries no commercial commitment; it becomes an `Order` only upon buyer confirmation.
-* Every authenticated operation must be traceable to the `User` who performed it. This is recorded by `AuditOperationService` through `AuditLogPort`, invoked by the security layer for every authenticated request.
+* Every state-changing operation must be traceable to the `User` who performed it. Each Domain Service that changes state records an `Operation` and its `AuditLog` through `RegisterOperationAndAuditService` after saving; both are append-only.
 * An `Order` follows a strict, forward-only lifecycle, can only be cancelled before payment, and can never be modified once `DELIVERED` or `CANCELLED`.
 
 ## Value Objects

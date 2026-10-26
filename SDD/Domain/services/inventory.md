@@ -41,6 +41,14 @@ Registers a Marketplace-owned or Seller-owned warehouse. The kind of warehouse t
 * A Marketplace-owned warehouse can only be registered by an `Administrator`.
 * A Seller-owned warehouse can only be registered by its own `Seller`, who is always set as the `owner`: a seller cannot register a warehouse for another seller, and an administrator cannot register Seller-owned warehouses.
 
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `WAREHOUSE_REGISTRATION` | `WAREHOUSE` — the new warehouse | `ownerType`, `ownerId` (only for Seller-owned warehouses) |
+
 ## Exceptions
 
 | Exception | When |
@@ -66,6 +74,14 @@ Marks a warehouse as inactive through `Warehouse.deactivate()`. An inactive ware
 | warehouseReference | Warehouse | Reference to the warehouse to deactivate. |
 
 **Returns:** `Warehouse`
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `WAREHOUSE_DEACTIVATION` | `WAREHOUSE` — the warehouse | `previousActive`, `newActive` |
 
 ## Exceptions
 
@@ -112,6 +128,7 @@ Except for `AdjustInventoryService`, every inventory service receives `execute(U
 * Negative stock is forbidden: `InventoryItem` rejects any operation that would leave a negative quantity.
 * Damaged units are kept apart from `availableQuantity`, so they can never be reserved.
 * Every stock change is recorded as an `InventoryMovement`.
+* The four services with an actor (inbound, return, adjustment, damage report) also record an operation through `RegisterOperationAndAuditService` after saving, with `INVENTORY_ITEM` as the affected entity and `productId:warehouseId` (`InventoryItem.getIdentifier()`) as its identifier; see each service. The internal stock services (`ReserveInventoryService`, `ReleaseInventoryReservationService`, `ConfirmInventoryOutboundService`) record none: the order confirmation, cancellation or shipment dispatch that calls them is audited instead.
 
 ## Common Exceptions
 
@@ -120,7 +137,7 @@ Except for `AdjustInventoryService`, every inventory service receives `execute(U
 | `EntityNotFoundException` | No `InventoryItem` exists for the product in that warehouse. |
 | `OperationNotAllowedException` | The actor may not operate on the item's warehouse (services with an actor only). |
 | `InsufficientStockException` | The operation needs more units than are available (or reserved, for release and outbound). |
-| `IllegalArgumentException` | `quantity` is zero or negative. |
+| `InvalidQuantityException` | `quantity` is zero or negative (rejected by `InventoryItem`). |
 
 ---
 
@@ -134,12 +151,20 @@ Registers stock received in a warehouse.
 
 1. Find the `InventoryItem` for the product and warehouse. If none exists, check that the product is `PHYSICAL` and create the item with zero stock (this is the first time the product is stocked in that warehouse).
 2. Check that the warehouse is active.
-3. Call `receive(quantity)` and record an `INBOUND` movement.
+3. Call `receive(quantity)`, record an `INBOUND` movement, and record the operation (`INVENTORY_INBOUND`).
 
 ## Business Rules
 
 * An inactive warehouse cannot receive stock.
 * Only `PHYSICAL` products are stocked. The product type is checked when the `InventoryItem` is created; restocking an existing item does not repeat the check.
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `INVENTORY_INBOUND` | `INVENTORY_ITEM` — `productId:warehouseId` (`InventoryItem.getIdentifier()`) | `productId`, `warehouseId`, `quantity`, `previousAvailableQuantity`, `newAvailableQuantity` |
 
 ## Exceptions
 
@@ -148,8 +173,8 @@ In addition to the common exceptions (except "no inventory item", since it is cr
 | Exception | When |
 | --------- | ---- |
 | `EntityNotFoundException` | The item is new and the product or the warehouse does not exist. |
-| `BusinessRuleViolationException` | The warehouse is inactive. |
-| `BusinessRuleViolationException` | The item is new and the product is `DIGITAL`: digital products neither require nor allow inventory tracking. |
+| `InactiveWarehouseException` | The warehouse is inactive. |
+| `InventoryNotTrackedException` | The item is new and the product is `DIGITAL`: digital products neither require nor allow inventory tracking. |
 
 ---
 
@@ -159,6 +184,14 @@ In addition to the common exceptions (except "no inventory item", since it is cr
 
 Returns units sent back by a buyer to the available stock of an existing inventory record, recording a `RETURN` movement. Used by `ApproveReturnService` for every line of an approved return.
 
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving; when called by `ApproveReturnService`, one per order line, besides the `RETURN_APPROVAL` of the request.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `INVENTORY_RETURN` | `INVENTORY_ITEM` — `productId:warehouseId` (`InventoryItem.getIdentifier()`) | `productId`, `warehouseId`, `quantity`, `previousAvailableQuantity`, `newAvailableQuantity` |
+
 ---
 
 # AdjustInventoryService
@@ -167,6 +200,14 @@ Returns units sent back by a buyer to the available stock of an existing invento
 
 Applies a manual correction (positive or negative) to the available stock, e.g. after a physical count, recording an `ADJUSTMENT` movement.
 
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `INVENTORY_ADJUSTMENT` | `INVENTORY_ITEM` — `productId:warehouseId` (`InventoryItem.getIdentifier()`) | `productId`, `warehouseId`, `quantityDelta`, `previousAvailableQuantity`, `newAvailableQuantity` |
+
 ---
 
 # ReportDamagedInventoryService
@@ -174,6 +215,14 @@ Applies a manual correction (positive or negative) to the available stock, e.g. 
 ## Description
 
 Moves available units to damaged, so they can no longer be sold or reserved, recording a negative `ADJUSTMENT` movement.
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `INVENTORY_DAMAGE_REPORT` | `INVENTORY_ITEM` — `productId:warehouseId` (`InventoryItem.getIdentifier()`) | `productId`, `warehouseId`, `quantity`, `previousDamagedQuantity`, `newDamagedQuantity` |
 
 ---
 

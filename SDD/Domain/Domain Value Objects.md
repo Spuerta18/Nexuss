@@ -295,6 +295,109 @@ Represents the currency a `Money` amount is expressed in. Codes follow ISO 4217.
 
 ---
 
+# OperationType
+
+## Description
+
+Represents the kind of state-changing business operation recorded as an `Operation` and its `AuditLog`. There is one code per operation that changes the state of the platform; reads are never recorded. Each code is recorded by exactly one Domain Service (see [Audit](services/audit.md#recorded-operations)).
+
+## Inherits From
+
+`DomainCatalog`
+
+## Allowed Values
+
+**Users and sessions**
+
+| Code                            | Name                            | Description |
+| ------------------------------- | ------------------------------- | ----------- |
+| BUYER_REGISTRATION              | Buyer Registration              | A buyer registered themselves. |
+| SELLER_REGISTRATION             | Seller Registration             | An administrator registered a seller. |
+| SUPERVISOR_REGISTRATION         | Supervisor Registration         | An administrator registered a supervisor. |
+| LOGISTICS_OPERATOR_REGISTRATION | Logistics Operator Registration | An administrator registered a logistics operator. |
+| USER_LOGIN                      | User Login                      | A user logged in successfully and received a token. |
+| USER_LOGOUT                     | User Logout                     | A user logged out; every token issued before is revoked. |
+| PASSWORD_CHANGE                 | Password Change                 | A user changed their password; every token issued before is revoked. |
+| USER_STATUS_CHANGE              | User Status Change              | An administrator changed the operational status of a user. |
+| SELLER_STATUS_CHANGE            | Seller Status Change            | An administrator changed the commercial status of a seller. |
+
+**Catalog**
+
+| Code                    | Name                    | Description |
+| ----------------------- | ----------------------- | ----------- |
+| PRODUCT_PUBLICATION     | Product Publication     | A seller published a product. |
+| PRODUCT_STATUS_CHANGE   | Product Status Change   | The publication status of a product changed. |
+| PRODUCT_VARIANTS_UPDATE | Product Variants Update | The variants of a product were replaced. |
+
+**Warehouses and inventory**
+
+| Code                    | Name                    | Description |
+| ----------------------- | ----------------------- | ----------- |
+| WAREHOUSE_REGISTRATION  | Warehouse Registration  | A warehouse was registered. |
+| WAREHOUSE_DEACTIVATION  | Warehouse Deactivation  | A warehouse was deactivated. |
+| INVENTORY_INBOUND       | Inventory Inbound       | Stock was received in a warehouse. |
+| INVENTORY_ADJUSTMENT    | Inventory Adjustment    | The available stock of a warehouse was corrected. |
+| INVENTORY_DAMAGE_REPORT | Inventory Damage Report | Units were reported as damaged and left the sellable stock. |
+| INVENTORY_RETURN        | Inventory Return        | Returned units went back to the sellable stock of a warehouse. |
+
+**Carts and orders**
+
+| Code                      | Name                      | Description |
+| ------------------------- | ------------------------- | ----------- |
+| CART_CREATION             | Cart Creation             | A buyer created a shopping cart. |
+| CART_LINE_ADDITION        | Cart Line Addition        | A product was added to a cart. |
+| CART_LINE_QUANTITY_UPDATE | Cart Line Quantity Update | The quantity of a cart line changed. |
+| CART_LINE_REMOVAL         | Cart Line Removal         | A product was removed from a cart. |
+| ORDER_CONFIRMATION        | Order Confirmation        | A cart was turned into an order and its stock reserved. |
+| ORDER_CANCELLATION        | Order Cancellation        | An order was cancelled and its reserved stock released. |
+| ORDER_STATUS_ADVANCE      | Order Status Advance      | An order moved to its next status outside the shipment lifecycle. |
+
+**Shipments**
+
+| Code              | Name              | Description |
+| ----------------- | ----------------- | ----------- |
+| SHIPMENT_CREATION | Shipment Creation | The shipment of a paid order was created. |
+| SHIPMENT_PACKING  | Shipment Packing  | The goods of a shipment were packed. |
+| SHIPMENT_DISPATCH | Shipment Dispatch | A shipment left the warehouse and its order moved to `SHIPPED`. |
+| SHIPMENT_DELIVERY | Shipment Delivery | A shipment reached the buyer and its order moved to `DELIVERED`. |
+
+**Returns and refunds**
+
+| Code              | Name              | Description |
+| ----------------- | ----------------- | ----------- |
+| RETURN_REQUEST    | Return Request    | A buyer requested the return of an order. |
+| RETURN_APPROVAL   | Return Approval   | An administrator approved a return request and a refund was created. |
+| RETURN_REJECTION  | Return Rejection  | An administrator rejected a return request. |
+| REFUND_PROCESSING | Refund Processing | A pending refund was paid to the buyer. |
+
+---
+
+# AffectedEntityType
+
+## Description
+
+Represents the kind of entity changed by an `Operation`. Together with the entity's identifier (`affectedEntityId`) it tells which record an operation and its audit log refer to.
+
+## Inherits From
+
+`DomainCatalog`
+
+## Allowed Values
+
+| Code           | Name           | Description |
+| -------------- | -------------- | ----------- |
+| USER           | User           | A user of any role. |
+| PRODUCT        | Product        | A product of the catalog. |
+| WAREHOUSE      | Warehouse      | A Marketplace-owned or Seller-owned warehouse. |
+| INVENTORY_ITEM | Inventory Item | The stock of one product in one warehouse; identified as `productId:warehouseId`. |
+| SHOPPING_CART  | Shopping Cart  | A buyer's shopping cart. |
+| ORDER          | Order          | An order placed by a buyer. |
+| SHIPMENT       | Shipment       | The shipment of an order. |
+| RETURN_REQUEST | Return Request | A buyer's request to return an order. |
+| REFUND         | Refund         | The refund of an approved return. |
+
+---
+
 # Money
 
 ## Description
@@ -320,7 +423,7 @@ Represents an amount of money in a given `Currency`. It is used for every moneta
 
 ## Rules
 
-* Immutable. A `null` amount, a `null` currency or a negative amount fail with `DomainException`, as does combining two different currencies in `add` / `subtract`.
+* Immutable. A `null` amount, a `null` currency, a negative amount (also as the result of `subtract`) or a `null` operand fail with `InvalidMoneyException`; combining two different currencies in `add` / `subtract` fails with `CurrencyMismatchException`.
 * **Equality by value, ignoring scale:** two values are equal when they have the same currency and their amounts compare as equal (`compareTo`), so `10.0 COP` equals `10.00 COP`. The hash code uses the amount without trailing zeros, consistent with that equality.
 * Persisted as an embedded `{ amount: Decimal128, currency: "<code>" }` subdocument (see [Persistence](../Adapters/Persistence.md)).
 

@@ -30,8 +30,14 @@ classDiagram
         -ReserveInventoryService reserveInventoryService
         -ReleaseInventoryReservationService releaseInventoryReservationService
         -ValidateRoleAuthorizationService validateRoleAuthorizationService
+        -RegisterOperationAndAuditService registerOperationAndAuditService
         -AuthorizeCartAccessService authorizeCartAccessService
         +execute(User actor, ShoppingCart cartReference, Order newOrder) Order
+    }
+    class RegisterOperationAndAuditService {
+        -RegisterOperationService registerOperationService
+        -RegisterAuditLogService registerAuditLogService
+        +execute(Operation operation, Map details) AuditLog
     }
     class ShoppingCart {
         -String identifier
@@ -95,6 +101,7 @@ classDiagram
     Order *-- OrderLine
     OrderLine --> Money
     ConfirmOrderService --> OrderRepositoryPort : save
+    ConfirmOrderService --> RegisterOperationAndAuditService : ORDER_CONFIRMATION
     MongoOrderRepositoryAdapter ..|> OrderRepositoryPort
     MongoOrderRepositoryAdapter --> OrderMongoRepository
     MongoOrderRepositoryAdapter --> OrderMapper
@@ -114,12 +121,16 @@ classDiagram
     class JwtAuthenticationFilter {
         -JwtProvider jwtProvider
         -NexusUserDetailsService userDetailsService
-        -AuditOperationService auditOperationService
         #doFilterInternal(...)
+        -currentPrincipal(JwtClaims) Optional~AuthenticatedUserPrincipal~
     }
     class JwtProvider {
         +generateToken(User) String
         +validate(String) Optional~JwtClaims~
+    }
+    class JwtClaims {
+        <<record>>
+        userId, role, email, version, issuedAt, expiresAt
     }
     class NexusUserDetailsService {
         -UserRepositoryPort userRepositoryPort
@@ -134,6 +145,7 @@ classDiagram
         +handleNotFound(...) ResponseEntity~ErrorResponse~
         +handleConflict(...) ResponseEntity~ErrorResponse~
         +handleForbidden(...) ResponseEntity~ErrorResponse~
+        +handleInvalidValue(...) ResponseEntity~ErrorResponse~
     }
     class RestErrors {
         +response(...)$ ResponseEntity~ErrorResponse~
@@ -147,6 +159,7 @@ classDiagram
     SecurityConfig --> JwtAuthenticationFilter : registers
     SecurityConfig --> RestErrors : 401 and 403
     JwtAuthenticationFilter --> JwtProvider : validate
+    JwtProvider --> JwtClaims : ver claim
     JwtAuthenticationFilter --> NexusUserDetailsService : reload user
     NexusUserDetailsService --> AuthenticatedUserPrincipal : creates
     GlobalExceptionHandler --> RestErrors
@@ -155,7 +168,8 @@ classDiagram
 
 ## Notes
 
-* **`ConfirmOrderService.execute`**: checks the role (`BUYER` or `ADMINISTRATOR`), loads the cart, checks cart access, requires the buyer to be `ACTIVE` and `ENABLED` and the cart to be non-empty with `PUBLISHED` products, reserves stock per line with `ReserveInventoryService` (releasing what was already reserved if one line fails), builds the immutable `Order` with its lines, saves it and deletes the cart.
+* **`ConfirmOrderService.execute`**: checks the role (`BUYER` or `ADMINISTRATOR`), loads the cart, checks cart access, requires the buyer to be `ACTIVE` and `ENABLED` and the cart to be non-empty with `PUBLISHED` products, reserves stock per line with `ReserveInventoryService` (releasing what was already reserved if one line fails), builds the immutable `Order` with its lines, saves it, deletes the cart and records `ORDER_CONFIRMATION` through `RegisterOperationAndAuditService` (details: `cartId`, `newStatus`, `lineCount`). Refusals use one exception per rule, e.g. `EmptyCartException`, `ProductNotPurchasableException` (409) and `BuyerNotEnabledException` (403).
 * **Controllers receive the actor** through `@AuthenticationPrincipal(expression = "user") User actor`, i.e. `AuthenticatedUserPrincipal.getUser()` — the user reloaded by `JwtAuthenticationFilter`.
 * **`MongoReferenceResolver`** turns the IDs stored in documents (`buyerId`, `productId`, `warehouseId`) back into domain objects, with one query per collection.
-* **`ReserveInventoryService`, `AuditOperationService` and the authorization services** are plain classes registered in `infrastructure/config`; the rest of the classes above are component-scanned.
+* **Token revocation.** `JwtProvider` writes the user's `authTokenVersion` as the `ver` claim and rejects tokens without it; `JwtAuthenticationFilter.currentPrincipal` drops the principal (so the chain answers `401`) when the user is not `ACTIVE`, its role changed, or `ver` differs from the stored version, which logout and password change raise.
+* **`ReserveInventoryService`, `RegisterOperationAndAuditService` (with `RegisterOperationService` and `RegisterAuditLogService`) and the authorization services** are plain classes registered in `infrastructure/config`; the rest of the classes above are component-scanned.

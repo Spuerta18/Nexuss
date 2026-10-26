@@ -33,23 +33,29 @@
 
 # Mapping
 
+Every business rule has its own exception in `domain/exceptions`, all extending `DomainException`; there is no generic "business rule violated" exception. The handler groups them by status:
+
 | Exception | Status | Message |
 | --------- | ------ | ------- |
 | `MethodArgumentNotValidException` (`@Valid` body) | 400 | `"Validation failed"` + `fieldErrors` |
 | `HttpMessageNotReadableException` | 400 | `"Malformed or unreadable request body"` |
 | `InvalidRequestException` (unknown code in a request) | 400 | e.g. `"Unknown role 'KING'"` |
-| `IllegalArgumentException` (value rejected by an entity, e.g. a quantity) | 400 | Entity message |
-| Other `DomainException` (e.g. an invalid `Money`) | 400 | Domain message |
+| `InvalidQuantityException` (cart line, order line, inventory or cart quantity out of range), `InvalidProductPriceException`, `InvalidMoneyException`, `InvalidPasswordException` (new password too short), `IncorrectCurrentPasswordException`, `OrderStatusRequiresShipmentException` | 400 | Domain message |
+| Other `DomainException` (present or future) | 400 | Domain message |
+| `IllegalArgumentException` (programming guard of an entity, e.g. a `null` status) | 400 | Entity message |
 | `InvalidCredentialsException` | 401 | Always `"Invalid email or password"` |
-| No or invalid token on a protected route (security chain) | 401 | `"Authentication required"` |
+| No, invalid or revoked token on a protected route (security chain) | 401 | `"Authentication required"` |
 | `AccessDeniedException` (`@PreAuthorize`) / wrong role (security chain) | 403 | `"Access denied"` |
-| `OperationNotAllowedException`, `SellerNotAuthorizedException` | 403 | Domain message |
+| `OperationNotAllowedException`, `SellerNotAuthorizedException`, `BuyerNotEnabledException` | 403 | Domain message |
 | `EntityNotFoundException` | 404 | Domain message |
-| `DuplicateResourceException`, `InsufficientStockException`, `InvalidOrderStatusTransitionException`, `InvalidShipmentStatusTransitionException`, `BusinessRuleViolationException` | 409 | Domain message |
+| `DuplicateResourceException`, `InsufficientStockException`, `InvalidOrderStatusTransitionException`, `InvalidShipmentStatusTransitionException`, `EmptyCartException`, `ProductNotPurchasableException`, `CurrencyMismatchException`, `OrderNotShippableException`, `EmptyOrderException`, `ReturnNotEligibleException`, `ReturnAlreadyDecidedException`, `RefundAlreadyProcessedException`, `InactiveWarehouseException`, `InventoryNotTrackedException` | 409 | Domain message |
 | Spring MVC errors (unknown route `404`, wrong method `405`, missing parameter `400`, …) | Their own status | Spring's detail message |
 | Any other exception | 500 | `"Unexpected error"` |
 
-`409 Conflict` means the request is valid but the current state of the data does not allow it (duplicate, not enough stock, wrong status for the transition).
+* `400` (value rules) means a value sent by the client breaks a rule whatever the state of the data: a quantity, price or amount out of range, a new password that is too short, a wrong current password, or an order status that only the shipment lifecycle may set.
+* `403` means the actor may not perform the operation: the domain authorization services rejected them, or their current state does not allow it (a suspended seller, a buyer not enabled to purchase).
+* `409 Conflict` means the request is valid but the current state of the data does not allow it (duplicate, not enough stock, wrong status for the transition, empty cart or order, product not purchasable, mixed currencies, inactive warehouse, return or refund already decided).
+* **`IllegalArgumentException` is only for programming guards.** Rules that a client can break have their own `DomainException`; the `IllegalArgumentException`s left in the entities protect against values no business rule covers (e.g. a `null` argument) and still answer `400` with their message.
 
 ---
 

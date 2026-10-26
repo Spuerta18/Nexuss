@@ -8,9 +8,9 @@ The domain is never changed to accommodate persistence: documents, mappers and S
 
 ```text
 adapters/out/persistence/mongodb/
-├── documents/     @Document classes, one per aggregate root (+ audit log)
+├── documents/     @Document classes, one per aggregate root (+ operations and audit log)
 ├── mappers/       Domain Model <-> Document conversion
-├── repositories/  Spring Data MongoRepository<XxxDocument, String> interfaces
+├── repositories/  Spring Data interfaces (MongoRepository, or the bare Repository for append-only collections)
 └── adapters/      One class per output port, delegating to repository + mapper
 ```
 
@@ -19,7 +19,7 @@ adapters/out/persistence/mongodb/
 # Design Conventions
 
 * **One document per aggregate root.** Each aggregate root has its own collection. Child objects without an independent lifecycle are embedded; everything else is referenced by ID (see [Collections](#collections)).
-* **The domain identifier is the document `_id`.** Every aggregate root receives its identifier from the domain model passed to the Domain Service (e.g. the `identifier` of the new `ShoppingCart`, `Order` or `User`), so documents never rely on MongoDB-generated IDs. The only exceptions are the append-only collections (`inventory_movements`, `audit_logs`), whose domain objects have no identifier; there `_id` is a MongoDB-generated `ObjectId`.
+* **The domain identifier is the document `_id`.** Every aggregate root receives its identifier from the domain model passed to the Domain Service (e.g. the `identifier` of the new `ShoppingCart`, `Order` or `User`), so documents never rely on MongoDB-generated IDs. The append-only `operations` and `audit_logs` follow the same rule: `Operation.identifier` and `AuditLog.auditId` are UUIDs generated in the domain. The only exception is `inventory_movements`, whose domain object has no identifier; there `_id` is a MongoDB-generated `ObjectId`.
 * **References are stored as plain `String` IDs** named `<relation>Id` (`sellerId`, `buyerId`, `productId`, `warehouseId`, `ownerId`). DBRefs and `@DocumentReference` are not used: resolving references is the adapter's job, so it stays explicit and can be batched.
 * **Value Objects are stored as their `code`** and rebuilt with `fromCode(...)`, never with new instances, so the domain can compare them against its constants (`status == OrderStatus.PAID`). A stored code the catalog does not know is corrupt data and makes the mapper fail with `IllegalStateException` naming the code, instead of rebuilding the entity with a `null` value. Primitive enums (`VariantAttributeType`, `NotificationChannel`) are stored by `name()`.
 * **Money is stored as an embedded `{ amount, currency }` subdocument** (`MoneyDocument`): the amount as `Decimal128` (`@Field(targetType = FieldType.DECIMAL128)`), never as `double` or as a string, so it keeps its exact scale and can be compared/aggregated in queries; the currency as its `Currency` code. `MoneyMapper` converts it to and from the `Money` value object.
@@ -44,7 +44,8 @@ adapters/out/persistence/mongodb/
 | `invoices`            | `InvoiceDocument`           | `Invoice.identifier` (`INV-<orderId>`) | —                            | `orderId` → `orders` (unique), `buyerId` → `users`   |
 | `return_requests`     | `ReturnRequestDocument`     | `ReturnRequest.identifier`      | —                                   | `orderId` → `orders` (unique), `buyerId` → `users`, `decidedById` → `users` (once decided) |
 | `refunds`             | `RefundDocument`            | `Refund.identifier` (`REF-<returnRequestId>`) | —                     | `returnRequestId` → `return_requests` (unique)       |
-| `audit_logs`          | `AuditLogDocument`          | generated `ObjectId`            | —                                   | `userId` → `users` (not resolved)                    |
+| `operations`          | `OperationDocument`         | `Operation.identifier` (UUID)   | —                                   | `performedById` → `users`; `affectedEntityId` → the collection named by `affectedEntityType` (not resolved) |
+| `audit_logs`          | `AuditLogDocument`          | `AuditLog.auditId` (UUID)       | `details` (free-form subdocument)   | `performedById` → `users`; `affectedEntityId` (not resolved) |
 
 The embed-vs-reference decisions are exactly those of the [Persistence Strategy](../Software%20Architecture/Software%20Architecture.md#persistence-strategy-embedding-vs-referencing): `Order` embeds `OrderLine`, `ShoppingCart` embeds `CartLine`, and every other relationship is a reference by ID. `ProductVariant` is embedded inside `products` because it is a value object with no identity of its own — it is part of the product's state, not a relationship.
 
@@ -62,6 +63,7 @@ The embed-vs-reference decisions are exactly those of the [Persistence Strategy]
   "email": "ana@example.com",
   "status": "ACTIVE",
   "passwordHash": "$2a$10$...",
+  "authTokenVersion": 2,
 
   "primaryAddress": "1 Main Street",         // BUYER only
   "additionalAddresses": ["..."],           // BUYER only
@@ -69,6 +71,8 @@ The embed-vs-reference decisions are exactly those of the [Persistence Strategy]
   "sellerStatus": "ACTIVE"                  // SELLER only
 }
 ```
+
+`authTokenVersion` is the user's token version (see [REST Security and CORS](Rest-security-cors.md#logout-and-token-revocation)); a logout or password change increments it. Documents written before it existed have no such field and are read as version `0`, so their users' tokens (also issued without the `ver` claim) are rejected and they simply log in again.
 
 Indexes: unique on `email`. `UserRepositoryPort.existsByRole` queries by `userType` (used once at startup by the initial administrator seeder). See [User Hierarchy](#user-hierarchy).
 
@@ -179,7 +183,7 @@ Written once, when the order becomes `PAID`, and never updated. Indexes: unique 
 MongoDB has no table inheritance, and the domain `User` is an abstract class with five specializations (`Buyer`, `Seller`, `LogisticsOperator`, `Administrator`, `Supervisor`). All of them are stored in the single `users` collection as one `UserDocument` type:
 
 * **Discriminator — `userType`.** Holds the `SystemRole` code of the user (`BUYER`, `SELLER`, `LOGISTICS_OPERATOR`, `ADMINISTRATOR`, `SUPERVISOR`). In the domain the role is fixed by the subclass (each constructor passes its own `SystemRole`), so the role and the subtype are the same piece of information; storing it once as `userType` avoids two fields that could disagree. `UserMapper.toDomain` switches on `userType` to instantiate the right subclass, and the rebuilt entity's `role` comes from that constructor.
-* **Shared fields** (`fullName`, `email`, `status`, `passwordHash`) are present on every document.
+* **Shared fields** (`fullName`, `email`, `status`, `passwordHash`, `authTokenVersion`) are present on every document.
 * **Specialization-only fields** are optional on the document and simply absent (not written as `null`) on users of other types:
 
   | Field                 | Present for |
@@ -208,7 +212,7 @@ The domain works with object graphs (`ShoppingCart.getBuyer().getCommercialStatu
 
 # Repositories
 
-Each document has a Spring Data interface `<Aggregate>MongoRepository extends MongoRepository<XxxDocument, String>` (`UserMongoRepository`, `ProductMongoRepository`, …, `AuditLogMongoRepository`). The `Mongo` infix keeps them apart from the domain's `<Name>RepositoryPort` interfaces. They only declare the derived queries the ports need (`findByEmail`, `existsByEmail`, `findBySellerId`, `findByStatus`, `findAllByProductId`, `findAllByProductIdAndWarehouseIdOrderByOccurredAtAsc`, `findAllByBuyerIdOrderByCreatedAtDesc` on orders, `findAllByBuyerId` on carts, `findByOrderId` on shipments, invoices and return requests, `findByReturnRequestId` on refunds); they are package-internal plumbing and are never injected outside `adapters/out/persistence/mongodb`.
+Each document has a Spring Data interface `<Aggregate>MongoRepository extends MongoRepository<XxxDocument, String>` (`UserMongoRepository`, `ProductMongoRepository`, …), except the append-only `OperationMongoRepository` and `AuditLogMongoRepository`, which extend the bare `Repository` (see [Operations and Audit Log](#cross-cutting-operations-and-audit-log)). The `Mongo` infix keeps them apart from the domain's `<Name>RepositoryPort` interfaces. They only declare the derived queries the ports need (`findByEmail`, `existsByEmail`, `findBySellerId`, `findByStatus`, `findAllByProductId`, `findAllByProductIdAndWarehouseIdOrderByOccurredAtAsc`, `findAllByBuyerIdOrderByCreatedAtDesc` on orders, `findAllByBuyerId` on carts, `findByOrderId` on shipments, invoices and return requests, `findByReturnRequestId` on refunds); they are package-internal plumbing and are never injected outside `adapters/out/persistence/mongodb`.
 
 Spring Data MongoDB comes from `spring-boot-starter-data-mongodb`. In Spring Boot 4, `spring-boot-starter-mongodb` only provides the MongoDB driver, without `@Document` or `MongoRepository`.
 
@@ -229,7 +233,8 @@ Spring Data MongoDB comes from `spring-boot-starter-data-mongodb`. In Spring Boo
 | `InvoiceRepositoryPort`            | `MongoInvoiceRepositoryAdapter`        | `invoices`            |
 | `ReturnRequestRepositoryPort`      | `MongoReturnRequestRepositoryAdapter`  | `return_requests`     |
 | `RefundRepositoryPort`             | `MongoRefundRepositoryAdapter`         | `refunds`             |
-| `AuditLogPort`                     | `MongoAuditLogAdapter`                 | `audit_logs`          |
+| `OperationRepositoryPort`          | `MongoOperationRepositoryAdapter`      | `operations`          |
+| `AuditLogRepositoryPort`           | `MongoAuditLogRepositoryAdapter`       | `audit_logs`          |
 | `NotificationPort`                 | `LoggingNotificationAdapter`           | — (log only)          |
 
 Persistence adapters are annotated `@Repository`, so Spring translates MongoDB driver exceptions into its `DataAccessException` hierarchy. They are picked up by component scanning; the domain services that consume them are wired in `infrastructure/config` (next phase).
@@ -244,26 +249,40 @@ There is no real notification channel yet ([Domain Services](../Domain/Domain%20
 
 ---
 
-# Cross-Cutting: Audit Log
+# Cross-Cutting: Operations and Audit Log
 
-`AuditLogPort` is also backed by MongoDB, but it is documented apart from the aggregates because it is **transversal, not domain data**: it does not persist any Domain Model, no use case reads it, and it is written for every authenticated request by the security layer through `AuditOperationService`.
+Every state-changing Domain Service records what it did through `RegisterOperationAndAuditService`: one `Operation` (what was done, by whom, on which entity) and one `AuditLog` (the same, plus the performer's role and operation-specific details). Both are domain models, read back by `ConsultOperationsService` and `ConsultAuditLogsService` (administrators and supervisors). They are stored in two append-only collections.
 
-* **Collection:** `audit_logs`, one document per recorded operation.
+## `operations` and `audit_logs`
 
-  ```json
-  { "_id": ObjectId("..."), "userId": "1020304050", "operation": "POST /orders", "occurredAt": ISODate("...") }
-  ```
+```json
+// operations
+{ "_id": "5b1e…", "operationType": "USER_STATUS_CHANGE", "executionDate": ISODate("2026-10-20T14:00:00Z"),
+  "performedById": "INITIAL-ADMIN", "affectedEntityType": "USER", "affectedEntityId": "1020304050" }
 
-* **Append-only.** The port only exposes `record(userId, operation, occurredAt)`; the adapter only inserts, and entries are never updated or deleted by the application.
-* **No domain entity.** Because the port receives plain values, `AuditLogMapper` only has `toDocument(userId, operation, occurredAt)`. A `toDomain` would have no domain type to return; it will be added if an audit query port is ever introduced.
-* **`userId` is not resolved** against `users`: the log must remain valid and cheap to write even if the user later changes, and it is never hydrated.
-* **Indexes:** `(userId, occurredAt)` for per-user traceability queries.
+// audit_logs
+{ "_id": "9c4a…", "operationType": "USER_STATUS_CHANGE", "operationDate": ISODate("2026-10-20T14:00:00Z"),
+  "performedById": "INITIAL-ADMIN", "userRole": "ADMINISTRATOR",
+  "affectedEntityType": "USER", "affectedEntityId": "1020304050",
+  "details": { "previousStatus": "ACTIVE", "newStatus": "BLOCKED", "role": "BUYER" } }
+```
+
+* **Documents and mappers.** `OperationDocument` and `AuditLogDocument` store `OperationType`, `AffectedEntityType` and `SystemRole` (`userRole`) by code and the performer by identifier (`performedById`). `OperationMapper` and `AuditLogMapper` have `toDocument(entity)` and `toDomain(document, performedBy)`; `userRole` and `performedById` may be absent and are rebuilt as `null`. `details` is stored as an embedded subdocument; the domain `AuditLog` already rejects keys that name a password, hash, token or secret, so credentials never reach the collection.
+* **Append-only.** `OperationMongoRepository` and `AuditLogMongoRepository` extend the bare Spring Data `Repository`, not `MongoRepository`, and declare only `insert` and reads (`findAll(Sort)`; `findByOperationTypeNotNull(Sort)` for audit logs). No update or delete method exists, so the application cannot change or remove an entry; `insert` also fails on an existing `_id` instead of overwriting it.
+* **Adapters.** `MongoOperationRepositoryAdapter` (`OperationRepositoryPort`) and `MongoAuditLogRepositoryAdapter` (`AuditLogRepositoryPort`) expose `save` (insert) and `findAll`, which returns the entries most recent first (`executionDate` / `operationDate` descending) and resolves every performer with one `MongoReferenceResolver` query, as a plain `User` of its stored subtype. `affectedEntityId` is not resolved: the entity may since have changed.
+* **Legacy entries skipped.** `audit_logs` entries written by the old per-request audit (`userId`, `operation`, `occurredAt`) have no `operationType`; `findByOperationTypeNotNull` leaves them out, so they stay in the collection but are never read.
+* **Indexes.**
+
+  | Collection | Indexes |
+  | ---------- | ------- |
+  | `operations` | `operationType`; `executionDate`; `(performedById, executionDate desc)`; `(affectedEntityType, affectedEntityId)` |
+  | `audit_logs` | `operationType`; `operationDate`; `(performedById, operationDate desc)`; `(affectedEntityType, affectedEntityId)` |
 
 ---
 
 # Index Creation
 
-The indexes declared on the documents (`@Indexed`, `@CompoundIndex`) are created at startup: `application.properties` sets `spring.data.mongodb.auto-index-creation=true`. In Spring Boot 4.1.1 the property is defined by `spring-boot-data-mongodb` (`DataMongoProperties.autoIndexCreation`), which scans the `@Document` classes and enables index creation on the mapping context, so the indexes of all twelve collections are created when the application starts.
+The indexes declared on the documents (`@Indexed`, `@CompoundIndex`) are created at startup: `application.properties` sets `spring.data.mongodb.auto-index-creation=true`. In Spring Boot 4.1.1 the property is defined by `spring-boot-data-mongodb` (`DataMongoProperties.autoIndexCreation`), which scans the `@Document` classes and enables index creation on the mapping context, so the indexes of all thirteen collections are created when the application starts.
 
 * Startup therefore needs a reachable MongoDB server: without one, index creation fails after the driver's server selection timeout and the application does not start.
 * The tests set the property to `false`, since they run without a MongoDB server.
@@ -273,6 +292,6 @@ The indexes declared on the documents (`@Indexed`, `@CompoundIndex`) are created
 
 # Known Gaps
 
-* **No multi-document transactions.** `ConfirmOrderService` reserves stock in several `inventory_items`, saves the order and deletes the cart as separate writes. The same applies to `AdvanceOrderStatusService` (order, then invoice), `DispatchShipmentService` (stock of every line, order, shipment) and `ApproveReturnService` (stock of every line, return request, refund). MongoDB transactions require a replica set and a `MongoTransactionManager`, to be decided in `infrastructure/`.
+* **No multi-document transactions.** `ConfirmOrderService` reserves stock in several `inventory_items`, saves the order and deletes the cart as separate writes. The same applies to `AdvanceOrderStatusService` (order, then invoice), `DispatchShipmentService` (stock of every line, order, shipment) and `ApproveReturnService` (stock of every line, return request, refund). The `Operation` and `AuditLog` of each service are also separate inserts after the business write, so a failure between them can leave a change without its audit entry. MongoDB transactions require a replica set and a `MongoTransactionManager`, to be decided in `infrastructure/`.
 * **No optimistic locking on stock.** Two concurrent reservations on the same `InventoryItem` can overwrite each other (last write wins). Adding `@Version` needs the version to travel with the domain object, which the current domain model does not carry.
 * **`_class` type hints.** Spring Data writes a `_class` field on every document. It is harmless (the `userType` discriminator does not depend on it) and can be disabled with a custom `MappingMongoConverter` in `infrastructure/database`.

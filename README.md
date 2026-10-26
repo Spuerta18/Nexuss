@@ -1,6 +1,6 @@
 # NexusMarket
 
-NexusMarket is the backend of a digital marketplace that mediates between buyers and sellers. It manages catalogs, Marketplace-owned and Seller-owned warehouses, distributed stock, shopping carts, the order lifecycle, shipments, invoices, returns and refunds, through a REST/JSON API secured with JWT.
+NexusMarket is the backend of a digital marketplace that mediates between buyers and sellers. It manages catalogs, Marketplace-owned and Seller-owned warehouses, distributed stock, shopping carts, the order lifecycle, shipments, invoices, returns and refunds, through a REST/JSON API secured with JWT. Every state-changing operation is recorded in an append-only audit trail that administrators and supervisors can consult.
 
 ## Architecture
 
@@ -8,7 +8,7 @@ NexusMarket is the backend of a digital marketplace that mediates between buyers
 * **One input port per role** (`PublicAccessPort`, `BuyerPort`, `SellerPort`, `AdministratorPort`, `LogisticsOperatorPort`, `SupervisorPort`), implemented by `adapters/useCases/*UseCaseImpl` classes that only delegate to the services.
 * **REST adapter** (`adapters/in/rest`): one controller per role port, `@PreAuthorize` by role, request/response records with Jakarta Validation, a uniform error body.
 * **MongoDB adapter** (`adapters/out/persistence/mongodb`) implements the output ports with Spring Data; indexes are created at startup.
-* **Security** (`infrastructure/security`): stateless JWT; the filter reloads the user on every request, so blocking a user takes effect immediately.
+* **Security** (`infrastructure/security`): stateless JWT; the filter reloads the user on every request, so blocking a user takes effect immediately. Logout and password change (`POST /api/<role>/logout`, `POST /api/<role>/password`) revoke every token issued before through a token version (`ver` claim).
 
 Full design: [SDD](SDD/) — start with the [C4 model](SDD/C4/README.md).
 

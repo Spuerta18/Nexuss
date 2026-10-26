@@ -38,9 +38,11 @@ import nexussMarket.adapters.in.rest.exception.RestErrors;
  * {@code authTokenVersion}, and {@link JwtAuthenticationFilter} rejects every
  * token whose {@code ver} claim is older, answering {@code 401}. Spring
  * Security's own logout filter stays disabled: it clears an HTTP session,
- * which a stateless API does not have, and it would intercept the request
- * before the role controllers. {@link #SESSION_PATHS} require a valid token of
- * any role at this level; each controller then restricts them to its role.</p>
+ * which a stateless API does not have, and if it were mapped to these paths it
+ * would answer before the role controllers, skipping the port. {@link #SESSION_PATHS}
+ * require a valid token of any role at this level (as {@code anyRequest()}
+ * already does; the rule documents the intent); each controller then
+ * restricts them to its role.</p>
  */
 @Configuration
 @EnableWebSecurity

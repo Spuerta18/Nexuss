@@ -9,11 +9,11 @@ The ports live in `domain/ports/in`. Each one is implemented by a single class i
 ```text
 domain/ports/in/
 ├── PublicAccessPort.java        No authenticated user: login and buyer self-registration
-├── BuyerPort.java               Carts, orders, catalog browsing, returns
-├── SellerPort.java              Own catalog, own warehouses, inventory
-├── AdministratorPort.java       Staff registration, user/seller status, warehouses, returns, refunds
-├── LogisticsOperatorPort.java   Order payment, shipments, warehouse stock
-└── SupervisorPort.java          Read-only consultation
+├── BuyerPort.java               Carts, orders, catalog browsing, returns, own session
+├── SellerPort.java              Own catalog, own warehouses, inventory, own session
+├── AdministratorPort.java       Staff registration, user/seller status, warehouses, returns, refunds, audit, own session
+├── LogisticsOperatorPort.java   Order payment, shipments, warehouse stock, own session
+└── SupervisorPort.java          Read-only consultation, audit, own session
 ```
 
 ---
@@ -33,7 +33,20 @@ domain/ports/in/
   * A **reference** carries only the identifier of an existing entity (e.g. the `order` in `cancelOrder`). The service loads the real entity through its output port and ignores every other field.
   * A **new model** carries the data of the entity to create (e.g. the `product` in `publishProduct`). The service builds the stored entity itself, so fields the caller must not decide (initial status, owner, timestamps) are always set by the domain.
 * **The actor comes first.** Every operation except those of `PublicAccessPort` receives the authenticated user as its first parameter, `User user`. It is the user the security layer authenticated, never one taken from the request body. Domain Services call this parameter `actor`.
-* **Secrets are separate parameters.** A plain password travels as its own `String password` parameter, never inside the model, and is hashed by the service.
+* **Secrets are separate parameters.** A plain password travels as its own `String password` parameter (`currentPassword` and `newPassword` in `changePassword`), never inside the model, and is hashed by the service.
+
+## Session Operations
+
+Every role port except `PublicAccessPort` declares the same two operations on the authenticated user's own account:
+
+* `void logout(User user)` — delegates to `LogoutService`: revokes every access token issued to the user.
+* `void changePassword(User user, String currentPassword, String newPassword)` — delegates to `ChangeUserPasswordService`: changes the user's own password and revokes every access token issued before.
+
+After either one, every earlier token is rejected and the user has to log in again (see [Users and Authentication](services/users-and-authentication.md)).
+
+## Audit Consultation
+
+`AdministratorPort` and `SupervisorPort` declare `List<Operation> consultOperations(User user)` and `List<AuditLog> consultAuditLogs(User user)`, which delegate to `ConsultOperationsService` and `ConsultAuditLogsService` and return the operation history and the audit trail, most recent first (see [Audit](services/audit.md)).
 
 ---
 
@@ -42,11 +55,11 @@ domain/ports/in/
 | Port | Role | Implemented by | Operations |
 | ---- | ---- | -------------- | ---------- |
 | `PublicAccessPort` | No authenticated user | `PublicAccessUseCaseImpl` | 2 |
-| `BuyerPort` | `BUYER` | `BuyerUseCaseImpl` | 12 |
-| `SellerPort` | `SELLER` | `SellerUseCaseImpl` | 9 |
-| `AdministratorPort` | `ADMINISTRATOR` | `AdministratorUseCaseImpl` | 11 |
-| `LogisticsOperatorPort` | `LOGISTICS_OPERATOR` | `LogisticsOperatorUseCaseImpl` | 9 |
-| `SupervisorPort` | `SUPERVISOR` | `SupervisorUseCaseImpl` | 5 |
+| `BuyerPort` | `BUYER` | `BuyerUseCaseImpl` | 14 |
+| `SellerPort` | `SELLER` | `SellerUseCaseImpl` | 11 |
+| `AdministratorPort` | `ADMINISTRATOR` | `AdministratorUseCaseImpl` | 15 |
+| `LogisticsOperatorPort` | `LOGISTICS_OPERATOR` | `LogisticsOperatorUseCaseImpl` | 11 |
+| `SupervisorPort` | `SUPERVISOR` | `SupervisorUseCaseImpl` | 9 |
 
 ---
 
@@ -97,6 +110,12 @@ public interface BuyerPort {
     Product consultProduct(User user, Product product);
 
     ReturnRequest requestReturn(User user, ReturnRequest returnRequest);
+
+    /** Logs {@code user} out, revoking every access token issued to them. */
+    void logout(User user);
+
+    /** Changes {@code user}'s own password and revokes every access token issued to them. */
+    void changePassword(User user, String currentPassword, String newPassword);
 }
 ```
 
@@ -124,6 +143,12 @@ public interface SellerPort {
     InventoryItem adjustInventory(User user, Product product, Warehouse warehouse, int quantityDelta);
 
     List<InventoryItem> consultInventory(User user, Product product);
+
+    /** Logs {@code user} out, revoking every access token issued to them. */
+    void logout(User user);
+
+    /** Changes {@code user}'s own password and revokes every access token issued to them. */
+    void changePassword(User user, String currentPassword, String newPassword);
 }
 ```
 
@@ -158,6 +183,18 @@ public interface AdministratorPort {
     Refund processRefund(User user, Refund refund);
 
     User consultUser(User user, User target);
+
+    /** The operation history, most recent first. */
+    List<Operation> consultOperations(User user);
+
+    /** The audit trail, most recent first. */
+    List<AuditLog> consultAuditLogs(User user);
+
+    /** Logs {@code user} out, revoking every access token issued to them. */
+    void logout(User user);
+
+    /** Changes {@code user}'s own password and revokes every access token issued to them. */
+    void changePassword(User user, String currentPassword, String newPassword);
 }
 ```
 
@@ -185,6 +222,12 @@ public interface LogisticsOperatorPort {
     InventoryItem registerInventoryReturn(User user, Product product, Warehouse warehouse, int quantity);
 
     List<InventoryItem> consultInventory(User user, Product product);
+
+    /** Logs {@code user} out, revoking every access token issued to them. */
+    void logout(User user);
+
+    /** Changes {@code user}'s own password and revokes every access token issued to them. */
+    void changePassword(User user, String currentPassword, String newPassword);
 }
 ```
 
@@ -203,6 +246,18 @@ public interface SupervisorPort {
     User consultUser(User user, User target);
 
     List<Product> listPublishedProducts(User user);
+
+    /** The operation history, most recent first. */
+    List<Operation> consultOperations(User user);
+
+    /** The audit trail, most recent first. */
+    List<AuditLog> consultAuditLogs(User user);
+
+    /** Logs {@code user} out, revoking every access token issued to them. */
+    void logout(User user);
+
+    /** Changes {@code user}'s own password and revokes every access token issued to them. */
+    void changePassword(User user, String currentPassword, String newPassword);
 }
 ```
 

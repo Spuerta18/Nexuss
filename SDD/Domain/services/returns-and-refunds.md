@@ -23,6 +23,7 @@ A buyer can ask to return a delivered order through a `ReturnRequest`. Approving
 
 * Each service authorizes the actor by role, through `ValidateRoleAuthorizationService`, before anything is loaded.
 * The entities make their own transitions (`ReturnRequest.approve` / `reject`, `Refund.process`); a return request is decided exactly once and a refund is processed exactly once.
+* Each service records one operation through `RegisterOperationAndAuditService` after saving (see each service).
 
 ## Common Exceptions
 
@@ -30,7 +31,8 @@ A buyer can ask to return a delivered order through a `ReturnRequest`. Approving
 | --------- | ---- |
 | `OperationNotAllowedException` | The actor is not active or its role is not allowed. |
 | `EntityNotFoundException` | The order, return request or refund does not exist. |
-| `BusinessRuleViolationException` | The return request is already decided, or the refund already processed. |
+| `ReturnAlreadyDecidedException` | The return request is no longer `REQUESTED` (`ReturnRequest.approve` / `reject`). |
+| `RefundAlreadyProcessedException` | The refund is no longer `PENDING` (`Refund.process`). |
 
 ---
 
@@ -56,13 +58,21 @@ Lets a buyer request the return of one of its delivered orders.
 1. Authorize the actor as `BUYER`.
 2. Load the order and check, through `AuthorizeOrderAccessService`, that it belongs to the actor.
 3. Check that the order is `DELIVERED`, that the return request identifier is not used, and that the order has no return request yet.
-4. Create the return request (`REQUESTED`, `requestedAt` = now, `buyer` = the order's buyer) and save it.
+4. Create the return request (`REQUESTED`, `requestedAt` = now, `buyer` = the order's buyer), save it and record it (`RETURN_REQUEST`).
 
 ## Business Rules
 
 * Only the buyer who placed the order may request its return; administrators and supervisors may not request it on the buyer's behalf.
 * Only `DELIVERED` orders can be returned.
 * An order has at most one return request.
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `RETURN_REQUEST` | `RETURN_REQUEST` — the new request | `orderId`, `newStatus` |
 
 ## Exceptions
 
@@ -71,7 +81,7 @@ In addition to the common exceptions:
 | Exception | When |
 | --------- | ---- |
 | `OperationNotAllowedException` | The order belongs to another buyer. |
-| `BusinessRuleViolationException` | The order is not `DELIVERED`. |
+| `ReturnNotEligibleException` | The order is not `DELIVERED`. |
 | `DuplicateResourceException` | The return request identifier is already used, or the order already has a return request. |
 
 ---
@@ -100,12 +110,23 @@ Approves a return request: every order line goes back to the warehouse it was sh
 3. For every order line, register the return of its quantity to its warehouse through `RegisterInventoryReturnService`, with the same actor.
 4. Save the return request.
 5. Create the refund (`PENDING`, identifier `REF-<return request identifier>`, amount = the order total) and save it through `RefundRepositoryPort`.
+6. Record the approval (`RETURN_APPROVAL`).
 
 ## Business Rules
 
 * Only administrators may approve a return: an order can hold lines of several sellers, so no single seller has authority over the whole return.
 * The refund amount is the same total the invoice charged: the sum of `quantity × unitPrice` over the order lines, as a `Money` in the order's currency.
 * A return request has exactly one refund, so the refund identifier derives from the request's.
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving; in addition, `RegisterInventoryReturnService` records one `INVENTORY_RETURN` per order line (step 3).
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `RETURN_APPROVAL` | `RETURN_REQUEST` — the request | `previousStatus`, `newStatus`, `orderId`, `refundId` |
+
+If the order has no lines, totalling the refund fails with `EmptyOrderException`.
 
 ---
 
@@ -130,6 +151,14 @@ Rejects a return request. Stock and refunds are not affected.
 
 * Only administrators may reject a return, for the same reason as approving: an order can hold lines of several sellers.
 
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `RETURN_REJECTION` | `RETURN_REQUEST` — the request | `previousStatus`, `newStatus` |
+
 ---
 
 # ProcessRefundService
@@ -152,3 +181,11 @@ Pays a pending refund back to the buyer.
 ## Business Rules
 
 * Only administrators may process refunds.
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `REFUND_PROCESSING` | `REFUND` — the refund | `previousStatus`, `newStatus`, `amount`, `currency` |

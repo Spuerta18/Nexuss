@@ -34,13 +34,21 @@ Creates a product in the catalog and publishes it immediately (`status = PUBLISH
 * Only a `Seller` whose `sellerStatus` is `ACTIVE` can publish products, and always as the product's seller: a product cannot be published for another seller.
 * **The price is required and must be greater than zero.** It is fixed when the product is created, together with the seller; `OrderLine` freezes it when an order is confirmed.
 
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `PRODUCT_PUBLICATION` | `PRODUCT` — the new product | `newStatus`, `price` (plain amount), `currency` |
+
 ## Exceptions
 
 | Exception | When |
 | --------- | ---- |
 | `EntityNotFoundException` | The actor's identifier does not belong to a `Seller`. |
 | `SellerNotAuthorizedException` | The seller's `sellerStatus` is not `ACTIVE`. |
-| `BusinessRuleViolationException` | The product has no price, or its price is zero. |
+| `InvalidProductPriceException` | The product has no price, or its price is zero. |
 
 ---
 
@@ -61,6 +69,14 @@ Changes the `ProductStatus` of a product (e.g. withdraws it from sale) through `
 | status           | ProductStatus | New status. |
 
 **Returns:** `Product`
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `PRODUCT_STATUS_CHANGE` | `PRODUCT` — the product | `previousStatus`, `newStatus` |
 
 ## Exceptions
 
@@ -88,6 +104,14 @@ Replaces the list of variants of a product through `Product.replaceVariants`.
 | variants         | List\<ProductVariant\> | New list of variants. It replaces the previous one. |
 
 **Returns:** `Product`
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `PRODUCT_VARIANTS_UPDATE` | `PRODUCT` — the product | `previousVariantCount`, `newVariantCount` |
 
 ## Exceptions
 

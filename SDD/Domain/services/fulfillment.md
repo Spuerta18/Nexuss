@@ -24,6 +24,7 @@ A paid order is delivered through a `Shipment`, whose lifecycle drives the last 
 * All four services are restricted to `LOGISTICS_OPERATOR` and `ADMINISTRATOR` through `ValidateRoleAuthorizationService`, checked before anything is loaded.
 * Shipment transitions only happen through the entity (`pack`, `dispatch`, `confirmDelivery`); each records its own timestamp.
 * When both the shipment and its order change, both are saved.
+* Each step records one operation through `RegisterOperationAndAuditService` after saving, with `SHIPMENT` as the affected entity (see each service).
 
 ## Common Exceptions
 
@@ -57,12 +58,20 @@ Registers the shipment of a paid order, in `CREATED`.
 1. Check that no shipment with that identifier exists.
 2. Load the order and check that it is `PAID`.
 3. Check that the order has no shipment yet.
-4. Create the shipment (`CREATED`, `createdAt` = now) and save it.
+4. Create the shipment (`CREATED`, `createdAt` = now), save it and record it (`SHIPMENT_CREATION`).
 
 ## Business Rules
 
 * Only `PAID` orders can be shipped.
 * An order has at most one shipment.
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `SHIPMENT_CREATION` | `SHIPMENT` — the new shipment | `orderId`, `newStatus` |
 
 ## Exceptions
 
@@ -71,7 +80,7 @@ In addition to the common exceptions:
 | Exception | When |
 | --------- | ---- |
 | `DuplicateResourceException` | The shipment identifier is already used, or the order already has a shipment. |
-| `BusinessRuleViolationException` | The order is not `PAID`. |
+| `OrderNotShippableException` | The order is not `PAID`. |
 
 ---
 
@@ -91,6 +100,14 @@ Marks the goods of a shipment as packed (`CREATED` → `PACKED`). The order is n
 | shipmentReference | Shipment | Reference to the shipment to pack. |
 
 **Returns:** `Shipment`
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `SHIPMENT_PACKING` | `SHIPMENT` — the shipment | `previousStatus`, `newStatus` |
 
 ---
 
@@ -116,7 +133,15 @@ Dispatches a packed shipment (`PACKED` → `DISPATCHED`): the stock reserved for
 1. Load the shipment; its order comes with it.
 2. Call `Shipment.dispatch()` and `Order.advanceTo(SHIPPED)`. Both transitions are validated before any stock is touched.
 3. Confirm the outbound of every order line through `ConfirmInventoryOutboundService`.
-4. Save the order and the shipment.
+4. Save the order and the shipment, and record the dispatch (`SHIPMENT_DISPATCH`). The stock outbound is covered by this operation; `ConfirmInventoryOutboundService` records none of its own.
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `SHIPMENT_DISPATCH` | `SHIPMENT` — the shipment | `previousStatus`, `newStatus` (shipment), `orderId`, `newOrderStatus` |
 
 ## Exceptions
 
@@ -150,7 +175,15 @@ Confirms that a dispatched shipment reached the buyer (`DISPATCHED` → `DELIVER
 
 1. Load the shipment; its order comes with it.
 2. Call `Shipment.confirmDelivery()` and `Order.advanceTo(DELIVERED)`.
-3. Save the order and the shipment.
+3. Save the order and the shipment, and record the delivery (`SHIPMENT_DELIVERY`).
+
+## Audit
+
+Recorded through `RegisterOperationAndAuditService` after saving.
+
+| Operation type | Affected entity | Details |
+| -------------- | --------------- | ------- |
+| `SHIPMENT_DELIVERY` | `SHIPMENT` — the shipment | `previousStatus`, `newStatus` (shipment), `orderId`, `newOrderStatus` |
 
 ## Exceptions
 

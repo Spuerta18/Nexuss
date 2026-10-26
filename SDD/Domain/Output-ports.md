@@ -17,7 +17,8 @@ domain/ports/out/
 ├── InvoiceRepositoryPort.java            invoices
 ├── ReturnRequestRepositoryPort.java      return_requests
 ├── RefundRepositoryPort.java             refunds
-├── AuditLogPort.java                     audit_logs
+├── OperationRepositoryPort.java          operations (append-only)
+├── AuditLogRepositoryPort.java           audit_logs (append-only)
 ├── PasswordHasherPort.java               BCrypt
 ├── TokenServicePort.java                 JWT
 └── NotificationPort.java                 log (no real channel yet)
@@ -31,6 +32,7 @@ domain/ports/out/
 * **`save` returns the domain object** that was stored. Adapters map it to a document and back.
 * **Identifiers are plain `String`s** in finder parameters (`findByOrderId(String orderId)`), matching the references stored by ID in MongoDB.
 * **One adapter per port.** Every port has exactly one production implementation, found by component scan.
+* **Audit ports are append-only.** `OperationRepositoryPort` and `AuditLogRepositoryPort` only add entries and read them; they declare no update or delete. Their Spring Data repositories extend the bare `Repository` and declare only `insert` and reads, so an existing identifier is never overwritten.
 
 ---
 
@@ -38,7 +40,7 @@ domain/ports/out/
 
 | Port | Implemented by | Used by |
 | ---- | -------------- | ------- |
-| `UserRepositoryPort` | `MongoUserRepositoryAdapter` | `AuthenticateUserService`, `RegisterBuyerService`, `RegisterSellerService`, `RegisterSupervisorService`, `RegisterLogisticsOperatorService`, `UpdateUserStatusService`, `UpdateSellerStatusService`, `ConsultUserService`, `CreateShoppingCartService`, `PublishProductService`, `RegisterWarehouseService`; `NexusUserDetailsService` (security); `InitialAdministratorSeeder` (seed) |
+| `UserRepositoryPort` | `MongoUserRepositoryAdapter` | `AuthenticateUserService`, `LogoutService`, `ChangeUserPasswordService`, `RegisterBuyerService`, `RegisterSellerService`, `RegisterSupervisorService`, `RegisterLogisticsOperatorService`, `UpdateUserStatusService`, `UpdateSellerStatusService`, `ConsultUserService`, `CreateShoppingCartService`, `PublishProductService`, `RegisterWarehouseService`; `NexusUserDetailsService` (security); `InitialAdministratorSeeder` (seed) |
 | `WarehouseRepositoryPort` | `MongoWarehouseRepositoryAdapter` | `RegisterWarehouseService`, `DeactivateWarehouseService`, `RegisterInventoryInboundService` |
 | `ProductRepositoryPort` | `MongoProductRepositoryAdapter` | `PublishProductService`, `UpdateProductStatusService`, `UpdateProductVariantsService`, `ConsultProductService`, `ListPublishedProductsService`, `ListSellerProductsService`, `ConsultInventoryService`, `RegisterInventoryInboundService`, `AddCartLineService` |
 | `InventoryRepositoryPort` | `MongoInventoryRepositoryAdapter` | `RegisterInventoryInboundService`, `RegisterInventoryReturnService`, `AdjustInventoryService`, `ReportDamagedInventoryService`, `ReserveInventoryService`, `ReleaseInventoryReservationService`, `ConfirmInventoryOutboundService`, `ConsultInventoryService` |
@@ -49,12 +51,13 @@ domain/ports/out/
 | `InvoiceRepositoryPort` | `MongoInvoiceRepositoryAdapter` | `AdvanceOrderStatusService` |
 | `ReturnRequestRepositoryPort` | `MongoReturnRequestRepositoryAdapter` | `RequestReturnService`, `ApproveReturnService`, `RejectReturnService` |
 | `RefundRepositoryPort` | `MongoRefundRepositoryAdapter` | `ApproveReturnService`, `ProcessRefundService` |
-| `AuditLogPort` | `MongoAuditLogAdapter` | `AuditOperationService` |
-| `PasswordHasherPort` | `BCryptPasswordHasherAdapter` (`infrastructure/security`) | `AuthenticateUserService`, the four registration services; `InitialAdministratorSeeder` (seed) |
+| `OperationRepositoryPort` | `MongoOperationRepositoryAdapter` | `RegisterOperationService`, `ConsultOperationsService` |
+| `AuditLogRepositoryPort` | `MongoAuditLogRepositoryAdapter` | `RegisterAuditLogService`, `ConsultAuditLogsService` |
+| `PasswordHasherPort` | `BCryptPasswordHasherAdapter` (`infrastructure/security`) | `AuthenticateUserService`, `ChangeUserPasswordService`, the four registration services; `InitialAdministratorSeeder` (seed) |
 | `TokenServicePort` | `JwtTokenServiceAdapter` (`infrastructure/security`) | `AuthenticateUserService` |
 | `NotificationPort` | `LoggingNotificationAdapter` (writes to the log) | `NotifyUserService` (not used by any service yet) |
 
-The internal services `ReserveInventoryService`, `AuditOperationService` and `NotifyUserService` receive their ports in `infrastructure/config/InternalServiceBeanConfiguration`; every other user receives them by constructor injection.
+The internal services `ReserveInventoryService`, `RegisterOperationService`, `RegisterAuditLogService` and `NotifyUserService` receive their ports in `infrastructure/config/InternalServiceBeanConfiguration`; every other user receives them by constructor injection.
 
 ---
 
@@ -133,13 +136,31 @@ public interface RefundRepositoryPort {
 }
 ```
 
-## Audit, Security and Notifications
+## Audit
 
 ```java
-public interface AuditLogPort {
-    void record(String userId, String operation, LocalDateTime occurredAt);
+/** Append-only store of {@link Operation}s: operations are added, never updated nor deleted. */
+public interface OperationRepositoryPort {
+    /** Appends {@code operation}; an existing identifier is never overwritten. */
+    Operation save(Operation operation);
+    /** Every operation, most recent first. */
+    List<Operation> findAll();
 }
 
+/** Append-only store of {@link AuditLog}s: entries are added, never updated nor deleted. */
+public interface AuditLogRepositoryPort {
+    /** Appends {@code auditLog}; an existing identifier is never overwritten. */
+    AuditLog save(AuditLog auditLog);
+    /** Every audit log entry, most recent first. */
+    List<AuditLog> findAll();
+}
+```
+
+`findAll` sorts by `executionDate` / `operationDate` descending and has no pagination. `MongoAuditLogRepositoryAdapter` skips legacy `audit_logs` entries without `operationType` (written by the former per-request auditing of the security layer).
+
+## Security and Notifications
+
+```java
 public interface PasswordHasherPort {
     String hash(String rawPassword);
     boolean matches(String rawPassword, String passwordHash);

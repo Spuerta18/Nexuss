@@ -39,10 +39,10 @@ flowchart LR
 | ----- | -------------------------- | ---------- |
 | REST input adapter | `adapters.in.rest` (`controllers`, `requests`, `responses`, `mappers`, `exception`) | `*RestController`, `*Request`, `*Response`, `*RestMapper`, `DomainReferences`, `GlobalExceptionHandler`, `RestErrors` |
 | Use case adapters | `adapters.useCases` | `PublicAccessUseCaseImpl`, `BuyerUseCaseImpl`, `SellerUseCaseImpl`, `AdministratorUseCaseImpl`, `LogisticsOperatorUseCaseImpl`, `SupervisorUseCaseImpl` |
-| Persistence output adapter | `adapters.out.persistence.mongodb` (`adapters`, `documents`, `repositories`, `mappers`) | `Mongo*Adapter`, `MongoReferenceResolver`, `*Document`, `*MongoRepository`, `*Mapper`, `LoggingNotificationAdapter` |
-| Domain | `domain` (`models`, `valueobjects`, `enums`, `exceptions`, `services`, `services.authorization`, `ports.in`, `ports.out`) | Entities, `Money`, catalogs, `*Service`, `*Port` |
+| Persistence output adapter | `adapters.out.persistence.mongodb` (`adapters`, `documents`, `repositories`, `mappers`) | `Mongo*Adapter` (incl. `MongoOperationRepositoryAdapter`, `MongoAuditLogRepositoryAdapter`), `MongoReferenceResolver`, `*Document`, `*MongoRepository`, `*Mapper`, `LoggingNotificationAdapter` |
+| Domain | `domain` (`models`, `valueobjects`, `enums`, `exceptions`, `services`, `services.authorization`, `ports.in`, `ports.out`) | Entities (incl. `Operation`, `AuditLog`), `Money`, catalogs (incl. `OperationType`, `AffectedEntityType`), `*Service`, `*Exception`, `*Port` |
 | Security | `infrastructure.security` | `SecurityConfig`, `JwtAuthenticationFilter`, `JwtProvider`, `JwtTokenServiceAdapter`, `BCryptPasswordHasherAdapter`, `NexusUserDetailsService`, `AuthenticatedUserPrincipal`, `CorsProperties`, `JwtProperties` |
-| Infrastructure | `infrastructure.config`, `infrastructure.database`, `infrastructure.seed` | `AuthorizationBeanConfiguration`, `InternalServiceBeanConfiguration`, `OpenApiConfiguration`, `SeedConfiguration`, `InitialAdministratorSeeder` |
+| Infrastructure | `infrastructure.config`, `infrastructure.database`, `infrastructure.seed` | `AuthorizationBeanConfiguration`, `InternalServiceBeanConfiguration` (stock, audit and notification services), `OpenApiConfiguration`, `SeedConfiguration`, `InitialAdministratorSeeder` |
 | Entry point | `nexussMarket` | `Application` (`@SpringBootApplication`) |
 
 ## Notes

@@ -152,8 +152,9 @@ Run as one execution in 3 blocks (each compiled, tested, recorded here and commi
   - `logout(User)` and `changePassword(User, String, String)` on the 5 role ports (not `PublicAccessPort`), delegated
     by each `*UseCaseImpl`; `POST /api/{buyer|seller|admin|logistics|supervisor}/logout` and `/password`
     (`ChangePasswordRequest`, new password 8-72), both `204`. After either call every earlier token answers `401`.
-  - `SecurityConfig`: Spring's session logout stays disabled (it would intercept the request and there is no
-    session); `SESSION_PATHS` require any valid token, the controllers then restrict them to their role.
+  - `SecurityConfig`: Spring's session logout stays disabled (there is no session, and mapped to these paths it would
+    answer before the controllers); `SESSION_PATHS` require any valid token (redundant with `anyRequest()`, kept as
+    explicit intent), the controllers then restrict them to their role.
   - Tests: `SessionServicesTest`, `SessionRestControllerTest` (5 roles, revoked token → 401), `UserTest`,
     `UserMapperTest`. 183 tests green.
 - **Block 3 — one exception per business rule, done.** `DomainException` stays the base;
@@ -174,6 +175,17 @@ Run as one execution in 3 blocks (each compiled, tested, recorded here and commi
     negative token version) and still answer `400`.
   - Tests: `DomainExceptionMappingTest` (every exception → status), `BusinessRuleExceptionsTest`, and the updated
     `ShoppingCartTest`, `MoneyTest`, `InventoryItemMapperTest`, `BuyerRestControllerTest`. 219 tests green.
+- **Documentation and real verification — done.** Updated `Domain Model.md`, `Domain Value Objects.md`,
+  `Domain Services.md`, every file in `SDD/Domain/services/` (with an "Audit" section per state-changing service and a
+  "Recorded Operations" table in `audit.md`), `Input-ports.md`, `Output-ports.md`, `Software Architecture.md`, every
+  adapter doc (`Api-rest-endpoints.md`, `Rest-security-cors.md`, `Global-exception-handler.md`, `Persistence.md`,
+  `Rest-adapters.md`, `Use-cases-adapters.md`), all of `SDD/C4/` (63 endpoints) and `README.md`. Verified with the
+  app running on `nexusmarket_demo`: logins, registration, publication and status change wrote matching
+  `operations` / `audit_logs` entries (checked with mongosh, no credentials in details); logout and password change
+  made the previous token answer `401`.
+  - Known leftovers: databases created before Block 1 keep the old `audit_logs` index `user_occurred` and the
+    legacy entries (skipped on read); audit inserts are not transactional with the business write; the initial
+    administrator seeder records no operation; `USER_LOGIN` is recorded after issuing the token (nothing is saved).
 
 ## Documentation and Delivery
 

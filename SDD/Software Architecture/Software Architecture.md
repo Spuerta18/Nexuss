@@ -95,7 +95,7 @@ Root package. Contains the entry point and holds all architectural components to
 
 - Spring Boot entry point (`@SpringBootApplication`).
 - Initializes the application and starts the REST server.
-- Its `@SpringBootApplication` component scan covers the whole `nexussMarket` package: Domain Services (`@Service`), use case adapters (`@Service`) and output adapters are found there. Only the authorization services and three internal services are registered explicitly, in `infrastructure/config` (see [Infrastructure](#infrastructure)).
+- Its `@SpringBootApplication` component scan covers the whole `nexussMarket` package: Domain Services (`@Service`), use case adapters (`@Service`) and output adapters are found there. Only the authorization services and five internal services are registered explicitly, in `infrastructure/config` (see [Infrastructure](#infrastructure)).
 
 ---
 
@@ -134,10 +134,10 @@ One class per role input port (`BuyerUseCaseImpl implements BuyerPort`, …). Ea
 
 ## Output Adapters — `adapters/out/persistence/mongodb`
 
-Responsible for document-based persistence of all business data (users, sellers, buyers, warehouses, products, inventory, inventory movements, carts, orders, audit log).
+Responsible for document-based persistence of all business data (users, sellers, buyers, warehouses, products, inventory, inventory movements, carts, orders, shipments, invoices, returns, refunds, operations, audit logs).
 
 - **Documents:** represent MongoDB collections (classes annotated with `@Document`), following the embedding/referencing strategy defined in the [Persistence Strategy](#persistence-strategy-embedding-vs-referencing) section below.
-- **Repositories:** implement raw persistence operations (Spring Data MongoDB repositories, extending `MongoRepository`).
+- **Repositories:** implement raw persistence operations (Spring Data MongoDB repositories, extending `MongoRepository`). The append-only `operations` and `audit_logs` repositories extend the bare `Repository` instead and declare only `insert` and reads, so no update or delete exists for them.
 - **Mappers:** convert Domain Models into persistence documents and back. Value Objects are rebuilt with `fromCode(...)`, never with new instances, so the domain can compare them against its constants.
 - **Adapters:** implement the Domain Output Ports, isolating MongoDB-specific details from the domain.
 
@@ -148,12 +148,12 @@ Responsible for document-based persistence of all business data (users, sellers,
 The core of the application. Contains all business rules and must remain independent from any external technology (Spring, JPA, HTTP, REST, JSON, SQL).
 
 ## Models
-Business entities: `User`, `Buyer`, `Seller`, `LogisticsOperator`, `Administrator`, `Supervisor`, `Warehouse`, `Product`, `InventoryItem`, `InventoryMovement`, `ShoppingCart`, `CartLine`, `Order`, `OrderLine`, `Shipment`, `Invoice`, `ReturnRequest`, `Refund`.
+Business entities: `User`, `Buyer`, `Seller`, `LogisticsOperator`, `Administrator`, `Supervisor`, `Warehouse`, `Product`, `InventoryItem`, `InventoryMovement`, `ShoppingCart`, `CartLine`, `Order`, `OrderLine`, `Shipment`, `Invoice`, `ReturnRequest`, `Refund`, `Operation`, `AuditLog` (the last two are the append-only operation history and audit trail; `AuthenticationResult` is the non-persisted result of a login).
 
-Entities protect their own invariants: e.g. `Order` only changes status through `advanceTo` / `cancel`, and `InventoryItem` only changes stock through `receive`, `reserve`, `releaseReservation`, `confirmOutbound`, `adjust`, and `markDamaged`.
+Entities protect their own invariants: e.g. `Order` only changes status through `advanceTo` / `cancel`, `InventoryItem` only changes stock through `receive`, `reserve`, `releaseReservation`, `confirmOutbound`, `adjust`, and `markDamaged`, and `User.authTokenVersion` only grows through `bumpAuthTokenVersion`.
 
 ## Value Objects
-Immutable business concepts compared by value: `SystemRole`, `UserStatus`, `CustomerStatus`, `SellerStatus`, `ProductType`, `ProductStatus`, `OrderStatus`, `InventoryMovementType`, `WarehouseOwnerType`, `ShipmentStatus`, `ReturnStatus`, `RefundStatus`, `ProductVariant`.
+Immutable business concepts compared by value: `SystemRole`, `UserStatus`, `CustomerStatus`, `SellerStatus`, `ProductType`, `ProductStatus`, `OrderStatus`, `InventoryMovementType`, `WarehouseOwnerType`, `ShipmentStatus`, `ReturnStatus`, `RefundStatus`, `Currency`, `OperationType`, `AffectedEntityType`, `Money`, `ProductVariant`.
 
 ## Enums
 Fixed technical values without business metadata: `VariantAttributeType`, `NotificationChannel`.
@@ -161,10 +161,10 @@ Fixed technical values without business metadata: `VariantAttributeType`, `Notif
 ## Services
 Business logic that does not naturally belong to a single entity. Each operation has one concrete service class, `<Name>Service`, annotated `@Service`, with a single `execute(...)` method that receives the actor and domain models. Services implement no interface; the role input ports reach them through the use case adapters. Besides the operation services there are:
 - **Authorization services** (`domain/services/authorization`) — decide whether the actor may perform an operation.
-- **Internal services**, used by other services or by the security layer:
+- **Internal services**, used by other services:
   - `ReserveInventoryService` — reserves stock from the first active warehouse with enough available units (used by `ConfirmOrderService`).
   - `ReleaseInventoryReservationService` and `ConfirmInventoryOutboundService` — release or dispatch reserved stock (used by `ConfirmOrderService`, `CancelOrderService` and `DispatchShipmentService`).
-  - `AuditOperationService` — records which authenticated user performed which operation, through `AuditLogPort`.
+  - `RegisterOperationAndAuditService` — called by every state-changing service after saving: it stores the `Operation` through `RegisterOperationService` (`OperationRepositoryPort`) and then its `AuditLog` through `RegisterAuditLogService` (`AuditLogRepositoryPort`), with the performer's role and the operation's details.
   - `NotifyUserService` — sends notifications through `NotificationPort`.
 
 When a service needs another one (e.g. `CancelOrderService` releasing reservations), it injects the concrete service. See [Domain Services](../Domain/Domain%20Services.md).
@@ -180,11 +180,11 @@ Each role has one input port listing every operation it can execute. Parameters 
 | Port | Role | Implemented by | Operations |
 | ---- | ---- | -------------- | ---------- |
 | `PublicAccessPort` | No authenticated user | `PublicAccessUseCaseImpl` | `authenticate`, `registerBuyer` |
-| `BuyerPort` | `BUYER` | `BuyerUseCaseImpl` | `createShoppingCart`, `addCartLine`, `updateCartLineQuantity`, `removeCartLine`, `consultCart`, `confirmOrder`, `cancelOrder`, `consultOrder`, `listBuyerOrders`, `listPublishedProducts`, `consultProduct`, `requestReturn` |
-| `SellerPort` | `SELLER` | `SellerUseCaseImpl` | `publishProduct`, `updateProductStatus`, `updateProductVariants`, `listSellerProducts`, `consultProduct`, `registerWarehouse`, `registerInventoryInbound`, `adjustInventory`, `consultInventory` |
-| `AdministratorPort` | `ADMINISTRATOR` | `AdministratorUseCaseImpl` | `registerSeller`, `registerSupervisor`, `registerLogisticsOperator`, `updateSellerStatus`, `updateUserStatus`, `registerMarketplaceWarehouse`, `deactivateWarehouse`, `approveReturn`, `rejectReturn`, `processRefund`, `consultUser` |
-| `LogisticsOperatorPort` | `LOGISTICS_OPERATOR` | `LogisticsOperatorUseCaseImpl` | `consultOrder`, `advanceOrderStatus`, `createShipment`, `packShipment`, `dispatchShipment`, `confirmDelivery`, `reportDamagedInventory`, `registerInventoryReturn`, `consultInventory` |
-| `SupervisorPort` | `SUPERVISOR` | `SupervisorUseCaseImpl` | `consultOrder`, `consultInventory`, `consultProduct`, `consultUser`, `listPublishedProducts` |
+| `BuyerPort` | `BUYER` | `BuyerUseCaseImpl` | `createShoppingCart`, `addCartLine`, `updateCartLineQuantity`, `removeCartLine`, `consultCart`, `confirmOrder`, `cancelOrder`, `consultOrder`, `listBuyerOrders`, `listPublishedProducts`, `consultProduct`, `requestReturn`, `logout`, `changePassword` |
+| `SellerPort` | `SELLER` | `SellerUseCaseImpl` | `publishProduct`, `updateProductStatus`, `updateProductVariants`, `listSellerProducts`, `consultProduct`, `registerWarehouse`, `registerInventoryInbound`, `adjustInventory`, `consultInventory`, `logout`, `changePassword` |
+| `AdministratorPort` | `ADMINISTRATOR` | `AdministratorUseCaseImpl` | `registerSeller`, `registerSupervisor`, `registerLogisticsOperator`, `updateSellerStatus`, `updateUserStatus`, `registerMarketplaceWarehouse`, `deactivateWarehouse`, `approveReturn`, `rejectReturn`, `processRefund`, `consultUser`, `consultOperations`, `consultAuditLogs`, `logout`, `changePassword` |
+| `LogisticsOperatorPort` | `LOGISTICS_OPERATOR` | `LogisticsOperatorUseCaseImpl` | `consultOrder`, `advanceOrderStatus`, `createShipment`, `packShipment`, `dispatchShipment`, `confirmDelivery`, `reportDamagedInventory`, `registerInventoryReturn`, `consultInventory`, `logout`, `changePassword` |
+| `SupervisorPort` | `SUPERVISOR` | `SupervisorUseCaseImpl` | `consultOrder`, `consultInventory`, `consultProduct`, `consultUser`, `listPublishedProducts`, `consultOperations`, `consultAuditLogs`, `logout`, `changePassword` |
 
 ### Output Ports (dependencies)
 
@@ -201,13 +201,19 @@ Each role has one input port listing every operation it can execute. Parameters 
 | `InvoiceRepositoryPort`            | MongoDB adapter |
 | `ReturnRequestRepositoryPort`      | MongoDB adapter |
 | `RefundRepositoryPort`             | MongoDB adapter |
-| `AuditLogPort`                     | MongoDB adapter |
+| `OperationRepositoryPort`          | MongoDB adapter (append-only) |
+| `AuditLogRepositoryPort`           | MongoDB adapter (append-only) |
 | `PasswordHasherPort`               | Security adapter (`infrastructure/security`) |
 | `TokenServicePort`                 | Security adapter (`infrastructure/security`, JWT) |
 | `NotificationPort`                 | `LoggingNotificationAdapter` (logs the message; no real channel yet) |
 
 ## Exceptions
-Business exceptions belong exclusively to the domain: `EntityNotFoundException`, `DuplicateResourceException`, `InsufficientStockException`, `InvalidOrderStatusTransitionException`, `InvalidShipmentStatusTransitionException`, `SellerNotAuthorizedException`, `OperationNotAllowedException`, `BusinessRuleViolationException`, `InvalidCredentialsException`. All of them extend `DomainException`.
+Business exceptions belong exclusively to the domain, one per business rule, and all of them extend `DomainException`:
+- Lookups, duplicates and state: `EntityNotFoundException`, `DuplicateResourceException`, `InsufficientStockException`, `InvalidOrderStatusTransitionException`, `InvalidShipmentStatusTransitionException`, `EmptyCartException`, `ProductNotPurchasableException`, `CurrencyMismatchException`, `OrderNotShippableException`, `EmptyOrderException`, `ReturnNotEligibleException`, `ReturnAlreadyDecidedException`, `RefundAlreadyProcessedException`, `InactiveWarehouseException`, `InventoryNotTrackedException`.
+- Authorization and authentication: `OperationNotAllowedException`, `SellerNotAuthorizedException`, `BuyerNotEnabledException`, `InvalidCredentialsException`.
+- Invalid values: `InvalidQuantityException`, `InvalidProductPriceException`, `InvalidMoneyException`, `InvalidPasswordException`, `IncorrectCurrentPasswordException`, `OrderStatusRequiresShipmentException`.
+
+`GlobalExceptionHandler` maps each one to its HTTP status (`404`, `409`, `403`, `401` or `400`). The remaining `IllegalArgumentException`s are programming guards, not business rules.
 
 ---
 
@@ -218,7 +224,7 @@ Technical configuration required by the application. No business logic.
 ## Config
 REST configuration, serialization, environment configuration, and the part of the domain wiring that component scan does not cover. There are no per-use-case `*BeanConfiguration` classes: Domain Services and use case adapters are `@Service` classes found by component scan. Two configuration classes take part in that wiring, and a third one describes the API:
 - `AuthorizationBeanConfiguration` — registers the six authorization services, which are plain classes.
-- `InternalServiceBeanConfiguration` — registers `ReserveInventoryService`, `AuditOperationService` and `NotifyUserService`, which are plain classes as well.
+- `InternalServiceBeanConfiguration` — registers `ReserveInventoryService`, `RegisterOperationService`, `RegisterAuditLogService`, `RegisterOperationAndAuditService` and `NotifyUserService`, which are plain classes as well.
 - `OpenApiConfiguration` — the OpenAPI document behind the Swagger UI and its Bearer JWT scheme (see [REST Adapters](../Adapters/Rest-adapters.md#api-documentation-swagger-ui)).
 
 The startup seeders have their own configuration class, `SeedConfiguration`, in `infrastructure/seed` (see [Seed](#seed)).
@@ -232,9 +238,9 @@ Data the application needs before anyone can use it. Every seeder is idempotent.
 
 ## Security
 Authentication, authorization and CORS configuration (see [REST Security and CORS](../Adapters/Rest-security-cors.md)):
-- `SecurityConfig`: stateless filter chain, public routes (login, buyer registration, API documentation), `401` / `403` with the uniform error body, method security for `@PreAuthorize`, and CORS for the origins in `NEXUS_CORS_ORIGINS`.
-- `JwtProvider` and `JwtTokenServiceAdapter` (implements `TokenServicePort`): HMAC-signed tokens (HS256/HS384/HS512, chosen by the key length) carrying the user identifier, role and email.
-- `JwtAuthenticationFilter`: validates the token, reloads the user from the database and rejects it if it is not `ACTIVE` or its stored role differs from the token; it also calls `AuditOperationService` for every authenticated request, so every operation is traceable to its `User`.
+- `SecurityConfig`: stateless filter chain, public routes (login, buyer registration, API documentation), session routes (`SESSION_PATHS`: `POST /api/*/logout` and `/api/*/password`, which need any valid token; the role is checked by the controller's `@PreAuthorize`), `401` / `403` with the uniform error body, method security for `@PreAuthorize`, and CORS for the origins in `NEXUS_CORS_ORIGINS`. Spring's session logout filter stays disabled: there is no HTTP session, and logout revokes tokens instead.
+- `JwtProvider` and `JwtTokenServiceAdapter` (implements `TokenServicePort`): HMAC-signed tokens (HS256/HS384/HS512, chosen by the key length) carrying the user identifier, role, email and the user's `authTokenVersion` as the `ver` claim. A token without `ver` is rejected.
+- `JwtAuthenticationFilter`: validates the token, reloads the user from the database and rejects it (`401`) if it is not `ACTIVE`, its stored role differs from the token, or the token's `ver` differs from the stored `authTokenVersion`. Logout and password change raise that version, so every token issued before stops working. The filter records no audit: traceability comes from the Domain Services, which record an `Operation` and its `AuditLog` for every state change.
 - The adapter implementing `PasswordHasherPort` (`BCryptPasswordHasherAdapter`). The domain only stores `User.passwordHash` and never knows the algorithm.
 
 ---
@@ -263,6 +269,7 @@ MongoDB is a document database: it has no JOINs and no foreign key constraints. 
 | `OrderLine` / `CartLine` → `Product` | **Reference (ID)**, with the snapshot fields `productName` and `unitPrice` (for `OrderLine` only) | The full product must not be duplicated, but an order must preserve the price and name exactly as they were at purchase time, even if the product changes later. |
 | `OrderLine` → `Warehouse`          | **Reference (ID)** | Identifies the `InventoryItem` whose reservation must be released or dispatched; the warehouse is shared across many lines. |
 | `InventoryMovement` → `Product` / `Warehouse` | **Reference (ID)**, own collection | Movements are an append-only history that grows without bound; embedding them in `InventoryItem` would make that document grow indefinitely. |
+| `Operation` / `AuditLog` → `User` (performer) | **Reference (ID)**, own collections (`operations`, `audit_logs`) | Both are append-only histories that grow without bound and point to a user shared by many entries; the affected entity is stored as `affectedEntityType` + `affectedEntityId`, since it can be of any kind. |
 | `Buyer` → `carts` / `orders`, `Seller` → `warehouses` / `products` | **Not stored** | These lists are the inverse side of the references above (`ShoppingCart.buyerId`, `Order.buyerId`, `Warehouse.ownerId`, `Product.sellerId`). Storing them too would duplicate every relationship; they are loaded on demand by querying the other collection. |
 
 ## User Inheritance
