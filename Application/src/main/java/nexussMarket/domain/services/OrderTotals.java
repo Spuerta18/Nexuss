@@ -2,7 +2,7 @@ package nexussMarket.domain.services;
 
 import java.math.BigDecimal;
 
-import nexussMarket.domain.exceptions.BusinessRuleViolationException;
+import nexussMarket.domain.exceptions.EmptyOrderException;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.OrderLine;
 import nexussMarket.domain.valueobjects.Money;
@@ -24,7 +24,7 @@ final class OrderTotals {
         return order.getLines().stream()
                 .map(OrderTotals::lineTotal)
                 .reduce(Money::add)
-                .orElseThrow(() -> new BusinessRuleViolationException(
+                .orElseThrow(() -> new EmptyOrderException(
                         "Order " + order.getIdentifier() + " has no lines to total"));
     }
 

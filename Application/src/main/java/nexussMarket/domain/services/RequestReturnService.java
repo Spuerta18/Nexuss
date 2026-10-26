@@ -2,9 +2,9 @@ package nexussMarket.domain.services;
 
 import org.springframework.stereotype.Service;
 
-import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
+import nexussMarket.domain.exceptions.ReturnNotEligibleException;
 import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.ReturnRequest;
@@ -52,7 +52,7 @@ public class RequestReturnService {
         // With the role restricted to BUYER above, this only lets the owning buyer through.
         authorizeOrderAccessService.execute(actor, order);
         if (order.getStatus() != OrderStatus.DELIVERED) {
-            throw new BusinessRuleViolationException("Order " + order.getIdentifier() + " is "
+            throw new ReturnNotEligibleException("Order " + order.getIdentifier() + " is "
                     + order.getStatus().getCode() + "; only DELIVERED orders can be returned");
         }
         if (returnRequestRepositoryPort.findById(returnRequestId).isPresent()) {

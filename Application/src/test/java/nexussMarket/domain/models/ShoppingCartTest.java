@@ -8,8 +8,10 @@ import java.math.BigDecimal;
 
 import org.junit.jupiter.api.Test;
 
-import nexussMarket.domain.exceptions.BusinessRuleViolationException;
+import nexussMarket.domain.exceptions.CurrencyMismatchException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
+import nexussMarket.domain.exceptions.InvalidQuantityException;
+import nexussMarket.domain.exceptions.ProductNotPurchasableException;
 import nexussMarket.domain.valueobjects.Currency;
 import nexussMarket.domain.valueobjects.CustomerStatus;
 import nexussMarket.domain.valueobjects.Money;
@@ -38,7 +40,7 @@ class ShoppingCartTest {
     void addLineRejectsProductsThatAreNotPublished() {
         Product suspended = product("P-1", ProductStatus.SUSPENDED, Currency.COP);
 
-        assertThrows(BusinessRuleViolationException.class, () -> cart.addLine(suspended, 1));
+        assertThrows(ProductNotPurchasableException.class, () -> cart.addLine(suspended, 1));
     }
 
     @Test
@@ -46,7 +48,7 @@ class ShoppingCartTest {
         cart.addLine(product("P-1", ProductStatus.PUBLISHED, Currency.COP), 1);
         Product inDollars = product("P-2", ProductStatus.PUBLISHED, Currency.USD);
 
-        assertThrows(BusinessRuleViolationException.class, () -> cart.addLine(inDollars, 1));
+        assertThrows(CurrencyMismatchException.class, () -> cart.addLine(inDollars, 1));
         assertEquals(1, cart.getLines().size());
     }
 
@@ -54,7 +56,7 @@ class ShoppingCartTest {
     void addLineRejectsNonPositiveQuantity() {
         Product shirt = product("P-1", ProductStatus.PUBLISHED, Currency.COP);
 
-        assertThrows(IllegalArgumentException.class, () -> cart.addLine(shirt, 0));
+        assertThrows(InvalidQuantityException.class, () -> cart.addLine(shirt, 0));
         assertTrue(cart.getLines().isEmpty());
     }
 

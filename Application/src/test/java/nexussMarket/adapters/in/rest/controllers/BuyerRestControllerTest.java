@@ -21,8 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 
-import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
+import nexussMarket.domain.exceptions.ReturnNotEligibleException;
 import nexussMarket.domain.models.Buyer;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.OrderLine;
@@ -132,12 +132,14 @@ class BuyerRestControllerTest extends RestControllerTestSupport {
     void domainExceptionsMapToCoherentStatuses() throws Exception {
         String token = bearer(buyer());
         when(buyerPort.consultOrder(any(), any())).thenThrow(new EntityNotFoundException("No order found with id X"));
-        when(buyerPort.cancelOrder(any(), any())).thenThrow(new BusinessRuleViolationException("Not allowed now"));
+        when(buyerPort.requestReturn(any(), any())).thenThrow(new ReturnNotEligibleException("Order X is PAID; only DELIVERED orders can be returned"));
 
         mockMvc.perform(get("/api/buyer/orders/X").header(authorization(), token))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("No order found with id X"));
-        mockMvc.perform(post("/api/buyer/orders/X/cancel").header(authorization(), token))
+        mockMvc.perform(post("/api/buyer/orders/X/returns").header(authorization(), token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"returnRequestId\":\"R-1\",\"reason\":\"Broken\"}"))
                 .andExpect(status().isConflict());
     }
 

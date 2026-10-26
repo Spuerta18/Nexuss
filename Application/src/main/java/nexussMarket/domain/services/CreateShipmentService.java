@@ -2,9 +2,9 @@ package nexussMarket.domain.services;
 
 import org.springframework.stereotype.Service;
 
-import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
+import nexussMarket.domain.exceptions.OrderNotShippableException;
 import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Shipment;
@@ -45,7 +45,7 @@ public class CreateShipmentService {
         Order order = orderRepositoryPort.findById(orderId)
                 .orElseThrow(() -> new EntityNotFoundException("No order found with id " + orderId));
         if (order.getStatus() != OrderStatus.PAID) {
-            throw new BusinessRuleViolationException("Order " + order.getIdentifier() + " is "
+            throw new OrderNotShippableException("Order " + order.getIdentifier() + " is "
                     + order.getStatus().getCode() + "; only PAID orders can be shipped");
         }
         if (shipmentRepositoryPort.findByOrderId(order.getIdentifier()).isPresent()) {

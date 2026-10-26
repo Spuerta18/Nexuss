@@ -5,8 +5,10 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import nexussMarket.domain.exceptions.BusinessRuleViolationException;
+import nexussMarket.domain.exceptions.BuyerNotEnabledException;
+import nexussMarket.domain.exceptions.EmptyCartException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
+import nexussMarket.domain.exceptions.ProductNotPurchasableException;
 import nexussMarket.domain.models.Buyer;
 import nexussMarket.domain.models.CartLine;
 import nexussMarket.domain.models.InventoryItem;
@@ -70,7 +72,7 @@ public class ConfirmOrderService {
         authorizeCartAccessService.execute(actor, cart);
         requireBuyerCanPurchase(cart.getBuyer());
         if (cart.getLines().isEmpty()) {
-            throw new BusinessRuleViolationException("Shopping cart " + cartId + " is empty");
+            throw new EmptyCartException("Shopping cart " + cartId + " is empty");
         }
         for (CartLine cartLine : cart.getLines()) {
             requirePublished(cartLine.getProduct());
@@ -109,16 +111,16 @@ public class ConfirmOrderService {
 
     private static void requireBuyerCanPurchase(Buyer buyer) {
         if (buyer.getStatus() != UserStatus.ACTIVE) {
-            throw new BusinessRuleViolationException("Buyer " + buyer.getIdentifier() + " is not active");
+            throw new BuyerNotEnabledException("Buyer " + buyer.getIdentifier() + " is not active");
         }
         if (buyer.getCommercialStatus() != CustomerStatus.ENABLED) {
-            throw new BusinessRuleViolationException("Buyer " + buyer.getIdentifier() + " is suspended from purchasing");
+            throw new BuyerNotEnabledException("Buyer " + buyer.getIdentifier() + " is suspended from purchasing");
         }
     }
 
     private static void requirePublished(Product product) {
         if (product.getStatus() != ProductStatus.PUBLISHED) {
-            throw new BusinessRuleViolationException(
+            throw new ProductNotPurchasableException(
                     "Product " + product.getIdentifier() + " is not available for purchase");
         }
     }

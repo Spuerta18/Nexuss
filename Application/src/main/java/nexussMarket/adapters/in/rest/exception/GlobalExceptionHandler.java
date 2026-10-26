@@ -15,15 +15,31 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import jakarta.servlet.http.HttpServletRequest;
 import nexussMarket.adapters.in.rest.responses.ErrorResponse;
 import nexussMarket.adapters.in.rest.responses.ErrorResponse.FieldViolation;
-import nexussMarket.domain.exceptions.BusinessRuleViolationException;
+import nexussMarket.domain.exceptions.BuyerNotEnabledException;
+import nexussMarket.domain.exceptions.CurrencyMismatchException;
 import nexussMarket.domain.exceptions.DomainException;
 import nexussMarket.domain.exceptions.DuplicateResourceException;
+import nexussMarket.domain.exceptions.EmptyCartException;
+import nexussMarket.domain.exceptions.EmptyOrderException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
+import nexussMarket.domain.exceptions.InactiveWarehouseException;
+import nexussMarket.domain.exceptions.IncorrectCurrentPasswordException;
 import nexussMarket.domain.exceptions.InsufficientStockException;
 import nexussMarket.domain.exceptions.InvalidCredentialsException;
+import nexussMarket.domain.exceptions.InvalidMoneyException;
 import nexussMarket.domain.exceptions.InvalidOrderStatusTransitionException;
+import nexussMarket.domain.exceptions.InvalidPasswordException;
+import nexussMarket.domain.exceptions.InvalidProductPriceException;
+import nexussMarket.domain.exceptions.InvalidQuantityException;
 import nexussMarket.domain.exceptions.InvalidShipmentStatusTransitionException;
+import nexussMarket.domain.exceptions.InventoryNotTrackedException;
 import nexussMarket.domain.exceptions.OperationNotAllowedException;
+import nexussMarket.domain.exceptions.OrderNotShippableException;
+import nexussMarket.domain.exceptions.OrderStatusRequiresShipmentException;
+import nexussMarket.domain.exceptions.ProductNotPurchasableException;
+import nexussMarket.domain.exceptions.RefundAlreadyProcessedException;
+import nexussMarket.domain.exceptions.ReturnAlreadyDecidedException;
+import nexussMarket.domain.exceptions.ReturnNotEligibleException;
 import nexussMarket.domain.exceptions.SellerNotAuthorizedException;
 
 /**
@@ -56,21 +72,44 @@ public class GlobalExceptionHandler {
         return RestErrors.response(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
 
-    /** The request is valid, but the current state of the data does not allow it. */
+    /**
+     * The request is valid, but the current state of the data does not allow it: a duplicate, missing stock, an
+     * invalid status transition, or a business rule that depends on the state of the cart, order, product,
+     * warehouse, return or refund involved.
+     */
     @ExceptionHandler({DuplicateResourceException.class, InsufficientStockException.class,
             InvalidOrderStatusTransitionException.class, InvalidShipmentStatusTransitionException.class,
-            BusinessRuleViolationException.class})
+            EmptyCartException.class, ProductNotPurchasableException.class, CurrencyMismatchException.class,
+            OrderNotShippableException.class, EmptyOrderException.class, ReturnNotEligibleException.class,
+            ReturnAlreadyDecidedException.class, RefundAlreadyProcessedException.class,
+            InactiveWarehouseException.class, InventoryNotTrackedException.class})
     public ResponseEntity<ErrorResponse> handleConflict(DomainException ex, HttpServletRequest request) {
         return RestErrors.response(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
-    /** The domain authorization services rejected the authenticated actor. */
-    @ExceptionHandler({SellerNotAuthorizedException.class, OperationNotAllowedException.class})
+    /**
+     * The domain authorization services rejected the authenticated actor, or the actor may not perform the
+     * operation in their current state (a suspended seller publishing, a buyer not enabled to purchase).
+     */
+    @ExceptionHandler({SellerNotAuthorizedException.class, OperationNotAllowedException.class,
+            BuyerNotEnabledException.class})
     public ResponseEntity<ErrorResponse> handleForbidden(DomainException ex, HttpServletRequest request) {
         return RestErrors.response(HttpStatus.FORBIDDEN, ex.getMessage(), request);
     }
 
-    /** Any other domain exception, present or future (e.g. an invalid {@code Money}). */
+    /**
+     * A value sent by the client breaks a business rule whatever the state of the data: a quantity, a price or an
+     * amount out of range, a new password that is too short, a wrong current password, or an order status that
+     * only the shipment lifecycle may set.
+     */
+    @ExceptionHandler({InvalidQuantityException.class, InvalidProductPriceException.class,
+            InvalidMoneyException.class, InvalidPasswordException.class, IncorrectCurrentPasswordException.class,
+            OrderStatusRequiresShipmentException.class})
+    public ResponseEntity<ErrorResponse> handleInvalidValue(DomainException ex, HttpServletRequest request) {
+        return RestErrors.response(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    /** Any other domain exception, present or future. */
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ErrorResponse> handleDomain(DomainException ex, HttpServletRequest request) {
         return RestErrors.response(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
@@ -82,7 +121,7 @@ public class GlobalExceptionHandler {
         return RestErrors.response(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
     }
 
-    /** Invalid values rejected by the entities themselves, e.g. a quantity that is not greater than zero. */
+    /** Guards of the entities against values no business rule covers, e.g. a null product status. */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex,
                                                                HttpServletRequest request) {

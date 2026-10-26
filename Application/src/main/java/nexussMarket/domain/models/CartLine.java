@@ -1,5 +1,7 @@
 package nexussMarket.domain.models;
 
+import nexussMarket.domain.exceptions.InvalidQuantityException;
+
 /**
  * A single product selection, with quantity, inside a shopping cart. Quantity
  * must be greater than zero. It only changes through its {@link ShoppingCart}.
@@ -16,7 +18,7 @@ public class CartLine {
 
     private static int requirePositive(int value) {
         if (value <= 0) {
-            throw new IllegalArgumentException("quantity must be greater than zero");
+            throw new InvalidQuantityException("quantity must be greater than zero");
         }
         return value;
     }

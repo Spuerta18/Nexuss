@@ -4,8 +4,8 @@ import java.math.BigDecimal;
 import java.util.Objects;
 
 import lombok.Getter;
-
-import nexussMarket.domain.exceptions.DomainException;
+import nexussMarket.domain.exceptions.CurrencyMismatchException;
+import nexussMarket.domain.exceptions.InvalidMoneyException;
 
 /**
  * An amount of money in a given {@link Currency}. Immutable and compared by
@@ -20,13 +20,13 @@ public final class Money {
 
     public Money(BigDecimal amount, Currency currency) {
         if (amount == null) {
-            throw new DomainException("Money amount must not be null");
+            throw new InvalidMoneyException("Money amount must not be null");
         }
         if (currency == null) {
-            throw new DomainException("Money currency must not be null");
+            throw new InvalidMoneyException("Money currency must not be null");
         }
         if (amount.signum() < 0) {
-            throw new DomainException("Money amount must not be negative: " + amount);
+            throw new InvalidMoneyException("Money amount must not be negative: " + amount);
         }
         this.amount = amount;
         this.currency = currency;
@@ -53,7 +53,7 @@ public final class Money {
         return new Money(amount.add(other.amount), currency);
     }
 
-    /** Fails with {@link DomainException} if the result would be negative. */
+    /** Fails with {@link InvalidMoneyException} if the result would be negative. */
     public Money subtract(Money other) {
         requireSameCurrency(other);
         return new Money(amount.subtract(other.amount), currency);
@@ -61,10 +61,10 @@ public final class Money {
 
     private void requireSameCurrency(Money other) {
         if (other == null) {
-            throw new DomainException("Money operand must not be null");
+            throw new InvalidMoneyException("Money operand must not be null");
         }
         if (!currency.equals(other.currency)) {
-            throw new DomainException("Cannot combine " + currency.getCode() + " with " + other.currency.getCode());
+            throw new CurrencyMismatchException("Cannot combine " + currency.getCode() + " with " + other.currency.getCode());
         }
     }
 

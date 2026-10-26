@@ -10,23 +10,24 @@ import java.math.BigDecimal;
 
 import org.junit.jupiter.api.Test;
 
-import nexussMarket.domain.exceptions.DomainException;
+import nexussMarket.domain.exceptions.CurrencyMismatchException;
+import nexussMarket.domain.exceptions.InvalidMoneyException;
 
 class MoneyTest {
 
     @Test
     void rejectsNullAmount() {
-        assertThrows(DomainException.class, () -> Money.of(null, Currency.COP));
+        assertThrows(InvalidMoneyException.class, () -> Money.of(null, Currency.COP));
     }
 
     @Test
     void rejectsNullCurrency() {
-        assertThrows(DomainException.class, () -> Money.of(BigDecimal.ONE, null));
+        assertThrows(InvalidMoneyException.class, () -> Money.of(BigDecimal.ONE, null));
     }
 
     @Test
     void rejectsNegativeAmount() {
-        assertThrows(DomainException.class, () -> Money.of(new BigDecimal("-0.01"), Currency.COP));
+        assertThrows(InvalidMoneyException.class, () -> Money.of(new BigDecimal("-0.01"), Currency.COP));
     }
 
     @Test
@@ -51,7 +52,7 @@ class MoneyTest {
     void subtractRejectsNegativeResult() {
         Money three = Money.of(new BigDecimal("3"), Currency.COP);
 
-        assertThrows(DomainException.class, () -> three.subtract(Money.of(BigDecimal.TEN, Currency.COP)));
+        assertThrows(InvalidMoneyException.class, () -> three.subtract(Money.of(BigDecimal.TEN, Currency.COP)));
     }
 
     @Test
@@ -59,8 +60,8 @@ class MoneyTest {
         Money pesos = Money.of(BigDecimal.TEN, Currency.COP);
         Money dollars = Money.of(BigDecimal.ONE, Currency.USD);
 
-        assertThrows(DomainException.class, () -> pesos.add(dollars));
-        assertThrows(DomainException.class, () -> pesos.subtract(dollars));
+        assertThrows(CurrencyMismatchException.class, () -> pesos.add(dollars));
+        assertThrows(CurrencyMismatchException.class, () -> pesos.subtract(dollars));
     }
 
     @Test

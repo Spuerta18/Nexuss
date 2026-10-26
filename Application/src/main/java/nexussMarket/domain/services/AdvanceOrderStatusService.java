@@ -4,8 +4,8 @@ import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
 
-import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
+import nexussMarket.domain.exceptions.OrderStatusRequiresShipmentException;
 import nexussMarket.domain.models.Invoice;
 import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
@@ -48,7 +48,7 @@ public class AdvanceOrderStatusService {
         String orderId = orderReference.getIdentifier();
         validateRoleAuthorizationService.execute(actor, SystemRole.LOGISTICS_OPERATOR, SystemRole.ADMINISTRATOR);
         if (targetStatus == OrderStatus.SHIPPED || targetStatus == OrderStatus.DELIVERED) {
-            throw new BusinessRuleViolationException("Use the Shipment lifecycle to move an order to SHIPPED or"
+            throw new OrderStatusRequiresShipmentException("Use the Shipment lifecycle to move an order to SHIPPED or"
                     + " DELIVERED, not a direct order status change");
         }
         Order order = orderRepositoryPort.findById(orderId)

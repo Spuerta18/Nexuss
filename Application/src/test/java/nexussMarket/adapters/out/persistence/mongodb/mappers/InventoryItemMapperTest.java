@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.Test;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.InventoryItemDocument;
+import nexussMarket.domain.exceptions.InvalidQuantityException;
 import nexussMarket.domain.models.InventoryItem;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.Warehouse;
@@ -40,7 +41,7 @@ class InventoryItemMapperTest {
         InventoryItemDocument document = new InventoryItemDocument();
         document.setAvailableQuantity(-1);
 
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(InvalidQuantityException.class,
                 () -> InventoryItemMapper.toDomain(document, product, warehouse));
     }
 }

@@ -1,5 +1,6 @@
 package nexussMarket.domain.models;
 
+import nexussMarket.domain.exceptions.InvalidQuantityException;
 import nexussMarket.domain.valueobjects.Money;
 
 /**
@@ -25,7 +26,7 @@ public class OrderLine {
 
     private static int requirePositive(int value) {
         if (value <= 0) {
-            throw new IllegalArgumentException("quantity must be greater than zero");
+            throw new InvalidQuantityException("quantity must be greater than zero");
         }
         return value;
     }

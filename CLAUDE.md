@@ -156,6 +156,24 @@ Run as one execution in 3 blocks (each compiled, tested, recorded here and commi
     session); `SESSION_PATHS` require any valid token, the controllers then restrict them to their role.
   - Tests: `SessionServicesTest`, `SessionRestControllerTest` (5 roles, revoked token → 401), `UserTest`,
     `UserMapperTest`. 183 tests green.
+- **Block 3 — one exception per business rule, done.** `DomainException` stays the base;
+  `BusinessRuleViolationException` was replaced everywhere and deleted. New exceptions and their status in
+  `GlobalExceptionHandler` (each one listed explicitly):
+  - `409` (the state of the data does not allow it): `EmptyCartException`, `ProductNotPurchasableException` (not
+    `PUBLISHED` or no price), `CurrencyMismatchException` (cart or `Money` currencies), `OrderNotShippableException`,
+    `EmptyOrderException`, `ReturnNotEligibleException`, `ReturnAlreadyDecidedException`,
+    `RefundAlreadyProcessedException`, `InactiveWarehouseException`, `InventoryNotTrackedException` (DIGITAL), plus
+    the existing duplicate, stock and transition exceptions.
+  - `403`: `BuyerNotEnabledException` (buyer not `ACTIVE` or suspended), with `OperationNotAllowedException` and
+    `SellerNotAuthorizedException`.
+  - `400` (a client value breaks a rule): `InvalidQuantityException` (replaces the `IllegalArgumentException`s of
+    `CartLine`, `OrderLine`, `InventoryItem`, `ShoppingCart`), `InvalidProductPriceException`, `InvalidMoneyException`
+    (replaces plain `DomainException` in `Money`), `InvalidPasswordException`, `IncorrectCurrentPasswordException`,
+    `OrderStatusRequiresShipmentException`. Any other `DomainException` → `400`.
+  - The remaining `IllegalArgumentException`s are programming guards (null product status, audit detail keys,
+    negative token version) and still answer `400`.
+  - Tests: `DomainExceptionMappingTest` (every exception → status), `BusinessRuleExceptionsTest`, and the updated
+    `ShoppingCartTest`, `MoneyTest`, `InventoryItemMapperTest`, `BuyerRestControllerTest`. 219 tests green.
 
 ## Documentation and Delivery
 

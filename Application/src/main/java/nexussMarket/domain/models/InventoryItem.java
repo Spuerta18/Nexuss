@@ -1,6 +1,7 @@
 package nexussMarket.domain.models;
 
 import nexussMarket.domain.exceptions.InsufficientStockException;
+import nexussMarket.domain.exceptions.InvalidQuantityException;
 
 /**
  * Distributed stock of a specific product held in a specific warehouse. Every
@@ -29,14 +30,14 @@ public class InventoryItem {
 
     private static int requireNonNegative(int value, String field) {
         if (value < 0) {
-            throw new IllegalArgumentException(field + " must never be negative");
+            throw new InvalidQuantityException(field + " must never be negative");
         }
         return value;
     }
 
     private static int requirePositive(int value, String field) {
         if (value <= 0) {
-            throw new IllegalArgumentException(field + " must be greater than zero");
+            throw new InvalidQuantityException(field + " must be greater than zero");
         }
         return value;
     }

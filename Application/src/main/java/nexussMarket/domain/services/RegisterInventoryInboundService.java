@@ -2,8 +2,9 @@ package nexussMarket.domain.services;
 
 import org.springframework.stereotype.Service;
 
-import nexussMarket.domain.exceptions.BusinessRuleViolationException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
+import nexussMarket.domain.exceptions.InactiveWarehouseException;
+import nexussMarket.domain.exceptions.InventoryNotTrackedException;
 import nexussMarket.domain.models.InventoryItem;
 import nexussMarket.domain.models.InventoryMovement;
 import nexussMarket.domain.models.Operation;
@@ -57,7 +58,7 @@ public class RegisterInventoryInboundService {
                 .orElseGet(() -> newInventoryItem(productId, warehouseId));
         authorizeWarehouseOperationService.execute(actor, item.getWarehouse());
         if (!item.getWarehouse().isActive()) {
-            throw new BusinessRuleViolationException(
+            throw new InactiveWarehouseException(
                     "Warehouse " + warehouseId + " is inactive and cannot receive stock");
         }
         int previousAvailable = item.getAvailableQuantity();
@@ -78,7 +79,7 @@ public class RegisterInventoryInboundService {
                 .orElseThrow(() -> new EntityNotFoundException("No product found with id " + productId));
         // Checked only when the item is created: an existing item already passed this check.
         if (product.getProductType() != ProductType.PHYSICAL) {
-            throw new BusinessRuleViolationException("DIGITAL products neither require nor allow inventory tracking.");
+            throw new InventoryNotTrackedException("DIGITAL products neither require nor allow inventory tracking.");
         }
         Warehouse warehouse = warehouseRepositoryPort.findById(warehouseId)
                 .orElseThrow(() -> new EntityNotFoundException("No warehouse found with id " + warehouseId));

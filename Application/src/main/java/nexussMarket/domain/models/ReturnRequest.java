@@ -2,7 +2,7 @@ package nexussMarket.domain.models;
 
 import java.time.LocalDateTime;
 
-import nexussMarket.domain.exceptions.BusinessRuleViolationException;
+import nexussMarket.domain.exceptions.ReturnAlreadyDecidedException;
 import nexussMarket.domain.valueobjects.ReturnStatus;
 
 /**
@@ -91,7 +91,7 @@ public class ReturnRequest {
 
     private void decide(ReturnStatus decision, User decider) {
         if (status != ReturnStatus.REQUESTED) {
-            throw new BusinessRuleViolationException("Return request " + identifier + " was already decided: "
+            throw new ReturnAlreadyDecidedException("Return request " + identifier + " was already decided: "
                     + status.getCode());
         }
         status = decision;

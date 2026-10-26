@@ -2,7 +2,7 @@ package nexussMarket.domain.models;
 
 import java.time.LocalDateTime;
 
-import nexussMarket.domain.exceptions.BusinessRuleViolationException;
+import nexussMarket.domain.exceptions.RefundAlreadyProcessedException;
 import nexussMarket.domain.valueobjects.Money;
 import nexussMarket.domain.valueobjects.RefundStatus;
 
@@ -69,7 +69,7 @@ public class Refund {
     /** Pays the refund. Only allowed while {@code PENDING}. */
     public void process() {
         if (status != RefundStatus.PENDING) {
-            throw new BusinessRuleViolationException("Refund " + identifier + " was already processed");
+            throw new RefundAlreadyProcessedException("Refund " + identifier + " was already processed");
         }
         status = RefundStatus.PROCESSED;
         processedAt = LocalDateTime.now();

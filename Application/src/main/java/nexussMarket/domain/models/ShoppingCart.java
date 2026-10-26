@@ -4,8 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import nexussMarket.domain.exceptions.BusinessRuleViolationException;
+import nexussMarket.domain.exceptions.CurrencyMismatchException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
+import nexussMarket.domain.exceptions.InvalidQuantityException;
+import nexussMarket.domain.exceptions.ProductNotPurchasableException;
 import nexussMarket.domain.valueobjects.Currency;
 import nexussMarket.domain.valueobjects.ProductStatus;
 
@@ -57,7 +59,7 @@ public class ShoppingCart {
      */
     public void addLine(Product product, int quantity) {
         if (product.getStatus() != ProductStatus.PUBLISHED) {
-            throw new BusinessRuleViolationException(
+            throw new ProductNotPurchasableException(
                     "Product " + product.getIdentifier() + " is not available for purchase");
         }
         requireCartCurrency(product);
@@ -68,7 +70,7 @@ public class ShoppingCart {
             } else {
                 lines.add(new CartLine(product, quantity));
             }
-        } catch (IllegalArgumentException e) {
+        } catch (InvalidQuantityException e) {
             throw invalidQuantity(product, e);
         }
     }
@@ -78,7 +80,7 @@ public class ShoppingCart {
         CartLine line = findLine(product).orElseThrow(() -> lineNotFound(product));
         try {
             line.setQuantity(quantity);
-        } catch (IllegalArgumentException e) {
+        } catch (InvalidQuantityException e) {
             throw invalidQuantity(product, e);
         }
     }
@@ -93,7 +95,7 @@ public class ShoppingCart {
     /** Every product in the cart is priced in the same currency; a product without price cannot be added. */
     private void requireCartCurrency(Product product) {
         if (product.getPrice() == null) {
-            throw new BusinessRuleViolationException("Product " + product.getIdentifier() + " has no price");
+            throw new ProductNotPurchasableException("Product " + product.getIdentifier() + " has no price");
         }
         Currency currency = product.getPrice().getCurrency();
         for (CartLine line : lines) {
@@ -102,7 +104,7 @@ public class ShoppingCart {
             }
             Currency lineCurrency = line.getProduct().getPrice().getCurrency();
             if (!lineCurrency.equals(currency)) {
-                throw new BusinessRuleViolationException("Cart " + identifier + " holds products priced in "
+                throw new CurrencyMismatchException("Cart " + identifier + " holds products priced in "
                         + lineCurrency.getCode() + "; product " + product.getIdentifier() + " is priced in "
                         + currency.getCode());
             }
@@ -122,8 +124,8 @@ public class ShoppingCart {
                 "No cart line found for product " + product.getIdentifier() + " in cart " + identifier);
     }
 
-    private IllegalArgumentException invalidQuantity(Product product, IllegalArgumentException cause) {
-        return new IllegalArgumentException("Invalid quantity for product " + product.getIdentifier()
-                + " in cart " + identifier + ": " + cause.getMessage(), cause);
+    private InvalidQuantityException invalidQuantity(Product product, InvalidQuantityException cause) {
+        return new InvalidQuantityException("Invalid quantity for product " + product.getIdentifier()
+                + " in cart " + identifier + ": " + cause.getMessage());
     }
 }
