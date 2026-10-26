@@ -1,6 +1,7 @@
 package nexussMarket.domain.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
@@ -17,6 +18,18 @@ import nexussMarket.domain.valueobjects.UserStatus;
 class UserTest {
 
     private static final List<String> IMMUTABLE_FIELDS = List.of("identifier", "email", "role");
+
+    @Test
+    void authTokenVersionStartsAtZeroAndOnlyMovesForward() {
+        Administrator admin = new Administrator("A-1", "Root Admin", "admin@example.com", UserStatus.ACTIVE);
+
+        assertEquals(0, admin.getAuthTokenVersion());
+        admin.bumpAuthTokenVersion();
+        assertEquals(1, admin.getAuthTokenVersion());
+        admin.restoreAuthTokenVersion(7);
+        assertEquals(7, admin.getAuthTokenVersion());
+        assertThrows(IllegalArgumentException.class, () -> admin.restoreAuthTokenVersion(-1));
+    }
 
     @Test
     void identityIsFixedByTheConstructor() {

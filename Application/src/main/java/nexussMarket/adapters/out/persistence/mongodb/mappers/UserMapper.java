@@ -33,6 +33,7 @@ public final class UserMapper {
         document.setEmail(user.getEmail());
         document.setStatus(user.getStatus().getCode());
         document.setPasswordHash(user.getPasswordHash());
+        document.setAuthTokenVersion(user.getAuthTokenVersion());
         if (user instanceof Buyer buyer) {
             document.setPrimaryAddress(buyer.getPrimaryAddress());
             document.setAdditionalAddresses(new ArrayList<>(buyer.getAdditionalAddresses()));
@@ -46,6 +47,7 @@ public final class UserMapper {
     public static User toDomain(UserDocument document) {
         User user = newUser(document);
         user.setPasswordHash(document.getPasswordHash());
+        user.restoreAuthTokenVersion(document.getAuthTokenVersion() != null ? document.getAuthTokenVersion() : 0);
         return user;
     }
 

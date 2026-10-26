@@ -34,6 +34,9 @@ public class UserDocument {
     private String status;
     private String passwordHash;
 
+    /** Version of the user's access tokens; absent on documents stored before it existed (read as 0). */
+    private Integer authTokenVersion;
+
     /** {@code BUYER} only. */
     private String primaryAddress;
 

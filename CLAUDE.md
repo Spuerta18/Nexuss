@@ -140,6 +140,22 @@ Run as one execution in 3 blocks (each compiled, tested, recorded here and commi
     `MongoAuditLogAdapter`.
   - Tests: one audit assertion per state-changing service (`*AuditTest` classes on `AuditedServiceTestSupport`),
     `AuditServicesTest`, `AuditMappersTest`, `AuditRestControllerTest`. 156 tests green.
+- **Block 2 — logout and password change, done.**
+  - `User.authTokenVersion` (int, starts at 0) with `bumpAuthTokenVersion()`; `restoreAuthTokenVersion(int)` is only
+    for mappers rebuilding a stored user. Stored as `users.authTokenVersion`; documents without it read as 0.
+  - The JWT carries the claim `ver`; `JwtAuthenticationFilter` rejects (401) a token whose `ver` differs from the
+    stored user's version, and `JwtProvider` rejects tokens without `ver`.
+  - `LogoutService` (loads the stored user, bumps, saves, audits `USER_LOGOUT`; idempotent, no status check) and
+    `ChangeUserPasswordService` (stored user must be `ACTIVE`, current password must match →
+    `IncorrectCurrentPasswordException`, new password ≥ 8 characters → `InvalidPasswordException`, BCrypt hash, bump,
+    audits `PASSWORD_CHANGE`). Neither audits a password.
+  - `logout(User)` and `changePassword(User, String, String)` on the 5 role ports (not `PublicAccessPort`), delegated
+    by each `*UseCaseImpl`; `POST /api/{buyer|seller|admin|logistics|supervisor}/logout` and `/password`
+    (`ChangePasswordRequest`, new password 8-72), both `204`. After either call every earlier token answers `401`.
+  - `SecurityConfig`: Spring's session logout stays disabled (it would intercept the request and there is no
+    session); `SESSION_PATHS` require any valid token, the controllers then restrict them to their role.
+  - Tests: `SessionServicesTest`, `SessionRestControllerTest` (5 roles, revoked token → 401), `UserTest`,
+    `UserMapperTest`. 183 tests green.
 
 ## Documentation and Delivery
 
@@ -179,8 +195,9 @@ Run as one execution in 3 blocks (each compiled, tested, recorded here and commi
   entities owned by someone else; the other setters break no business rule. (`User.setIdentifier` and
   `User.setEmail`, which could bypass the uniqueness rule, were removed in Batch E.)
 
-- **JWT and fresh state:** the token carries `sub`, `role` and `email`, but `JwtAuthenticationFilter` reloads the user
-  from the database on every request and rejects it if it is not `ACTIVE` or its stored role differs from the token.
+- **JWT and fresh state:** the token carries `sub`, `role`, `email` and `ver`, but `JwtAuthenticationFilter` reloads the
+  user from the database on every request and rejects it if it is not `ACTIVE`, its stored role differs from the
+  token, or its `authTokenVersion` differs from `ver` (logout and password change revoke tokens this way).
 - **Abstract `User` targets in REST:** the client sends the target user's role (body of `PATCH /users/{id}/status`,
   `?role=` on `GET /users/{id}`) and the mapper builds that subtype. The services only read the identifier.
 - **Login errors:** a wrong email, a wrong password and a user who is not `ACTIVE` all answer `401` with

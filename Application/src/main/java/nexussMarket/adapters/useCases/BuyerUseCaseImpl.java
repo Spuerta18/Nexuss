@@ -5,7 +5,6 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
-
 import nexussMarket.domain.models.Buyer;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
@@ -15,6 +14,7 @@ import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.in.BuyerPort;
 import nexussMarket.domain.services.AddCartLineService;
 import nexussMarket.domain.services.CancelOrderService;
+import nexussMarket.domain.services.ChangeUserPasswordService;
 import nexussMarket.domain.services.ConfirmOrderService;
 import nexussMarket.domain.services.ConsultCartService;
 import nexussMarket.domain.services.ConsultOrderService;
@@ -22,6 +22,7 @@ import nexussMarket.domain.services.ConsultProductService;
 import nexussMarket.domain.services.CreateShoppingCartService;
 import nexussMarket.domain.services.ListBuyerOrdersService;
 import nexussMarket.domain.services.ListPublishedProductsService;
+import nexussMarket.domain.services.LogoutService;
 import nexussMarket.domain.services.RemoveCartLineService;
 import nexussMarket.domain.services.RequestReturnService;
 import nexussMarket.domain.services.UpdateCartLineQuantityService;
@@ -43,6 +44,8 @@ public class BuyerUseCaseImpl implements BuyerPort {
     private final ListPublishedProductsService listPublishedProductsService;
     private final ConsultProductService consultProductService;
     private final RequestReturnService requestReturnService;
+    private final LogoutService logoutService;
+    private final ChangeUserPasswordService changeUserPasswordService;
 
     @Override
     public ShoppingCart createShoppingCart(User user, ShoppingCart cart) {
@@ -102,5 +105,15 @@ public class BuyerUseCaseImpl implements BuyerPort {
     @Override
     public ReturnRequest requestReturn(User user, ReturnRequest returnRequest) {
         return requestReturnService.execute(user, returnRequest);
+    }
+
+    @Override
+    public void logout(User user) {
+        logoutService.execute(user);
+    }
+
+    @Override
+    public void changePassword(User user, String currentPassword, String newPassword) {
+        changeUserPasswordService.execute(user, currentPassword, newPassword);
     }
 }

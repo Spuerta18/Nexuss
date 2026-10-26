@@ -21,6 +21,7 @@ import nexussMarket.adapters.in.rest.mappers.CatalogRestMapper;
 import nexussMarket.adapters.in.rest.mappers.DomainReferences;
 import nexussMarket.adapters.in.rest.mappers.InventoryRestMapper;
 import nexussMarket.adapters.in.rest.mappers.WarehouseRestMapper;
+import nexussMarket.adapters.in.rest.requests.ChangePasswordRequest;
 import nexussMarket.adapters.in.rest.requests.InventoryAdjustmentRequest;
 import nexussMarket.adapters.in.rest.requests.InventoryMovementRequest;
 import nexussMarket.adapters.in.rest.requests.ProductStatusRequest;
@@ -109,5 +110,20 @@ public class SellerRestController {
         return InventoryRestMapper.toResponse(sellerPort.adjustInventory(actor,
                 DomainReferences.product(request.productId()), DomainReferences.warehouse(request.warehouseId()),
                 request.quantityDelta()));
+    }
+
+    /** Revokes every token of the caller, including the one used for this request. */
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@AuthenticationPrincipal(expression = "user") User actor) {
+        sellerPort.logout(actor);
+    }
+
+    /** Changes the caller's password; every token issued before, including this one, stops working. */
+    @PostMapping("/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changePassword(@AuthenticationPrincipal(expression = "user") User actor,
+                               @Valid @RequestBody ChangePasswordRequest request) {
+        sellerPort.changePassword(actor, request.currentPassword(), request.newPassword());
     }
 }

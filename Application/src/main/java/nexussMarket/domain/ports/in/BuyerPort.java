@@ -39,4 +39,10 @@ public interface BuyerPort {
     Product consultProduct(User user, Product product);
 
     ReturnRequest requestReturn(User user, ReturnRequest returnRequest);
+
+    /** Logs {@code user} out, revoking every access token issued to them. */
+    void logout(User user);
+
+    /** Changes {@code user}'s own password and revokes every access token issued to them. */
+    void changePassword(User user, String currentPassword, String newPassword);
 }

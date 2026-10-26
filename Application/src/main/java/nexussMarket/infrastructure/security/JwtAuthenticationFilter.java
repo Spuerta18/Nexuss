@@ -19,14 +19,17 @@ import nexussMarket.infrastructure.security.JwtProvider.JwtClaims;
 /**
  * Authenticates requests carrying {@code Authorization: Bearer <jwt>}. A
  * valid token whose user still exists, is {@code ACTIVE} (never
- * {@code BLOCKED}) and still has the role the token was issued for puts an
+ * {@code BLOCKED}), still has the role the token was issued for, and whose
+ * {@code ver} claim equals the user's current {@code authTokenVersion} puts an
  * {@link AuthenticatedUserPrincipal} in the {@link SecurityContext}. The
  * principal wraps the reloaded domain user, so it is always the right
  * {@code User} subtype with its current state. Auditing is not done here:
  * each state-changing Domain Service records its own operation.
  *
  * <p>Requests without a valid token continue unauthenticated; the security
- * configuration then rejects them on protected routes with {@code 401}. The
+ * configuration then rejects them on protected routes with {@code 401}. A
+ * logout or a password change raises the user's version, so every token
+ * issued before is rejected from the next request on. The
  * token itself is never logged. The principal is
  * reloaded on every request, so blocking a user takes effect immediately and
  * authorities never come from the token alone.</p>
@@ -58,13 +61,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     /**
      * The user the token was issued for, reloaded from the database, or empty
-     * if it no longer exists, is not {@code ACTIVE}, or its stored role differs
-     * from the role in the token.
+     * if it no longer exists, is not {@code ACTIVE}, its stored role differs
+     * from the role in the token, or the token's version was revoked.
      */
     private Optional<AuthenticatedUserPrincipal> currentPrincipal(JwtClaims claims) {
         return userDetailsService.loadUserById(claims.userId())
                 .filter(principal -> principal.isEnabled() && principal.isAccountNonLocked())
-                .filter(principal -> principal.getUser().getRole().getCode().equals(claims.role()));
+                .filter(principal -> principal.getUser().getRole().getCode().equals(claims.role()))
+                .filter(principal -> principal.getUser().getAuthTokenVersion() == claims.version());
     }
 
     private void authenticate(AuthenticatedUserPrincipal principal, HttpServletRequest request) {

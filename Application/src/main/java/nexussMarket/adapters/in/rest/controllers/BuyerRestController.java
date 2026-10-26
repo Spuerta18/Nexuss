@@ -23,6 +23,7 @@ import nexussMarket.adapters.in.rest.mappers.DomainReferences;
 import nexussMarket.adapters.in.rest.mappers.OrderRestMapper;
 import nexussMarket.adapters.in.rest.mappers.ReturnRestMapper;
 import nexussMarket.adapters.in.rest.requests.AddCartLineRequest;
+import nexussMarket.adapters.in.rest.requests.ChangePasswordRequest;
 import nexussMarket.adapters.in.rest.requests.ConfirmOrderRequest;
 import nexussMarket.adapters.in.rest.requests.CreateCartRequest;
 import nexussMarket.adapters.in.rest.requests.QuantityRequest;
@@ -123,5 +124,20 @@ public class BuyerRestController {
     public ProductResponse consultProduct(@AuthenticationPrincipal(expression = "user") User actor,
                                           @PathVariable String productId) {
         return CatalogRestMapper.toResponse(buyerPort.consultProduct(actor, DomainReferences.product(productId)));
+    }
+
+    /** Revokes every token of the caller, including the one used for this request. */
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@AuthenticationPrincipal(expression = "user") User actor) {
+        buyerPort.logout(actor);
+    }
+
+    /** Changes the caller's password; every token issued before, including this one, stops working. */
+    @PostMapping("/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changePassword(@AuthenticationPrincipal(expression = "user") User actor,
+                               @Valid @RequestBody ChangePasswordRequest request) {
+        buyerPort.changePassword(actor, request.currentPassword(), request.newPassword());
     }
 }

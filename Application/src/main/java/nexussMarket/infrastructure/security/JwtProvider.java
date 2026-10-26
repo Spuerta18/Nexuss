@@ -22,10 +22,11 @@ import nexussMarket.domain.models.User;
  * algorithm follows the key length: HS256 for a 32-byte key, HS384 for 48 bytes,
  * HS512 for 64 bytes or more.
  * Tokens carry the user identifier as {@code sub}, the {@code SystemRole}
- * code as {@code role}, the {@code email}, and the {@code iat} / {@code exp}
- * timestamps: enough to rebuild the right {@code User} subtype, which the
- * authentication filter then reloads from the database (see
- * {@link JwtAuthenticationFilter}).
+ * code as {@code role}, the {@code email}, the user's {@code authTokenVersion}
+ * as {@code ver}, and the {@code iat} / {@code exp} timestamps. The
+ * authentication filter reloads the user from the database and only accepts
+ * a token whose {@code ver} is the user's current version (see
+ * {@link JwtAuthenticationFilter}); a token without {@code ver} is rejected.
  */
 @Component
 public class JwtProvider {
@@ -33,6 +34,7 @@ public class JwtProvider {
     private static final Logger log = LoggerFactory.getLogger(JwtProvider.class);
     private static final String ROLE_CLAIM = "role";
     private static final String EMAIL_CLAIM = "email";
+    private static final String VERSION_CLAIM = "ver";
 
     private final SecretKey signingKey;
     private final JwtProperties properties;
@@ -54,6 +56,7 @@ public class JwtProvider {
                 .subject(user.getIdentifier())
                 .claim(ROLE_CLAIM, user.getRole().getCode())
                 .claim(EMAIL_CLAIM, user.getEmail())
+                .claim(VERSION_CLAIM, user.getAuthTokenVersion())
                 .issuedAt(Date.from(issuedAt))
                 .expiration(Date.from(issuedAt.plus(properties.expiration())))
                 .signWith(signingKey)
@@ -67,12 +70,13 @@ public class JwtProvider {
     public Optional<JwtClaims> validate(String token) {
         try {
             Claims claims = Jwts.parser().verifyWith(signingKey).build().parseSignedClaims(token).getPayload();
-            if (claims.getSubject() == null || claims.getExpiration() == null) {
-                log.debug("Rejected JWT without subject or expiration");
+            Integer version = claims.get(VERSION_CLAIM, Integer.class);
+            if (claims.getSubject() == null || claims.getExpiration() == null || version == null) {
+                log.debug("Rejected JWT without subject, expiration or version");
                 return Optional.empty();
             }
             return Optional.of(new JwtClaims(claims.getSubject(), claims.get(ROLE_CLAIM, String.class),
-                    claims.get(EMAIL_CLAIM, String.class), toInstant(claims.getIssuedAt()),
+                    claims.get(EMAIL_CLAIM, String.class), version, toInstant(claims.getIssuedAt()),
                     claims.getExpiration().toInstant()));
         } catch (JwtException | IllegalArgumentException e) {
             log.debug("Rejected JWT: {}", e.getMessage());
@@ -85,6 +89,7 @@ public class JwtProvider {
     }
 
     /** Validated content of a token. */
-    public record JwtClaims(String userId, String role, String email, Instant issuedAt, Instant expiresAt) {
+    public record JwtClaims(String userId, String role, String email, int version, Instant issuedAt,
+                            Instant expiresAt) {
     }
 }

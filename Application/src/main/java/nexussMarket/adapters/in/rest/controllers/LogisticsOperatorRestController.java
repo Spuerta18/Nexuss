@@ -20,6 +20,7 @@ import nexussMarket.adapters.in.rest.mappers.InventoryRestMapper;
 import nexussMarket.adapters.in.rest.mappers.OrderRestMapper;
 import nexussMarket.adapters.in.rest.mappers.ShipmentRestMapper;
 import nexussMarket.adapters.in.rest.requests.AdvanceOrderStatusRequest;
+import nexussMarket.adapters.in.rest.requests.ChangePasswordRequest;
 import nexussMarket.adapters.in.rest.requests.CreateShipmentRequest;
 import nexussMarket.adapters.in.rest.requests.InventoryMovementRequest;
 import nexussMarket.adapters.in.rest.responses.InventoryItemResponse;
@@ -104,5 +105,20 @@ public class LogisticsOperatorRestController {
                                                         @PathVariable String productId) {
         return InventoryRestMapper.toResponses(
                 logisticsOperatorPort.consultInventory(actor, DomainReferences.product(productId)));
+    }
+
+    /** Revokes every token of the caller, including the one used for this request. */
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@AuthenticationPrincipal(expression = "user") User actor) {
+        logisticsOperatorPort.logout(actor);
+    }
+
+    /** Changes the caller's password; every token issued before, including this one, stops working. */
+    @PostMapping("/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changePassword(@AuthenticationPrincipal(expression = "user") User actor,
+                               @Valid @RequestBody ChangePasswordRequest request) {
+        logisticsOperatorPort.changePassword(actor, request.currentPassword(), request.newPassword());
     }
 }

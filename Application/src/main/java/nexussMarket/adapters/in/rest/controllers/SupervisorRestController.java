@@ -2,14 +2,19 @@ package nexussMarket.adapters.in.rest.controllers;
 
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import nexussMarket.adapters.in.rest.mappers.AuditRestMapper;
 import nexussMarket.adapters.in.rest.mappers.CatalogRestMapper;
@@ -17,6 +22,7 @@ import nexussMarket.adapters.in.rest.mappers.DomainReferences;
 import nexussMarket.adapters.in.rest.mappers.InventoryRestMapper;
 import nexussMarket.adapters.in.rest.mappers.OrderRestMapper;
 import nexussMarket.adapters.in.rest.mappers.UserRestMapper;
+import nexussMarket.adapters.in.rest.requests.ChangePasswordRequest;
 import nexussMarket.adapters.in.rest.responses.AuditLogResponse;
 import nexussMarket.adapters.in.rest.responses.InventoryItemResponse;
 import nexussMarket.adapters.in.rest.responses.OperationResponse;
@@ -75,5 +81,20 @@ public class SupervisorRestController {
     @GetMapping("/audit-logs")
     public List<AuditLogResponse> consultAuditLogs(@AuthenticationPrincipal(expression = "user") User actor) {
         return AuditRestMapper.toAuditLogResponses(supervisorPort.consultAuditLogs(actor));
+    }
+
+    /** Revokes every token of the caller, including the one used for this request. */
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@AuthenticationPrincipal(expression = "user") User actor) {
+        supervisorPort.logout(actor);
+    }
+
+    /** Changes the caller's password; every token issued before, including this one, stops working. */
+    @PostMapping("/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changePassword(@AuthenticationPrincipal(expression = "user") User actor,
+                               @Valid @RequestBody ChangePasswordRequest request) {
+        supervisorPort.changePassword(actor, request.currentPassword(), request.newPassword());
     }
 }

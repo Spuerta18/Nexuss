@@ -31,4 +31,10 @@ public interface SellerPort {
     InventoryItem adjustInventory(User user, Product product, Warehouse warehouse, int quantityDelta);
 
     List<InventoryItem> consultInventory(User user, Product product);
+
+    /** Logs {@code user} out, revoking every access token issued to them. */
+    void logout(User user);
+
+    /** Changes {@code user}'s own password and revokes every access token issued to them. */
+    void changePassword(User user, String currentPassword, String newPassword);
 }

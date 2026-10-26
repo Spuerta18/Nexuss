@@ -31,6 +31,16 @@ import nexussMarket.adapters.in.rest.exception.RestErrors;
  * requests rejected by a role check get {@code 403}, both with the uniform
  * error body; role checks are declared with {@code @PreAuthorize} on each
  * controller. CORS allows the origins configured in {@link CorsProperties}.
+ *
+ * <p><b>Logout.</b> Tokens cannot be deleted from the client's hands, so
+ * logout revokes them instead: {@code POST /api/<role>/logout} (and
+ * {@code POST /api/<role>/password}) raise the user's
+ * {@code authTokenVersion}, and {@link JwtAuthenticationFilter} rejects every
+ * token whose {@code ver} claim is older, answering {@code 401}. Spring
+ * Security's own logout filter stays disabled: it clears an HTTP session,
+ * which a stateless API does not have, and it would intercept the request
+ * before the role controllers. {@link #SESSION_PATHS} require a valid token of
+ * any role at this level; each controller then restricts them to its role.</p>
  */
 @Configuration
 @EnableWebSecurity
@@ -53,6 +63,9 @@ public class SecurityConfig {
     public static final String[] API_DOCUMENTATION_PATHS = {
             "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"};
 
+    /** Logout and password change of every role: they revoke the caller's tokens. */
+    public static final String[] SESSION_PATHS = {"/api/*/logout", "/api/*/password"};
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtProvider jwtProvider,
                                                    NexusUserDetailsService userDetailsService) throws Exception {
@@ -60,6 +73,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
+                // Session-based logout is not used: logout revokes tokens (see the class Javadoc).
                 .logout(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -71,6 +85,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, LOGIN_PATH, BUYER_REGISTRATION_PATH).permitAll()
                         .requestMatchers(HttpMethod.GET, API_DOCUMENTATION_PATHS).permitAll()
+                        .requestMatchers(HttpMethod.POST, SESSION_PATHS).authenticated()
                         // Lets Spring's error page answer with the real status instead of a 401.
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())

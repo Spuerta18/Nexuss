@@ -72,6 +72,23 @@ class UserMapperTest {
     }
 
     @Test
+    void authTokenVersionRoundTrips() {
+        User user = UserMapper.toDomain(baseDocument("ADMINISTRATOR"));
+        user.bumpAuthTokenVersion();
+        user.bumpAuthTokenVersion();
+
+        UserDocument document = UserMapper.toDocument(user);
+
+        assertEquals(2, document.getAuthTokenVersion());
+        assertEquals(2, UserMapper.toDomain(document).getAuthTokenVersion());
+    }
+
+    @Test
+    void documentsWithoutAuthTokenVersionReadAsZero() {
+        assertEquals(0, UserMapper.toDomain(baseDocument("ADMINISTRATOR")).getAuthTokenVersion());
+    }
+
+    @Test
     void unknownUserTypeFails() {
         assertThrows(IllegalStateException.class, () -> UserMapper.toDomain(baseDocument("GUEST")));
     }

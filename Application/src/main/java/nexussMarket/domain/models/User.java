@@ -23,6 +23,7 @@ public abstract class User {
     private final SystemRole role;
     private UserStatus status;
     private String passwordHash;
+    private int authTokenVersion;
 
     protected User(String identifier, String fullName, String email, SystemRole role, UserStatus status) {
         this.identifier = identifier;
@@ -75,5 +76,27 @@ public abstract class User {
 
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    /**
+     * Version of the user's access tokens. Every token carries the version it
+     * was issued with, and only tokens of the current version are accepted, so
+     * raising it revokes every token issued before (logout, password change).
+     */
+    public int getAuthTokenVersion() {
+        return authTokenVersion;
+    }
+
+    /** Revokes every access token issued so far. */
+    public void bumpAuthTokenVersion() {
+        authTokenVersion++;
+    }
+
+    /** Restores the stored version when the user is rebuilt from persistence; never lowers it below zero. */
+    public void restoreAuthTokenVersion(int authTokenVersion) {
+        if (authTokenVersion < 0) {
+            throw new IllegalArgumentException("authTokenVersion must never be negative");
+        }
+        this.authTokenVersion = authTokenVersion;
     }
 }

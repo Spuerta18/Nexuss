@@ -16,10 +16,12 @@ import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
 import nexussMarket.domain.ports.in.AdministratorPort;
 import nexussMarket.domain.services.ApproveReturnService;
+import nexussMarket.domain.services.ChangeUserPasswordService;
 import nexussMarket.domain.services.ConsultAuditLogsService;
 import nexussMarket.domain.services.ConsultOperationsService;
 import nexussMarket.domain.services.ConsultUserService;
 import nexussMarket.domain.services.DeactivateWarehouseService;
+import nexussMarket.domain.services.LogoutService;
 import nexussMarket.domain.services.ProcessRefundService;
 import nexussMarket.domain.services.RegisterLogisticsOperatorService;
 import nexussMarket.domain.services.RegisterSellerService;
@@ -49,6 +51,8 @@ public class AdministratorUseCaseImpl implements AdministratorPort {
     private final ConsultUserService consultUserService;
     private final ConsultOperationsService consultOperationsService;
     private final ConsultAuditLogsService consultAuditLogsService;
+    private final LogoutService logoutService;
+    private final ChangeUserPasswordService changeUserPasswordService;
 
     @Override
     public Seller registerSeller(User user, Seller seller, String password) {
@@ -113,5 +117,15 @@ public class AdministratorUseCaseImpl implements AdministratorPort {
     @Override
     public List<AuditLog> consultAuditLogs(User user) {
         return consultAuditLogsService.execute(user);
+    }
+
+    @Override
+    public void logout(User user) {
+        logoutService.execute(user);
+    }
+
+    @Override
+    public void changePassword(User user, String currentPassword, String newPassword) {
+        changeUserPasswordService.execute(user, currentPassword, newPassword);
     }
 }
