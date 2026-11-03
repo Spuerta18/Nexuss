@@ -220,8 +220,12 @@ blocks are green. Plan:
   id showing the 409 and the unchanged data; update `Api-rest-endpoints.md`, `Input-ports.md`, `Persistence.md`, the
   affected C4 views, the service files, `README.md` and this file; merge to `main`.
 - **Last verification:** 2026-11-03, after the Block 3 commit: `mvn -o clean test`, 269 tests green, including
-  the 6 integration tests run against the real MongoDB (not skipped). **Next:** curl run on `nexusmarket_demo`, then
-  docs (SDD, C4, README), then merge. Not merged, not pushed.
+  the 6 integration tests run against the real MongoDB (not skipped). Real run on `nexusmarket_demo` (app on 8080,
+  driver script in the session scratchpad, run id `1f48d4`): generated `PRD-` / `WH-` / `CART-` / `ORD-` ids, second
+  cart 409, order total 45000 COP, payment 200 then 409, shipment to `DELIVERED`, invoice for owner and admin, foreign
+  buyer 403, existing order id 409 with the order unchanged and no stock reserved, `operations` == `audit_logs`. On
+  startup `ActiveCartIndexInitializer` replaced the demo's non-unique `buyerId` index. **Next:** docs (SDD, C4,
+  README), then merge to `main`. Not merged, not pushed.
 - **Caution:** the VS Code Java extension compiles into the same `target/`; if a test fails with
   "Unresolved compilation problems" (Eclipse compiler output), rerun with `clean`. It can also lock `target/` briefly.
 
