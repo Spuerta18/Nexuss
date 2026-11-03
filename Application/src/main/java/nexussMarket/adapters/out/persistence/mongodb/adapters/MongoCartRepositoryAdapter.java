@@ -31,7 +31,8 @@ public class MongoCartRepositoryAdapter implements CartRepositoryPort {
     @Override
     public ShoppingCart insert(ShoppingCart cart) {
         MongoInsertion.insert(() -> shoppingCartRepository.insert(ShoppingCartMapper.toDocument(cart)),
-                "A shopping cart with id " + cart.getIdentifier() + " already exists");
+                "A shopping cart with id " + cart.getIdentifier()
+                + ", or an active cart of buyer " + cart.getBuyer().getIdentifier() + ", already exists");
         return cart;
     }
 

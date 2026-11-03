@@ -25,8 +25,21 @@ public interface BuyerPort {
 
     ShoppingCart consultCart(User user, ShoppingCart cart);
 
-    /** {@code newOrder} carries the identifier of the order to create. */
+    /** {@code newOrder} carries the identifier of the order to create, or none to have it generated. */
     Order confirmOrder(User user, ShoppingCart cart, Order newOrder);
+
+    /** The buyer's active cart (a buyer has at most one). */
+    ShoppingCart consultActiveCart(User user);
+
+    /** Adds a line to the buyer's active cart, creating that cart if the buyer has none. */
+    ShoppingCart addActiveCartLine(User user, Product product, int quantity);
+
+    ShoppingCart updateActiveCartLineQuantity(User user, Product product, int quantity);
+
+    ShoppingCart removeActiveCartLine(User user, Product product);
+
+    /** Confirms the buyer's active cart; {@code newOrder} carries the order identifier, or none to have it generated. */
+    Order confirmActiveCart(User user, Order newOrder);
 
     Order cancelOrder(User user, Order order);
 

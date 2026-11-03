@@ -1,5 +1,7 @@
 package nexussMarket.domain.models;
 
+import java.math.BigDecimal;
+
 import nexussMarket.domain.exceptions.InvalidQuantityException;
 import nexussMarket.domain.valueobjects.Money;
 
@@ -54,5 +56,10 @@ public class OrderLine {
     /** Warehouse the stock for this line was reserved from. */
     public Warehouse getWarehouse() {
         return warehouse;
+    }
+
+    /** {@code quantity × unitPrice}, in the currency of the unit price. */
+    public Money getSubtotal() {
+        return Money.of(unitPrice.getAmount().multiply(BigDecimal.valueOf(quantity)), unitPrice.getCurrency());
     }
 }

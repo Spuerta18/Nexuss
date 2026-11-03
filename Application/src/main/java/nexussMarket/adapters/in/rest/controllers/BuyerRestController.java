@@ -44,10 +44,11 @@ public class BuyerRestController {
 
     private final BuyerPort buyerPort;
 
+    /** The body, and the cart identifier in it, are optional: without them the server generates the identifier. */
     @PostMapping("/carts")
     @ResponseStatus(HttpStatus.CREATED)
     public CartResponse createCart(@AuthenticationPrincipal(expression = "user") User actor,
-                                   @Valid @RequestBody CreateCartRequest request) {
+                                   @Valid @RequestBody(required = false) CreateCartRequest request) {
         return CartRestMapper.toResponse(buyerPort.createShoppingCart(actor, CartRestMapper.newCart(request)));
     }
 
@@ -79,12 +80,50 @@ public class BuyerRestController {
                 DomainReferences.product(productId)));
     }
 
+    /** The body, and the order identifier in it, are optional: without them the server generates the identifier. */
     @PostMapping("/carts/{cartId}/orders")
     @ResponseStatus(HttpStatus.CREATED)
     public OrderResponse confirmOrder(@AuthenticationPrincipal(expression = "user") User actor,
-                                      @PathVariable String cartId, @Valid @RequestBody ConfirmOrderRequest request) {
+                                      @PathVariable String cartId,
+                                      @Valid @RequestBody(required = false) ConfirmOrderRequest request) {
         return OrderRestMapper.toResponse(buyerPort.confirmOrder(actor, DomainReferences.cart(cartId),
                 OrderRestMapper.newOrder(request)));
+    }
+
+    /** The authenticated buyer's active cart; 404 when there is none. */
+    @GetMapping("/cart")
+    public CartResponse consultActiveCart(@AuthenticationPrincipal(expression = "user") User actor) {
+        return CartRestMapper.toResponse(buyerPort.consultActiveCart(actor));
+    }
+
+    /** Adds a line to the active cart, creating that cart first when the buyer has none. */
+    @PostMapping("/cart/items")
+    public CartResponse addActiveCartLine(@AuthenticationPrincipal(expression = "user") User actor,
+                                          @Valid @RequestBody AddCartLineRequest request) {
+        return CartRestMapper.toResponse(buyerPort.addActiveCartLine(actor,
+                DomainReferences.product(request.productId()), request.quantity()));
+    }
+
+    @PutMapping("/cart/items/{productId}")
+    public CartResponse updateActiveCartLineQuantity(@AuthenticationPrincipal(expression = "user") User actor,
+                                                     @PathVariable String productId,
+                                                     @Valid @RequestBody QuantityRequest request) {
+        return CartRestMapper.toResponse(buyerPort.updateActiveCartLineQuantity(actor,
+                DomainReferences.product(productId), request.quantity()));
+    }
+
+    @DeleteMapping("/cart/items/{productId}")
+    public CartResponse removeActiveCartLine(@AuthenticationPrincipal(expression = "user") User actor,
+                                             @PathVariable String productId) {
+        return CartRestMapper.toResponse(buyerPort.removeActiveCartLine(actor, DomainReferences.product(productId)));
+    }
+
+    /** Confirms the active cart; the body, and the order identifier in it, are optional. */
+    @PostMapping("/orders")
+    @ResponseStatus(HttpStatus.CREATED)
+    public OrderResponse confirmActiveCart(@AuthenticationPrincipal(expression = "user") User actor,
+                                           @Valid @RequestBody(required = false) ConfirmOrderRequest request) {
+        return OrderRestMapper.toResponse(buyerPort.confirmActiveCart(actor, OrderRestMapper.newOrder(request)));
     }
 
     /** The orders of the authenticated buyer. */

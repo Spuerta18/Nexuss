@@ -13,9 +13,12 @@ public final class CartRestMapper {
     private CartRestMapper() {
     }
 
-    /** A new, empty cart: the service sets the authenticated buyer as its owner. */
+    /**
+     * A new, empty cart: the service sets the authenticated buyer as its owner, and generates the identifier when the
+     * request or its identifier is absent.
+     */
     public static ShoppingCart newCart(CreateCartRequest request) {
-        return new ShoppingCart(request.cartId(), null);
+        return new ShoppingCart(request != null ? request.cartId() : null, null);
     }
 
     public static CartResponse toResponse(ShoppingCart cart) {

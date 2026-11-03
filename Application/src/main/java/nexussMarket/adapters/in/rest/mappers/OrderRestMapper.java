@@ -15,9 +15,12 @@ public final class OrderRestMapper {
     private OrderRestMapper() {
     }
 
-    /** Carries only the identifier of the order to create; the service builds the order from the cart. */
+    /**
+     * Carries only the identifier of the order to create (none when the request or its identifier is absent, so the
+     * service generates it); the service builds the order from the cart.
+     */
     public static Order newOrder(ConfirmOrderRequest request) {
-        return DomainReferences.order(request.orderId());
+        return DomainReferences.order(request != null ? request.orderId() : null);
     }
 
     public static OrderStatus orderStatus(String code) {
@@ -28,7 +31,8 @@ public final class OrderRestMapper {
         return new OrderResponse(order.getIdentifier(),
                 order.getBuyer() != null ? order.getBuyer().getIdentifier() : null,
                 RestCodes.code(order.getStatus()), order.getCreatedAt(),
-                order.getLines().stream().map(OrderRestMapper::toResponse).toList());
+                order.getLines().stream().map(OrderRestMapper::toResponse).toList(),
+                order.getTotal().map(CatalogRestMapper::toResponse).orElse(null));
     }
 
     public static List<OrderResponse> toResponses(List<Order> orders) {

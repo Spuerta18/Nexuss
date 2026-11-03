@@ -1,10 +1,7 @@
 package nexussMarket.domain.services;
 
-import java.math.BigDecimal;
-
 import nexussMarket.domain.exceptions.EmptyOrderException;
 import nexussMarket.domain.models.Order;
-import nexussMarket.domain.models.OrderLine;
 import nexussMarket.domain.valueobjects.Money;
 
 /**
@@ -16,21 +13,10 @@ final class OrderTotals {
     private OrderTotals() {
     }
 
-    /**
-     * Sum of {@code quantity × unitPrice} over the order lines, using the prices frozen at confirmation. Every line
-     * must be in the same currency; {@link Money#add} rejects a mix.
-     */
+    /** The order total ({@link Order#getTotal()}); an order without lines cannot be totalled. */
     static Money totalOf(Order order) {
-        return order.getLines().stream()
-                .map(OrderTotals::lineTotal)
-                .reduce(Money::add)
+        return order.getTotal()
                 .orElseThrow(() -> new EmptyOrderException(
                         "Order " + order.getIdentifier() + " has no lines to total"));
-    }
-
-    private static Money lineTotal(OrderLine line) {
-        Money unitPrice = line.getUnitPrice();
-        return Money.of(unitPrice.getAmount().multiply(BigDecimal.valueOf(line.getQuantity())),
-                unitPrice.getCurrency());
     }
 }

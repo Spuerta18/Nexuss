@@ -10,7 +10,7 @@ public interface CartRepositoryPort {
 
     /**
      * Stores a new cart. Fails with {@link DuplicateResourceException} if a cart with the same
-     * identifier already exists; the stored one is never replaced.
+     * identifier, or one of the same buyer, already exists; the stored one is never replaced.
      */
     ShoppingCart insert(ShoppingCart cart);
 

@@ -12,10 +12,13 @@ import nexussMarket.domain.models.ReturnRequest;
 import nexussMarket.domain.models.ShoppingCart;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.in.BuyerPort;
+import nexussMarket.domain.services.AddActiveCartLineService;
 import nexussMarket.domain.services.AddCartLineService;
 import nexussMarket.domain.services.CancelOrderService;
 import nexussMarket.domain.services.ChangeUserPasswordService;
+import nexussMarket.domain.services.ConfirmActiveCartService;
 import nexussMarket.domain.services.ConfirmOrderService;
+import nexussMarket.domain.services.ConsultActiveCartService;
 import nexussMarket.domain.services.ConsultCartService;
 import nexussMarket.domain.services.ConsultOrderService;
 import nexussMarket.domain.services.ConsultProductService;
@@ -23,8 +26,10 @@ import nexussMarket.domain.services.CreateShoppingCartService;
 import nexussMarket.domain.services.ListBuyerOrdersService;
 import nexussMarket.domain.services.ListPublishedProductsService;
 import nexussMarket.domain.services.LogoutService;
+import nexussMarket.domain.services.RemoveActiveCartLineService;
 import nexussMarket.domain.services.RemoveCartLineService;
 import nexussMarket.domain.services.RequestReturnService;
+import nexussMarket.domain.services.UpdateActiveCartLineQuantityService;
 import nexussMarket.domain.services.UpdateCartLineQuantityService;
 
 /** Implements {@link BuyerPort} by delegating each operation to its domain service. */
@@ -38,6 +43,11 @@ public class BuyerUseCaseImpl implements BuyerPort {
     private final RemoveCartLineService removeCartLineService;
     private final ConsultCartService consultCartService;
     private final ConfirmOrderService confirmOrderService;
+    private final ConsultActiveCartService consultActiveCartService;
+    private final AddActiveCartLineService addActiveCartLineService;
+    private final UpdateActiveCartLineQuantityService updateActiveCartLineQuantityService;
+    private final RemoveActiveCartLineService removeActiveCartLineService;
+    private final ConfirmActiveCartService confirmActiveCartService;
     private final CancelOrderService cancelOrderService;
     private final ConsultOrderService consultOrderService;
     private final ListBuyerOrdersService listBuyerOrdersService;
@@ -75,6 +85,31 @@ public class BuyerUseCaseImpl implements BuyerPort {
     @Override
     public Order confirmOrder(User user, ShoppingCart cart, Order newOrder) {
         return confirmOrderService.execute(user, cart, newOrder);
+    }
+
+    @Override
+    public ShoppingCart consultActiveCart(User user) {
+        return consultActiveCartService.execute(user);
+    }
+
+    @Override
+    public ShoppingCart addActiveCartLine(User user, Product product, int quantity) {
+        return addActiveCartLineService.execute(user, product, quantity);
+    }
+
+    @Override
+    public ShoppingCart updateActiveCartLineQuantity(User user, Product product, int quantity) {
+        return updateActiveCartLineQuantityService.execute(user, product, quantity);
+    }
+
+    @Override
+    public ShoppingCart removeActiveCartLine(User user, Product product) {
+        return removeActiveCartLineService.execute(user, product);
+    }
+
+    @Override
+    public Order confirmActiveCart(User user, Order newOrder) {
+        return confirmActiveCartService.execute(user, newOrder);
     }
 
     @Override

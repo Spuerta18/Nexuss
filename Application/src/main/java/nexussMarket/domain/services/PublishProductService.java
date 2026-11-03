@@ -35,11 +35,12 @@ public class PublishProductService {
         if (seller.getSellerStatus() != SellerStatus.ACTIVE) {
             throw new SellerNotAuthorizedException("Seller " + seller.getIdentifier() + " is not allowed to publish products");
         }
+        String productId = GeneratedIdentifiers.requestedOrGenerated(product.getIdentifier(),
+                GeneratedIdentifiers.PRODUCT, identifier -> productRepositoryPort.findById(identifier).isPresent());
         if (product.getPrice() == null || !product.getPrice().isPositive()) {
-            throw new InvalidProductPriceException(
-                    "Product " + product.getIdentifier() + " must have a price greater than zero");
+            throw new InvalidProductPriceException("Product " + productId + " must have a price greater than zero");
         }
-        Product newProduct = new Product(product.getIdentifier(), product.getName(), product.getProductType(),
+        Product newProduct = new Product(productId, product.getName(), product.getProductType(),
                 ProductStatus.PUBLISHED, seller, product.getPrice(), product.getVariants());
         Product saved = productRepositoryPort.insert(newProduct);
         registerOperationAndAuditService.execute(

@@ -2,8 +2,10 @@ package nexussMarket.domain.models;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import nexussMarket.domain.exceptions.InvalidOrderStatusTransitionException;
+import nexussMarket.domain.valueobjects.Money;
 import nexussMarket.domain.valueobjects.OrderStatus;
 
 /**
@@ -69,6 +71,15 @@ public class Order {
     /** Date and time the order was created. */
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    /**
+     * Sum of the line subtotals, using the prices frozen at confirmation; empty
+     * when the order has no lines. Every line must be in the same currency;
+     * {@link Money#add} rejects a mix.
+     */
+    public Optional<Money> getTotal() {
+        return lines.stream().map(OrderLine::getSubtotal).reduce(Money::add);
     }
 
     /**

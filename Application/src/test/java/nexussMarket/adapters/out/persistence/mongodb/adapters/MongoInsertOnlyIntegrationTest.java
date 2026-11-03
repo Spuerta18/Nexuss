@@ -1,10 +1,13 @@
 package nexussMarket.adapters.out.persistence.mongodb.adapters;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,6 +22,7 @@ import org.springframework.data.mongodb.repository.support.MongoRepositoryFactor
 import com.mongodb.MongoException;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
+import com.mongodb.client.model.IndexOptions;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.RefundDocument;
 import nexussMarket.adapters.out.persistence.mongodb.documents.ReturnRequestDocument;
@@ -58,7 +62,8 @@ import nexussMarket.domain.valueobjects.WarehouseOwnerType;
  * rejected with {@link DuplicateResourceException} and the stored document is
  * left exactly as it was. Uses a throwaway database on {@code 127.0.0.1:27017}
  * that is dropped afterwards; skipped when no MongoDB server is reachable, so
- * the suite still runs without one.
+ * the suite still runs without one. Also checks that
+ * {@link ActiveCartIndexInitializer} replaces a legacy non-unique cart index.
  */
 class MongoInsertOnlyIntegrationTest {
 
@@ -92,6 +97,10 @@ class MongoInsertOnlyIntegrationTest {
         for (Class<?> type : List.of(ShipmentDocument.class, ReturnRequestDocument.class, RefundDocument.class)) {
             indexResolver.resolveIndexFor(type).forEach(template.indexOps(type)::createIndex);
         }
+        // A database created before the one-cart rule: non-unique buyerId index, replaced at startup.
+        template.getCollection("shopping_carts").createIndex(new Document("buyerId", 1),
+                new IndexOptions().name(ActiveCartIndexInitializer.INDEX_NAME));
+        new ActiveCartIndexInitializer(template).afterPropertiesSet();
         repositories = new MongoRepositoryFactory(template);
     }
 
@@ -112,6 +121,22 @@ class MongoInsertOnlyIntegrationTest {
         assertThrows(DuplicateResourceException.class, () -> carts.insert(new ShoppingCart("C-1", secondBuyer)));
 
         assertEquals("B-1", stored("shopping_carts", "C-1").getString("buyerId"));
+    }
+
+    @Test
+    void aBuyerHasAtMostOneStoredCart() {
+        MongoCartRepositoryAdapter carts = new MongoCartRepositoryAdapter(
+                repositories.getRepository(ShoppingCartMongoRepository.class), resolver());
+        Buyer buyer = new Buyer("B-7", "Cy Buyer", "cy@example.com", UserStatus.ACTIVE, CustomerStatus.ENABLED);
+        carts.insert(new ShoppingCart("C-7", buyer));
+
+        assertThrows(DuplicateResourceException.class, () -> carts.insert(new ShoppingCart("C-8", buyer)));
+
+        assertNull(stored("shopping_carts", "C-8"));
+        Document buyerIndex = template.getCollection("shopping_carts").listIndexes().into(new ArrayList<>()).stream()
+                .filter(index -> ActiveCartIndexInitializer.INDEX_NAME.equals(index.getString("name")))
+                .findFirst().orElseThrow();
+        assertTrue(buyerIndex.getBoolean("unique", false));
     }
 
     @Test

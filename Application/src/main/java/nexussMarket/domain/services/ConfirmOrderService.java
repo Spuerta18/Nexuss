@@ -39,7 +39,8 @@ import nexussMarket.domain.valueobjects.UserStatus;
  * before reserving, and if the insert still loses a race every reservation is
  * released; the stored order is left untouched either way. The cart is
  * deleted once the order is stored. Only the buyer who owns the cart, or an
- * administrator, may confirm it.
+ * administrator, may confirm it. Without an identifier the server generates
+ * one ({@code ORD-xxxxxxxx}).
  */
 @Service
 public class ConfirmOrderService {
@@ -84,11 +85,13 @@ public class ConfirmOrderService {
 
         // Fast path: a taken identifier is rejected before any stock is reserved. The
         // insert below is still the guarantee when two confirmations race.
-        if (orderRepositoryPort.findById(newOrder.getIdentifier()).isPresent()) {
-            throw new DuplicateResourceException("An order with id " + newOrder.getIdentifier() + " already exists");
+        String orderId = GeneratedIdentifiers.requestedOrGenerated(newOrder.getIdentifier(), GeneratedIdentifiers.ORDER,
+                identifier -> orderRepositoryPort.findById(identifier).isPresent());
+        if (orderRepositoryPort.findById(orderId).isPresent()) {
+            throw new DuplicateResourceException("An order with id " + orderId + " already exists");
         }
         List<OrderLine> reservedLines = reserveLines(cart);
-        Order order = new Order(newOrder.getIdentifier(), cart.getBuyer(), OrderStatus.PENDING_PAYMENT, reservedLines);
+        Order order = new Order(orderId, cart.getBuyer(), OrderStatus.PENDING_PAYMENT, reservedLines);
         Order saved;
         try {
             saved = orderRepositoryPort.insert(order);

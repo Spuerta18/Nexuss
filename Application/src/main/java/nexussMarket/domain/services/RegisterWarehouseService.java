@@ -21,7 +21,7 @@ import nexussMarket.domain.valueobjects.WarehouseOwnerType;
  * Registers a warehouse, according to the actor's role: an {@link Administrator}
  * registers Marketplace-owned warehouses, and a {@link Seller} registers
  * Seller-owned warehouses with themselves as owner. Any other combination is
- * rejected.
+ * rejected. Without an identifier the server generates one ({@code WH-xxxxxxxx}).
  */
 @Service
 public class RegisterWarehouseService {
@@ -63,8 +63,10 @@ public class RegisterWarehouseService {
     }
 
     /** The warehouse to store: always active, with {@code owner} as its owner. */
-    private static Warehouse newWarehouse(Warehouse warehouse, Seller owner) {
-        return new Warehouse(warehouse.getIdentifier(), warehouse.getName(), warehouse.getAddress(),
+    private Warehouse newWarehouse(Warehouse warehouse, Seller owner) {
+        String warehouseId = GeneratedIdentifiers.requestedOrGenerated(warehouse.getIdentifier(),
+                GeneratedIdentifiers.WAREHOUSE, identifier -> warehouseRepositoryPort.findById(identifier).isPresent());
+        return new Warehouse(warehouseId, warehouse.getName(), warehouse.getAddress(),
                 warehouse.getOwnerType(), owner, true);
     }
 
