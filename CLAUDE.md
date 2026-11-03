@@ -208,16 +208,20 @@ blocks are green. Plan:
   `RemoveActiveCartLineService`, `ConfirmActiveCartService`) that delegate to the existing ones. `Order.getTotal()` /
   `OrderLine.getSubtotal()`; `OrderResponse.total`. Tests: `ActiveCartAndGeneratedIdentifierTest`,
   `ActiveCartRestControllerTest`, one more case in `MongoInsertOnlyIntegrationTest`.
-- **Block 3 — payment and invoice, pending.** `POST /api/admin/orders/{orderId}/payment` (`ADMINISTRATOR`, reuses
-  `AdvanceOrderStatus` to `PAID`); `GET /api/buyer/orders/{orderId}/invoice` (owner only), `GET /api/admin/...` and
-  `GET /api/supervisor/orders/{orderId}/invoice`; `GET /api/buyer/orders/{orderId}/shipment` (owner only). No new
-  permissions outside the existing authorization services.
+- **Block 3 — payment and invoice, done (`f3b3dec`).** `RegisterOrderPaymentService` (`ADMINISTRATOR`, delegates to
+  `AdvanceOrderStatusService` with `PAID`: invoice + `ORDER_STATUS_ADVANCE` audit) on
+  `AdministratorPort.registerOrderPayment` → `POST /api/admin/orders/{orderId}/payment`. `ConsultOrderInvoiceService`
+  (`BUYER` / `ADMINISTRATOR` / `SUPERVISOR` + `AuthorizeOrderAccessService`; 404 "has no invoice yet") on the three
+  ports → `GET /api/{buyer|admin|supervisor}/orders/{orderId}/invoice` (`InvoiceResponse`, `InvoiceRestMapper`).
+  `ConsultOrderShipmentService` (`BUYER` + ownership) → `GET /api/buyer/orders/{orderId}/shipment`. Tests:
+  `PaymentInvoiceShipmentServicesTest`, `PaymentInvoiceRestControllerTest`.
 - **Then:** tests for every new service and endpoint (happy path, forbidden role, foreign ownership); a curl run on
   `nexusmarket_demo` with automatic ids (login, add product, confirm, pay, ship to delivery, invoice) plus a duplicate
   id showing the 409 and the unchanged data; update `Api-rest-endpoints.md`, `Input-ports.md`, `Persistence.md`, the
   affected C4 views, the service files, `README.md` and this file; merge to `main`.
-- **Last verification:** 2026-11-03, after the Block 2 commit: `mvn -o clean test`, 253 tests green, including
-  the 6 integration tests run against the real MongoDB (not skipped). Docs (SDD, C4, README) not updated yet.
+- **Last verification:** 2026-11-03, after the Block 3 commit: `mvn -o clean test`, 269 tests green, including
+  the 6 integration tests run against the real MongoDB (not skipped). **Next:** curl run on `nexusmarket_demo`, then
+  docs (SDD, C4, README), then merge. Not merged, not pushed.
 - **Caution:** the VS Code Java extension compiles into the same `target/`; if a test fails with
   "Unresolved compilation problems" (Eclipse compiler output), rerun with `clean`. It can also lock `target/` briefly.
 
