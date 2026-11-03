@@ -19,6 +19,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import nexussMarket.adapters.in.rest.mappers.AuditRestMapper;
 import nexussMarket.adapters.in.rest.mappers.DomainReferences;
+import nexussMarket.adapters.in.rest.mappers.InvoiceRestMapper;
+import nexussMarket.adapters.in.rest.mappers.OrderRestMapper;
 import nexussMarket.adapters.in.rest.mappers.ReturnRestMapper;
 import nexussMarket.adapters.in.rest.mappers.UserRestMapper;
 import nexussMarket.adapters.in.rest.mappers.WarehouseRestMapper;
@@ -28,7 +30,9 @@ import nexussMarket.adapters.in.rest.requests.RegisterWarehouseRequest;
 import nexussMarket.adapters.in.rest.requests.SellerStatusRequest;
 import nexussMarket.adapters.in.rest.requests.UserStatusRequest;
 import nexussMarket.adapters.in.rest.responses.AuditLogResponse;
+import nexussMarket.adapters.in.rest.responses.InvoiceResponse;
 import nexussMarket.adapters.in.rest.responses.OperationResponse;
+import nexussMarket.adapters.in.rest.responses.OrderResponse;
 import nexussMarket.adapters.in.rest.responses.RefundResponse;
 import nexussMarket.adapters.in.rest.responses.ReturnRequestResponse;
 import nexussMarket.adapters.in.rest.responses.UserResponse;
@@ -143,6 +147,22 @@ public class AdministratorRestController {
     @GetMapping("/audit-logs")
     public List<AuditLogResponse> consultAuditLogs(@AuthenticationPrincipal(expression = "user") User actor) {
         return AuditRestMapper.toAuditLogResponses(administratorPort.consultAuditLogs(actor));
+    }
+
+    /** Records the payment of the order ({@code PENDING_PAYMENT} to {@code PAID}) and issues its invoice. */
+    @PostMapping("/orders/{orderId}/payment")
+    public OrderResponse registerOrderPayment(@AuthenticationPrincipal(expression = "user") User actor,
+                                              @PathVariable String orderId) {
+        return OrderRestMapper.toResponse(
+                administratorPort.registerOrderPayment(actor, DomainReferences.order(orderId)));
+    }
+
+    /** The invoice of the order, issued when it was paid; 404 until then. */
+    @GetMapping("/orders/{orderId}/invoice")
+    public InvoiceResponse consultOrderInvoice(@AuthenticationPrincipal(expression = "user") User actor,
+                                              @PathVariable String orderId) {
+        return InvoiceRestMapper.toResponse(
+                administratorPort.consultOrderInvoice(actor, DomainReferences.order(orderId)));
     }
 
     /** Revokes every token of the caller, including the one used for this request. */

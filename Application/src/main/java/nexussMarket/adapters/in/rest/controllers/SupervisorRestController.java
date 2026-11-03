@@ -20,11 +20,13 @@ import nexussMarket.adapters.in.rest.mappers.AuditRestMapper;
 import nexussMarket.adapters.in.rest.mappers.CatalogRestMapper;
 import nexussMarket.adapters.in.rest.mappers.DomainReferences;
 import nexussMarket.adapters.in.rest.mappers.InventoryRestMapper;
+import nexussMarket.adapters.in.rest.mappers.InvoiceRestMapper;
 import nexussMarket.adapters.in.rest.mappers.OrderRestMapper;
 import nexussMarket.adapters.in.rest.mappers.UserRestMapper;
 import nexussMarket.adapters.in.rest.requests.ChangePasswordRequest;
 import nexussMarket.adapters.in.rest.responses.AuditLogResponse;
 import nexussMarket.adapters.in.rest.responses.InventoryItemResponse;
+import nexussMarket.adapters.in.rest.responses.InvoiceResponse;
 import nexussMarket.adapters.in.rest.responses.OperationResponse;
 import nexussMarket.adapters.in.rest.responses.OrderResponse;
 import nexussMarket.adapters.in.rest.responses.ProductResponse;
@@ -81,6 +83,13 @@ public class SupervisorRestController {
     @GetMapping("/audit-logs")
     public List<AuditLogResponse> consultAuditLogs(@AuthenticationPrincipal(expression = "user") User actor) {
         return AuditRestMapper.toAuditLogResponses(supervisorPort.consultAuditLogs(actor));
+    }
+
+    /** The invoice of the order, issued when it was paid; 404 until then. */
+    @GetMapping("/orders/{orderId}/invoice")
+    public InvoiceResponse consultOrderInvoice(@AuthenticationPrincipal(expression = "user") User actor,
+                                              @PathVariable String orderId) {
+        return InvoiceRestMapper.toResponse(supervisorPort.consultOrderInvoice(actor, DomainReferences.order(orderId)));
     }
 
     /** Revokes every token of the caller, including the one used for this request. */

@@ -20,8 +20,10 @@ import lombok.RequiredArgsConstructor;
 import nexussMarket.adapters.in.rest.mappers.CartRestMapper;
 import nexussMarket.adapters.in.rest.mappers.CatalogRestMapper;
 import nexussMarket.adapters.in.rest.mappers.DomainReferences;
+import nexussMarket.adapters.in.rest.mappers.InvoiceRestMapper;
 import nexussMarket.adapters.in.rest.mappers.OrderRestMapper;
 import nexussMarket.adapters.in.rest.mappers.ReturnRestMapper;
+import nexussMarket.adapters.in.rest.mappers.ShipmentRestMapper;
 import nexussMarket.adapters.in.rest.requests.AddCartLineRequest;
 import nexussMarket.adapters.in.rest.requests.ChangePasswordRequest;
 import nexussMarket.adapters.in.rest.requests.ConfirmOrderRequest;
@@ -29,9 +31,11 @@ import nexussMarket.adapters.in.rest.requests.CreateCartRequest;
 import nexussMarket.adapters.in.rest.requests.QuantityRequest;
 import nexussMarket.adapters.in.rest.requests.RequestReturnRequest;
 import nexussMarket.adapters.in.rest.responses.CartResponse;
+import nexussMarket.adapters.in.rest.responses.InvoiceResponse;
 import nexussMarket.adapters.in.rest.responses.OrderResponse;
 import nexussMarket.adapters.in.rest.responses.ProductResponse;
 import nexussMarket.adapters.in.rest.responses.ReturnRequestResponse;
+import nexussMarket.adapters.in.rest.responses.ShipmentResponse;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.in.BuyerPort;
 
@@ -163,6 +167,20 @@ public class BuyerRestController {
     public ProductResponse consultProduct(@AuthenticationPrincipal(expression = "user") User actor,
                                           @PathVariable String productId) {
         return CatalogRestMapper.toResponse(buyerPort.consultProduct(actor, DomainReferences.product(productId)));
+    }
+
+    /** The invoice of the order, issued when it was paid; 404 until then. Only for the buyer who placed the order. */
+    @GetMapping("/orders/{orderId}/invoice")
+    public InvoiceResponse consultOrderInvoice(@AuthenticationPrincipal(expression = "user") User actor,
+                                              @PathVariable String orderId) {
+        return InvoiceRestMapper.toResponse(buyerPort.consultOrderInvoice(actor, DomainReferences.order(orderId)));
+    }
+
+    /** The shipment of the order; 404 until it is created. Only for the buyer who placed the order. */
+    @GetMapping("/orders/{orderId}/shipment")
+    public ShipmentResponse consultOrderShipment(@AuthenticationPrincipal(expression = "user") User actor,
+                                                 @PathVariable String orderId) {
+        return ShipmentRestMapper.toResponse(buyerPort.consultOrderShipment(actor, DomainReferences.order(orderId)));
     }
 
     /** Revokes every token of the caller, including the one used for this request. */

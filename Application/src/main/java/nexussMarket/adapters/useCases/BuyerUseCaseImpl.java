@@ -6,9 +6,11 @@ import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
 import nexussMarket.domain.models.Buyer;
+import nexussMarket.domain.models.Invoice;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.ReturnRequest;
+import nexussMarket.domain.models.Shipment;
 import nexussMarket.domain.models.ShoppingCart;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.in.BuyerPort;
@@ -20,7 +22,9 @@ import nexussMarket.domain.services.ConfirmActiveCartService;
 import nexussMarket.domain.services.ConfirmOrderService;
 import nexussMarket.domain.services.ConsultActiveCartService;
 import nexussMarket.domain.services.ConsultCartService;
+import nexussMarket.domain.services.ConsultOrderInvoiceService;
 import nexussMarket.domain.services.ConsultOrderService;
+import nexussMarket.domain.services.ConsultOrderShipmentService;
 import nexussMarket.domain.services.ConsultProductService;
 import nexussMarket.domain.services.CreateShoppingCartService;
 import nexussMarket.domain.services.ListBuyerOrdersService;
@@ -54,6 +58,8 @@ public class BuyerUseCaseImpl implements BuyerPort {
     private final ListPublishedProductsService listPublishedProductsService;
     private final ConsultProductService consultProductService;
     private final RequestReturnService requestReturnService;
+    private final ConsultOrderInvoiceService consultOrderInvoiceService;
+    private final ConsultOrderShipmentService consultOrderShipmentService;
     private final LogoutService logoutService;
     private final ChangeUserPasswordService changeUserPasswordService;
 
@@ -140,6 +146,16 @@ public class BuyerUseCaseImpl implements BuyerPort {
     @Override
     public ReturnRequest requestReturn(User user, ReturnRequest returnRequest) {
         return requestReturnService.execute(user, returnRequest);
+    }
+
+    @Override
+    public Invoice consultOrderInvoice(User user, Order order) {
+        return consultOrderInvoiceService.execute(user, order);
+    }
+
+    @Override
+    public Shipment consultOrderShipment(User user, Order order) {
+        return consultOrderShipmentService.execute(user, order);
     }
 
     @Override

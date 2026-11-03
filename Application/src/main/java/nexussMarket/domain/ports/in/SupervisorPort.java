@@ -4,6 +4,7 @@ import java.util.List;
 
 import nexussMarket.domain.models.AuditLog;
 import nexussMarket.domain.models.InventoryItem;
+import nexussMarket.domain.models.Invoice;
 import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
@@ -36,6 +37,9 @@ public interface SupervisorPort {
 
     /** The audit trail, most recent first. */
     List<AuditLog> consultAuditLogs(User user);
+
+    /** The invoice of an order, issued when it was paid. */
+    Invoice consultOrderInvoice(User user, Order order);
 
     /** Logs {@code user} out, revoking every access token issued to them. */
     void logout(User user);

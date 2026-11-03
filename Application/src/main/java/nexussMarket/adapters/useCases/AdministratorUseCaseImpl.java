@@ -6,8 +6,10 @@ import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
 import nexussMarket.domain.models.AuditLog;
+import nexussMarket.domain.models.Invoice;
 import nexussMarket.domain.models.LogisticsOperator;
 import nexussMarket.domain.models.Operation;
+import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Refund;
 import nexussMarket.domain.models.ReturnRequest;
 import nexussMarket.domain.models.Seller;
@@ -19,11 +21,13 @@ import nexussMarket.domain.services.ApproveReturnService;
 import nexussMarket.domain.services.ChangeUserPasswordService;
 import nexussMarket.domain.services.ConsultAuditLogsService;
 import nexussMarket.domain.services.ConsultOperationsService;
+import nexussMarket.domain.services.ConsultOrderInvoiceService;
 import nexussMarket.domain.services.ConsultUserService;
 import nexussMarket.domain.services.DeactivateWarehouseService;
 import nexussMarket.domain.services.LogoutService;
 import nexussMarket.domain.services.ProcessRefundService;
 import nexussMarket.domain.services.RegisterLogisticsOperatorService;
+import nexussMarket.domain.services.RegisterOrderPaymentService;
 import nexussMarket.domain.services.RegisterSellerService;
 import nexussMarket.domain.services.RegisterSupervisorService;
 import nexussMarket.domain.services.RegisterWarehouseService;
@@ -51,6 +55,8 @@ public class AdministratorUseCaseImpl implements AdministratorPort {
     private final ConsultUserService consultUserService;
     private final ConsultOperationsService consultOperationsService;
     private final ConsultAuditLogsService consultAuditLogsService;
+    private final RegisterOrderPaymentService registerOrderPaymentService;
+    private final ConsultOrderInvoiceService consultOrderInvoiceService;
     private final LogoutService logoutService;
     private final ChangeUserPasswordService changeUserPasswordService;
 
@@ -117,6 +123,16 @@ public class AdministratorUseCaseImpl implements AdministratorPort {
     @Override
     public List<AuditLog> consultAuditLogs(User user) {
         return consultAuditLogsService.execute(user);
+    }
+
+    @Override
+    public Order registerOrderPayment(User user, Order order) {
+        return registerOrderPaymentService.execute(user, order);
+    }
+
+    @Override
+    public Invoice consultOrderInvoice(User user, Order order) {
+        return consultOrderInvoiceService.execute(user, order);
     }
 
     @Override

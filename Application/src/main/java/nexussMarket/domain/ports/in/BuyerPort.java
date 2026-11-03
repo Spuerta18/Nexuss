@@ -3,9 +3,11 @@ package nexussMarket.domain.ports.in;
 import java.util.List;
 
 import nexussMarket.domain.models.Buyer;
+import nexussMarket.domain.models.Invoice;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.ReturnRequest;
+import nexussMarket.domain.models.Shipment;
 import nexussMarket.domain.models.ShoppingCart;
 import nexussMarket.domain.models.User;
 
@@ -38,7 +40,7 @@ public interface BuyerPort {
 
     ShoppingCart removeActiveCartLine(User user, Product product);
 
-    /** Confirms the buyer's active cart; {@code newOrder} carries the order identifier, or none to have it generated. */
+    /** Confirms the buyer's active cart; {@code newOrder} carries the order identifier, or none to generate it. */
     Order confirmActiveCart(User user, Order newOrder);
 
     Order cancelOrder(User user, Order order);
@@ -52,6 +54,12 @@ public interface BuyerPort {
     Product consultProduct(User user, Product product);
 
     ReturnRequest requestReturn(User user, ReturnRequest returnRequest);
+
+    /** The invoice of an order, issued when it was paid. */
+    Invoice consultOrderInvoice(User user, Order order);
+
+    /** The shipment of one of the buyer's orders. */
+    Shipment consultOrderShipment(User user, Order order);
 
     /** Logs {@code user} out, revoking every access token issued to them. */
     void logout(User user);

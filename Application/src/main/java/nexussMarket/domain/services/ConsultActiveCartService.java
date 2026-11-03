@@ -30,6 +30,7 @@ public class ConsultActiveCartService {
     public ShoppingCart execute(User actor) {
         validateRoleAuthorizationService.execute(actor, SystemRole.BUYER);
         return cartRepositoryPort.findByBuyerId(actor.getIdentifier()).stream().findFirst()
-                .orElseThrow(() -> new EntityNotFoundException("Buyer " + actor.getIdentifier() + " has no active cart"));
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Buyer " + actor.getIdentifier() + " has no active cart"));
     }
 }

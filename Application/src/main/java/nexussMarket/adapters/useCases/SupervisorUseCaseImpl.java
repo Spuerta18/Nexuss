@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 import nexussMarket.domain.models.AuditLog;
 import nexussMarket.domain.models.InventoryItem;
+import nexussMarket.domain.models.Invoice;
 import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
@@ -16,6 +17,7 @@ import nexussMarket.domain.services.ChangeUserPasswordService;
 import nexussMarket.domain.services.ConsultAuditLogsService;
 import nexussMarket.domain.services.ConsultInventoryService;
 import nexussMarket.domain.services.ConsultOperationsService;
+import nexussMarket.domain.services.ConsultOrderInvoiceService;
 import nexussMarket.domain.services.ConsultOrderService;
 import nexussMarket.domain.services.ConsultProductService;
 import nexussMarket.domain.services.ConsultUserService;
@@ -34,6 +36,7 @@ public class SupervisorUseCaseImpl implements SupervisorPort {
     private final ConsultOperationsService consultOperationsService;
     private final ConsultAuditLogsService consultAuditLogsService;
     private final ListPublishedProductsService listPublishedProductsService;
+    private final ConsultOrderInvoiceService consultOrderInvoiceService;
     private final LogoutService logoutService;
     private final ChangeUserPasswordService changeUserPasswordService;
 
@@ -70,6 +73,11 @@ public class SupervisorUseCaseImpl implements SupervisorPort {
     @Override
     public List<AuditLog> consultAuditLogs(User user) {
         return consultAuditLogsService.execute(user);
+    }
+
+    @Override
+    public Invoice consultOrderInvoice(User user, Order order) {
+        return consultOrderInvoiceService.execute(user, order);
     }
 
     @Override
