@@ -197,12 +197,17 @@ blocks are green. Plan:
   `DuplicateKeyException` into `DuplicateResourceException` (409). `ConfirmOrderService` rejects a taken order id
   before reserving stock and releases every reservation if the insert loses a race. Tests: `IdentifierCollisionTest`,
   `MongoInsertOnlyIntegrationTest` (real local MongoDB, throwaway database, skipped without a server).
-- **Block 2 — automatic ids and active cart, pending.** Optional identifier for carts, orders, warehouses and
-  products (server generates e.g. `ORD-ab12cd34` and returns it). At most one active cart per buyer. New `BUYER` routes:
-  `GET /api/buyer/cart` (404 if none), `POST /api/buyer/cart/items` (creates the active cart if missing, adds the line),
-  `PUT` / `DELETE /api/buyer/cart/items/{productId}`, `POST /api/buyer/orders` (confirms the active cart; returns the
-  order with its generated id and total). The order response includes the total (sum of quantity × unit price, with
-  currency). Existing rules unchanged.
+- **Block 2 — automatic ids and active cart, done (`86b1b7d`).** Optional identifier (blank → 400) for carts, orders,
+  products and warehouses; `GeneratedIdentifiers` (package-private) generates `CART-` / `ORD-` / `PRD-` / `WH-` + 8 hex
+  digits, skipping ids in use. At most one cart per buyer: `CreateShoppingCartService` answers 409 for a second one, and
+  `shopping_carts.buyerId` is unique through `ActiveCartIndexInitializer` (not `@Indexed`: it drops the legacy
+  non-unique `buyerId` index first; logs an error instead of failing if data already has several carts per buyer, as
+  `nexusmarket_stress` does). Routes `GET /api/buyer/cart`, `POST /api/buyer/cart/items`,
+  `PUT|DELETE /api/buyer/cart/items/{productId}`, `POST /api/buyer/orders` (body optional) on 5 new `BuyerPort`
+  methods and services (`ConsultActiveCartService`, `AddActiveCartLineService`, `UpdateActiveCartLineQuantityService`,
+  `RemoveActiveCartLineService`, `ConfirmActiveCartService`) that delegate to the existing ones. `Order.getTotal()` /
+  `OrderLine.getSubtotal()`; `OrderResponse.total`. Tests: `ActiveCartAndGeneratedIdentifierTest`,
+  `ActiveCartRestControllerTest`, one more case in `MongoInsertOnlyIntegrationTest`.
 - **Block 3 — payment and invoice, pending.** `POST /api/admin/orders/{orderId}/payment` (`ADMINISTRATOR`, reuses
   `AdvanceOrderStatus` to `PAID`); `GET /api/buyer/orders/{orderId}/invoice` (owner only), `GET /api/admin/...` and
   `GET /api/supervisor/orders/{orderId}/invoice`; `GET /api/buyer/orders/{orderId}/shipment` (owner only). No new
@@ -211,8 +216,8 @@ blocks are green. Plan:
   `nexusmarket_demo` with automatic ids (login, add product, confirm, pay, ship to delivery, invoice) plus a duplicate
   id showing the 409 and the unchanged data; update `Api-rest-endpoints.md`, `Input-ports.md`, `Persistence.md`, the
   affected C4 views, the service files, `README.md` and this file; merge to `main`.
-- **Last verification:** 2026-11-03, after the Block 1 commit: `mvn -o clean test`, 229 tests green, including
-  the integration test run against the real MongoDB.
+- **Last verification:** 2026-11-03, after the Block 2 commit: `mvn -o clean test`, 253 tests green, including
+  the 6 integration tests run against the real MongoDB (not skipped). Docs (SDD, C4, README) not updated yet.
 - **Caution:** the VS Code Java extension compiles into the same `target/`; if a test fails with
   "Unresolved compilation problems" (Eclipse compiler output), rerun with `clean`. It can also lock `target/` briefly.
 
