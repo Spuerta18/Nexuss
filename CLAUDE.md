@@ -187,6 +187,35 @@ Run as one execution in 3 blocks (each compiled, tested, recorded here and commi
     legacy entries (skipped on read); audit inserts are not transactional with the business write; the initial
     administrator seeder records no operation; `USER_LOGIN` is recorded after issuing the token (nothing is saved).
 
+## Status of the `feature/cart-order-flow` Branch (sales flow)
+
+Additive changes (existing routes keep working), one local commit per block, merge to `main` only when all three
+blocks are green. Plan:
+
+- **Block 1 — insert-only creation, done (`183d939`).** `insert(...)` on the 7 output ports (cart, order, product,
+  warehouse, return request, shipment, refund); the Mongo adapters run a real `insert` and `MongoInsertion` turns
+  `DuplicateKeyException` into `DuplicateResourceException` (409). `ConfirmOrderService` rejects a taken order id
+  before reserving stock and releases every reservation if the insert loses a race. Tests: `IdentifierCollisionTest`,
+  `MongoInsertOnlyIntegrationTest` (real local MongoDB, throwaway database, skipped without a server).
+- **Block 2 — automatic ids and active cart, pending.** Optional identifier for carts, orders, warehouses and
+  products (server generates e.g. `ORD-ab12cd34` and returns it). At most one active cart per buyer. New `BUYER` routes:
+  `GET /api/buyer/cart` (404 if none), `POST /api/buyer/cart/items` (creates the active cart if missing, adds the line),
+  `PUT` / `DELETE /api/buyer/cart/items/{productId}`, `POST /api/buyer/orders` (confirms the active cart; returns the
+  order with its generated id and total). The order response includes the total (sum of quantity × unit price, with
+  currency). Existing rules unchanged.
+- **Block 3 — payment and invoice, pending.** `POST /api/admin/orders/{orderId}/payment` (`ADMINISTRATOR`, reuses
+  `AdvanceOrderStatus` to `PAID`); `GET /api/buyer/orders/{orderId}/invoice` (owner only), `GET /api/admin/...` and
+  `GET /api/supervisor/orders/{orderId}/invoice`; `GET /api/buyer/orders/{orderId}/shipment` (owner only). No new
+  permissions outside the existing authorization services.
+- **Then:** tests for every new service and endpoint (happy path, forbidden role, foreign ownership); a curl run on
+  `nexusmarket_demo` with automatic ids (login, add product, confirm, pay, ship to delivery, invoice) plus a duplicate
+  id showing the 409 and the unchanged data; update `Api-rest-endpoints.md`, `Input-ports.md`, `Persistence.md`, the
+  affected C4 views, the service files, `README.md` and this file; merge to `main`.
+- **Last verification:** 2026-11-03, after the Block 1 commit: `mvn -o clean test`, 229 tests green, including
+  the integration test run against the real MongoDB.
+- **Caution:** the VS Code Java extension compiles into the same `target/`; if a test fails with
+  "Unresolved compilation problems" (Eclipse compiler output), rerun with `clean`. It can also lock `target/` briefly.
+
 ## Documentation and Delivery
 
 - `README.md` (repo root): overview, requirements, environment variables, build/test/run (including the offline
