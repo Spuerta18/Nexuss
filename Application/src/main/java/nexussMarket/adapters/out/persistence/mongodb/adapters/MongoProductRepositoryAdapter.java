@@ -24,6 +24,14 @@ public class MongoProductRepositoryAdapter implements ProductRepositoryPort {
         this.referenceResolver = referenceResolver;
     }
 
+    /** A real {@code insert}: an existing document with the same key is never replaced. */
+    @Override
+    public Product insert(Product product) {
+        MongoInsertion.insert(() -> productRepository.insert(ProductMapper.toDocument(product)),
+                "A product with id " + product.getIdentifier() + " already exists");
+        return product;
+    }
+
     @Override
     public Product save(Product product) {
         productRepository.save(ProductMapper.toDocument(product));

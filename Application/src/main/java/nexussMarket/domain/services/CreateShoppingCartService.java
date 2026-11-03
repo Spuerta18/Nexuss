@@ -32,7 +32,7 @@ public class CreateShoppingCartService {
         if (!(user instanceof Buyer buyer)) {
             throw new EntityNotFoundException("No buyer found with id " + actor.getIdentifier());
         }
-        ShoppingCart saved = cartRepositoryPort.save(new ShoppingCart(cart.getIdentifier(), buyer));
+        ShoppingCart saved = cartRepositoryPort.insert(new ShoppingCart(cart.getIdentifier(), buyer));
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.CART_CREATION, actor, AffectedEntityType.SHOPPING_CART, saved.getIdentifier()),
                 AuditDetails.of("buyerId", buyer.getIdentifier()));

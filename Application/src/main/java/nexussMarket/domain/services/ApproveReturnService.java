@@ -57,7 +57,7 @@ public class ApproveReturnService {
         }
         ReturnRequest saved = returnRequestRepositoryPort.save(returnRequest);
         // One refund per return request, so its identifier derives from the request's.
-        Refund refund = refundRepositoryPort.save(new Refund("REF-" + returnRequest.getIdentifier(), returnRequest,
+        Refund refund = refundRepositoryPort.insert(new Refund("REF-" + returnRequest.getIdentifier(), returnRequest,
                 OrderTotals.totalOf(returnRequest.getOrder())));
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.RETURN_APPROVAL, actor, AffectedEntityType.RETURN_REQUEST, returnRequestId),

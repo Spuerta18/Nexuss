@@ -22,6 +22,14 @@ public class MongoWarehouseRepositoryAdapter implements WarehouseRepositoryPort 
         this.referenceResolver = referenceResolver;
     }
 
+    /** A real {@code insert}: an existing document with the same key is never replaced. */
+    @Override
+    public Warehouse insert(Warehouse warehouse) {
+        MongoInsertion.insert(() -> warehouseRepository.insert(WarehouseMapper.toDocument(warehouse)),
+                "A warehouse with id " + warehouse.getIdentifier() + " already exists");
+        return warehouse;
+    }
+
     @Override
     public Warehouse save(Warehouse warehouse) {
         warehouseRepository.save(WarehouseMapper.toDocument(warehouse));

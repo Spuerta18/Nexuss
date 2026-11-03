@@ -41,7 +41,7 @@ public class PublishProductService {
         }
         Product newProduct = new Product(product.getIdentifier(), product.getName(), product.getProductType(),
                 ProductStatus.PUBLISHED, seller, product.getPrice(), product.getVariants());
-        Product saved = productRepositoryPort.save(newProduct);
+        Product saved = productRepositoryPort.insert(newProduct);
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.PRODUCT_PUBLICATION, actor, AffectedEntityType.PRODUCT, newProduct.getIdentifier()),
                 AuditDetails.of("newStatus", newProduct.getStatus().getCode(),

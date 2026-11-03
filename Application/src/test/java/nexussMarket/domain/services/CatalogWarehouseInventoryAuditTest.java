@@ -48,7 +48,9 @@ class CatalogWarehouseInventoryAuditTest extends AuditedServiceTestSupport {
     @BeforeEach
     void repositoriesReturnWhatTheyStore() {
         when(productRepositoryPort.save(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
+        when(productRepositoryPort.insert(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
         when(warehouseRepositoryPort.save(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
+        when(warehouseRepositoryPort.insert(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
         when(inventoryRepositoryPort.save(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
         when(userRepositoryPort.findById("S-1")).thenReturn(Optional.of(seller));
         when(productRepositoryPort.findById("P-1")).thenReturn(Optional.of(product));

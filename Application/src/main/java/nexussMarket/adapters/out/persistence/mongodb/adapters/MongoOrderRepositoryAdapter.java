@@ -22,6 +22,14 @@ public class MongoOrderRepositoryAdapter implements OrderRepositoryPort {
         this.referenceResolver = referenceResolver;
     }
 
+    /** A real {@code insert}: an existing document with the same key is never replaced. */
+    @Override
+    public Order insert(Order order) {
+        MongoInsertion.insert(() -> orderRepository.insert(OrderMapper.toDocument(order)),
+                "An order with id " + order.getIdentifier() + " already exists");
+        return order;
+    }
+
     @Override
     public Order save(Order order) {
         orderRepository.save(OrderMapper.toDocument(order));

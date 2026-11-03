@@ -115,6 +115,7 @@ class BusinessRuleExceptionsTest extends AuditedServiceTestSupport {
         assertThrows(InvalidProductPriceException.class, () -> service.execute(seller,
                 new Product("P-3", "Unpriced", ProductType.PHYSICAL, null, null, null, List.of())));
         verify(productRepositoryPort, never()).save(any());
+        verify(productRepositoryPort, never()).insert(any());
         assertNothingAudited();
     }
 
@@ -128,6 +129,7 @@ class BusinessRuleExceptionsTest extends AuditedServiceTestSupport {
         assertThrows(ReturnNotEligibleException.class, () -> service.execute(buyer,
                 new ReturnRequest("R-1", new Order("O-1", null, null), null, "Broken")));
         verify(returnRequestRepositoryPort, never()).save(any());
+        verify(returnRequestRepositoryPort, never()).insert(any());
         assertNothingAudited();
     }
 
@@ -142,6 +144,7 @@ class BusinessRuleExceptionsTest extends AuditedServiceTestSupport {
         assertThrows(OrderNotShippableException.class,
                 () -> service.execute(admin, new Shipment("SH-1", new Order("O-1", null, null))));
         verify(shipmentRepositoryPort, never()).save(any());
+        verify(shipmentRepositoryPort, never()).insert(any());
         assertNothingAudited();
     }
 
@@ -220,6 +223,7 @@ class BusinessRuleExceptionsTest extends AuditedServiceTestSupport {
 
     private void assertNothingSaved() {
         verify(orderRepositoryPort, never()).save(any());
+        verify(orderRepositoryPort, never()).insert(any());
         verify(cartRepositoryPort, never()).deleteById(any());
         assertNothingAudited();
     }

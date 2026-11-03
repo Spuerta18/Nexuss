@@ -55,14 +55,10 @@ public class RequestReturnService {
             throw new ReturnNotEligibleException("Order " + order.getIdentifier() + " is "
                     + order.getStatus().getCode() + "; only DELIVERED orders can be returned");
         }
-        if (returnRequestRepositoryPort.findById(returnRequestId).isPresent()) {
-            throw new DuplicateResourceException(
-                    "A return request with id " + returnRequestId + " already exists");
-        }
         if (returnRequestRepositoryPort.findByOrderId(order.getIdentifier()).isPresent()) {
             throw new DuplicateResourceException("Order " + order.getIdentifier() + " already has a return request");
         }
-        ReturnRequest saved = returnRequestRepositoryPort.save(
+        ReturnRequest saved = returnRequestRepositoryPort.insert(
                 new ReturnRequest(returnRequestId, order, order.getBuyer(), returnRequest.getReason()));
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.RETURN_REQUEST, actor, AffectedEntityType.RETURN_REQUEST, returnRequestId),

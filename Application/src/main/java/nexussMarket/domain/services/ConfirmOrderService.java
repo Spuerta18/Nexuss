@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import nexussMarket.domain.exceptions.BuyerNotEnabledException;
+import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.exceptions.EmptyCartException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.exceptions.ProductNotPurchasableException;
@@ -33,8 +34,11 @@ import nexussMarket.domain.valueobjects.UserStatus;
 /**
  * Converts a shopping cart into an order, reserving stock for every line. If
  * any reservation fails, the reservations already made are released, so no
- * stock is left reserved for an order that was never created. The cart is
- * deleted once the order is saved. Only the buyer who owns the cart, or an
+ * stock is left reserved for an order that was never created. The order is
+ * inserted, never saved over an existing one: a taken identifier is rejected
+ * before reserving, and if the insert still loses a race every reservation is
+ * released; the stored order is left untouched either way. The cart is
+ * deleted once the order is stored. Only the buyer who owns the cart, or an
  * administrator, may confirm it.
  */
 @Service
@@ -78,9 +82,20 @@ public class ConfirmOrderService {
             requirePublished(cartLine.getProduct());
         }
 
-        Order order = new Order(newOrder.getIdentifier(), cart.getBuyer(), OrderStatus.PENDING_PAYMENT,
-                reserveLines(cart));
-        Order saved = orderRepositoryPort.save(order);
+        // Fast path: a taken identifier is rejected before any stock is reserved. The
+        // insert below is still the guarantee when two confirmations race.
+        if (orderRepositoryPort.findById(newOrder.getIdentifier()).isPresent()) {
+            throw new DuplicateResourceException("An order with id " + newOrder.getIdentifier() + " already exists");
+        }
+        List<OrderLine> reservedLines = reserveLines(cart);
+        Order order = new Order(newOrder.getIdentifier(), cart.getBuyer(), OrderStatus.PENDING_PAYMENT, reservedLines);
+        Order saved;
+        try {
+            saved = orderRepositoryPort.insert(order);
+        } catch (RuntimeException e) {
+            reservedLines.forEach(this::release);
+            throw e;
+        }
         cartRepositoryPort.deleteById(cart.getIdentifier());
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.ORDER_CONFIRMATION, actor, AffectedEntityType.ORDER, order.getIdentifier()),

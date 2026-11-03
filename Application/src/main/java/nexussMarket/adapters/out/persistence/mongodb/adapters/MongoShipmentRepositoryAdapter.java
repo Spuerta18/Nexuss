@@ -23,6 +23,15 @@ public class MongoShipmentRepositoryAdapter implements ShipmentRepositoryPort {
         this.referenceResolver = referenceResolver;
     }
 
+    /** A real {@code insert}: an existing document with the same key is never replaced. */
+    @Override
+    public Shipment insert(Shipment shipment) {
+        MongoInsertion.insert(() -> shipmentRepository.insert(ShipmentMapper.toDocument(shipment)),
+                "A shipment with id " + shipment.getIdentifier()
+                + ", or one for order " + shipment.getOrder().getIdentifier() + ", already exists");
+        return shipment;
+    }
+
     @Override
     public Shipment save(Shipment shipment) {
         shipmentRepository.save(ShipmentMapper.toDocument(shipment));

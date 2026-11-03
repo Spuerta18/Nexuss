@@ -54,7 +54,7 @@ public class RegisterWarehouseService {
     }
 
     private Warehouse saveAndRecord(User actor, Warehouse warehouse) {
-        Warehouse saved = warehouseRepositoryPort.save(warehouse);
+        Warehouse saved = warehouseRepositoryPort.insert(warehouse);
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.WAREHOUSE_REGISTRATION, actor, AffectedEntityType.WAREHOUSE, warehouse.getIdentifier()),
                 AuditDetails.of("ownerType", warehouse.getOwnerType().getCode(),

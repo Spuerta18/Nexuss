@@ -23,6 +23,15 @@ public class MongoReturnRequestRepositoryAdapter implements ReturnRequestReposit
         this.referenceResolver = referenceResolver;
     }
 
+    /** A real {@code insert}: an existing document with the same key is never replaced. */
+    @Override
+    public ReturnRequest insert(ReturnRequest returnRequest) {
+        MongoInsertion.insert(() -> returnRequestRepository.insert(ReturnRequestMapper.toDocument(returnRequest)),
+                "A return request with id " + returnRequest.getIdentifier()
+                + ", or one for order " + returnRequest.getOrder().getIdentifier() + ", already exists");
+        return returnRequest;
+    }
+
     @Override
     public ReturnRequest save(ReturnRequest returnRequest) {
         returnRequestRepository.save(ReturnRequestMapper.toDocument(returnRequest));

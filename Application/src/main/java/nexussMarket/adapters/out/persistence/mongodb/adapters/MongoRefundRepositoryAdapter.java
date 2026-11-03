@@ -23,6 +23,15 @@ public class MongoRefundRepositoryAdapter implements RefundRepositoryPort {
         this.referenceResolver = referenceResolver;
     }
 
+    /** A real {@code insert}: an existing document with the same key is never replaced. */
+    @Override
+    public Refund insert(Refund refund) {
+        MongoInsertion.insert(() -> refundRepository.insert(RefundMapper.toDocument(refund)),
+                "A refund with id " + refund.getIdentifier()
+                + ", or one for return request " + refund.getReturnRequest().getIdentifier() + ", already exists");
+        return refund;
+    }
+
     @Override
     public Refund save(Refund refund) {
         refundRepository.save(RefundMapper.toDocument(refund));

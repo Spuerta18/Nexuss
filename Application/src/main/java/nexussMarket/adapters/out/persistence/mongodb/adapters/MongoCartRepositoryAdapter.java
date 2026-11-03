@@ -27,6 +27,14 @@ public class MongoCartRepositoryAdapter implements CartRepositoryPort {
         this.referenceResolver = referenceResolver;
     }
 
+    /** A real {@code insert}: an existing document with the same key is never replaced. */
+    @Override
+    public ShoppingCart insert(ShoppingCart cart) {
+        MongoInsertion.insert(() -> shoppingCartRepository.insert(ShoppingCartMapper.toDocument(cart)),
+                "A shopping cart with id " + cart.getIdentifier() + " already exists");
+        return cart;
+    }
+
     @Override
     public ShoppingCart save(ShoppingCart cart) {
         shoppingCartRepository.save(ShoppingCartMapper.toDocument(cart));

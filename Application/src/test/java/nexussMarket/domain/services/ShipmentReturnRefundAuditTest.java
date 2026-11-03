@@ -46,9 +46,13 @@ class ShipmentReturnRefundAuditTest extends AuditedServiceTestSupport {
     @BeforeEach
     void repositoriesReturnWhatTheyStore() {
         when(shipmentRepositoryPort.save(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
+        when(shipmentRepositoryPort.insert(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
         when(orderRepositoryPort.save(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
+        when(orderRepositoryPort.insert(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
         when(returnRequestRepositoryPort.save(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
+        when(returnRequestRepositoryPort.insert(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
         when(refundRepositoryPort.save(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
+        when(refundRepositoryPort.insert(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
         when(shipmentRepositoryPort.findById("SH-1")).thenReturn(Optional.empty());
         when(shipmentRepositoryPort.findByOrderId("O-1")).thenReturn(Optional.empty());
         when(returnRequestRepositoryPort.findById("R-1")).thenReturn(Optional.empty());

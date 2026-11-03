@@ -39,9 +39,6 @@ public class CreateShipmentService {
         String shipmentId = shipment.getIdentifier();
         String orderId = shipment.getOrder().getIdentifier();
         validateRoleAuthorizationService.execute(actor, SystemRole.LOGISTICS_OPERATOR, SystemRole.ADMINISTRATOR);
-        if (shipmentRepositoryPort.findById(shipmentId).isPresent()) {
-            throw new DuplicateResourceException("A shipment with id " + shipmentId + " already exists");
-        }
         Order order = orderRepositoryPort.findById(orderId)
                 .orElseThrow(() -> new EntityNotFoundException("No order found with id " + orderId));
         if (order.getStatus() != OrderStatus.PAID) {
@@ -51,7 +48,7 @@ public class CreateShipmentService {
         if (shipmentRepositoryPort.findByOrderId(order.getIdentifier()).isPresent()) {
             throw new DuplicateResourceException("Order " + order.getIdentifier() + " already has a shipment");
         }
-        Shipment saved = shipmentRepositoryPort.save(new Shipment(shipmentId, order));
+        Shipment saved = shipmentRepositoryPort.insert(new Shipment(shipmentId, order));
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.SHIPMENT_CREATION, actor, AffectedEntityType.SHIPMENT, shipmentId),
                 AuditDetails.of("orderId", order.getIdentifier(), "newStatus", saved.getStatus().getCode()));
