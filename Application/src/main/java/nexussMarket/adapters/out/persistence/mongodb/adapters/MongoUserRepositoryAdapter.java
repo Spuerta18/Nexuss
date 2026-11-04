@@ -3,13 +3,19 @@ package nexussMarket.adapters.out.persistence.mongodb.adapters;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
+import nexussMarket.adapters.out.persistence.mongodb.documents.UserDocument;
 import nexussMarket.adapters.out.persistence.mongodb.mappers.UserMapper;
 import nexussMarket.adapters.out.persistence.mongodb.repositories.UserMongoRepository;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
 import nexussMarket.domain.valueobjects.EmailAddress;
+import nexussMarket.domain.valueobjects.PageQuery;
 import nexussMarket.domain.valueobjects.SystemRole;
 
 /** Implements {@link UserRepositoryPort} on the {@code users} collection. */
@@ -61,5 +67,15 @@ public class MongoUserRepositoryAdapter implements UserRepositoryPort {
     @Override
     public boolean existsByRole(SystemRole role) {
         return userRepository.existsByUserType(role.getCode());
+    }
+
+    @Override
+    public ResultPage<User> findPage(SystemRole role, PageQuery page) {
+        Pageable pageable = MongoPages.pageable(page, Sort.by("_id"));
+        Page<UserDocument> documents = role != null
+                ? userRepository.findByUserType(role.getCode(), pageable)
+                : userRepository.findAll(pageable);
+        return MongoPages.toResultPage(documents, page,
+                content -> content.stream().map(UserMapper::toDomain).toList());
     }
 }

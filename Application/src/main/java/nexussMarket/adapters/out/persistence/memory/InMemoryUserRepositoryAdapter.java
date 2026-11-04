@@ -1,5 +1,6 @@
 package nexussMarket.adapters.out.persistence.memory;
 
+import java.util.Comparator;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -8,9 +9,11 @@ import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.UserDocument;
 import nexussMarket.adapters.out.persistence.mongodb.mappers.UserMapper;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
 import nexussMarket.domain.valueobjects.EmailAddress;
+import nexussMarket.domain.valueobjects.PageQuery;
 import nexussMarket.domain.valueobjects.SystemRole;
 
 /** {@link UserRepositoryPort} on the in-memory {@code users} collection (unique email, versioned). */
@@ -64,5 +67,13 @@ public class InMemoryUserRepositoryAdapter implements UserRepositoryPort {
     @Override
     public boolean existsByRole(SystemRole role) {
         return database.users.exists(document -> role.getCode().equals(document.getUserType()));
+    }
+
+    @Override
+    public ResultPage<User> findPage(SystemRole role, PageQuery page) {
+        return InMemoryPages.page(database.users.find(document -> role == null
+                        || role.getCode().equals(document.getUserType())),
+                Comparator.comparing(UserDocument::getId), page,
+                documents -> documents.stream().map(UserMapper::toDomain).toList());
     }
 }

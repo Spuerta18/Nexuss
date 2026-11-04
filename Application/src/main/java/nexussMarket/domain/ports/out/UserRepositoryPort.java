@@ -4,7 +4,9 @@ import java.util.Optional;
 
 import nexussMarket.domain.exceptions.ConcurrentUpdateException;
 import nexussMarket.domain.exceptions.DuplicateResourceException;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.User;
+import nexussMarket.domain.valueobjects.PageQuery;
 import nexussMarket.domain.valueobjects.SystemRole;
 
 public interface UserRepositoryPort {
@@ -29,6 +31,9 @@ public interface UserRepositoryPort {
     boolean existsById(String identifier);
 
     boolean existsByEmail(String email);
+
+    /** A page of users ordered by identifier; only those of {@code role} when it is not {@code null}. */
+    ResultPage<User> findPage(SystemRole role, PageQuery page);
 
     /** Whether at least one user has {@code role}. */
     boolean existsByRole(SystemRole role);

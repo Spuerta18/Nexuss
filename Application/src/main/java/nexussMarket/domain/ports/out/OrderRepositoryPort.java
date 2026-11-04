@@ -1,11 +1,14 @@
 package nexussMarket.domain.ports.out;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 import nexussMarket.domain.exceptions.ConcurrentUpdateException;
 import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.models.Order;
+import nexussMarket.domain.models.ResultPage;
+import nexussMarket.domain.valueobjects.PageQuery;
 
 public interface OrderRepositoryPort {
 
@@ -30,4 +33,10 @@ public interface OrderRepositoryPort {
      * Whether an open order (not yet delivered nor cancelled) holds {@code productId} in one of its lines.
      */
     boolean existsOpenOrderWithProduct(String productId);
+
+    /** A page of every order, most recent first. */
+    ResultPage<Order> findPage(PageQuery page);
+
+    /** A page of the orders with at least one line of the given products, most recent first. */
+    ResultPage<Order> findPageByProductIds(Collection<String> productIds, PageQuery page);
 }

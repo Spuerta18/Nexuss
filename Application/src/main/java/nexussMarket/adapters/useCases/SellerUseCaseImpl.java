@@ -6,7 +6,9 @@ import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
 import nexussMarket.domain.models.InventoryItem;
+import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
@@ -16,7 +18,10 @@ import nexussMarket.domain.services.ChangeUserPasswordService;
 import nexussMarket.domain.services.ConsultInventoryService;
 import nexussMarket.domain.services.ConsultProductService;
 import nexussMarket.domain.services.DiscontinueProductService;
+import nexussMarket.domain.services.ListInventoryService;
+import nexussMarket.domain.services.ListOrdersService;
 import nexussMarket.domain.services.ListSellerProductsService;
+import nexussMarket.domain.services.ListWarehousesService;
 import nexussMarket.domain.services.LogoutService;
 import nexussMarket.domain.services.PublishProductService;
 import nexussMarket.domain.services.RegisterInventoryInboundService;
@@ -25,6 +30,7 @@ import nexussMarket.domain.services.UpdateProductService;
 import nexussMarket.domain.services.UpdateProductStatusService;
 import nexussMarket.domain.services.UpdateProductVariantsService;
 import nexussMarket.domain.services.UpdateProfileService;
+import nexussMarket.domain.valueobjects.PageQuery;
 import nexussMarket.domain.valueobjects.ProductStatus;
 import nexussMarket.domain.valueobjects.ProductVariant;
 
@@ -45,6 +51,9 @@ public class SellerUseCaseImpl implements SellerPort {
     private final AdjustInventoryService adjustInventoryService;
     private final ConsultInventoryService consultInventoryService;
     private final LogoutService logoutService;
+    private final ListOrdersService listOrdersService;
+    private final ListWarehousesService listWarehousesService;
+    private final ListInventoryService listInventoryService;
     private final UpdateProfileService updateProfileService;
     private final ChangeUserPasswordService changeUserPasswordService;
 
@@ -116,5 +125,20 @@ public class SellerUseCaseImpl implements SellerPort {
     @Override
     public User updateProfile(User user, User changes) {
         return updateProfileService.execute(user, changes);
+    }
+
+    @Override
+    public ResultPage<Order> listOrders(User user, PageQuery page) {
+        return listOrdersService.execute(user, page);
+    }
+
+    @Override
+    public ResultPage<Warehouse> listWarehouses(User user, PageQuery page) {
+        return listWarehousesService.execute(user, page);
+    }
+
+    @Override
+    public ResultPage<InventoryItem> listInventory(User user, PageQuery page) {
+        return listInventoryService.execute(user, page);
     }
 }

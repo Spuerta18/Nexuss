@@ -1,5 +1,7 @@
 package nexussMarket.adapters.out.persistence.memory;
 
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -11,8 +13,10 @@ import nexussMarket.adapters.out.persistence.mongodb.documents.InventoryItemDocu
 import nexussMarket.adapters.out.persistence.mongodb.mappers.InventoryItemMapper;
 import nexussMarket.domain.models.InventoryItem;
 import nexussMarket.domain.models.Product;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.Warehouse;
 import nexussMarket.domain.ports.out.InventoryRepositoryPort;
+import nexussMarket.domain.valueobjects.PageQuery;
 
 /** {@link InventoryRepositoryPort} on the in-memory {@code inventory_items} collection (versioned). */
 @Repository
@@ -62,6 +66,29 @@ public class InMemoryInventoryRepositoryAdapter implements InventoryRepositoryPo
                 documents.stream().map(InventoryItemDocument::getWarehouseId).toList());
         return documents.stream()
                 .map(document -> InventoryItemMapper.toDomain(document, product,
+                        warehouses.get(document.getWarehouseId())))
+                .toList();
+    }
+
+    @Override
+    public ResultPage<InventoryItem> findPage(PageQuery page) {
+        return InMemoryPages.page(database.inventoryItems.findAll(), Comparator.comparing(InventoryItemDocument::getId),
+                page, this::toDomain);
+    }
+
+    @Override
+    public ResultPage<InventoryItem> findPageByProductIds(Collection<String> productIds, PageQuery page) {
+        return InMemoryPages.page(database.inventoryItems.find(document -> productIds.contains(document.getProductId())),
+                Comparator.comparing(InventoryItemDocument::getId), page, this::toDomain);
+    }
+
+    private List<InventoryItem> toDomain(List<InventoryItemDocument> documents) {
+        Map<String, Product> products = referenceResolver.products(
+                documents.stream().map(InventoryItemDocument::getProductId).toList());
+        Map<String, Warehouse> warehouses = referenceResolver.warehouses(
+                documents.stream().map(InventoryItemDocument::getWarehouseId).toList());
+        return documents.stream()
+                .map(document -> InventoryItemMapper.toDomain(document, products.get(document.getProductId()),
                         warehouses.get(document.getWarehouseId())))
                 .toList();
     }

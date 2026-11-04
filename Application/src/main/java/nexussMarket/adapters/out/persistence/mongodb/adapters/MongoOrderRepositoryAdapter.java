@@ -1,16 +1,20 @@
 package nexussMarket.adapters.out.persistence.mongodb.adapters;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.mappers.OrderMapper;
 import nexussMarket.adapters.out.persistence.mongodb.repositories.OrderMongoRepository;
 import nexussMarket.domain.models.Order;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.ports.out.OrderRepositoryPort;
 import nexussMarket.domain.valueobjects.OrderStatus;
+import nexussMarket.domain.valueobjects.PageQuery;
 
 /** Implements {@link OrderRepositoryPort} on the {@code orders} collection. */
 @Repository
@@ -18,6 +22,8 @@ import nexussMarket.domain.valueobjects.OrderStatus;
 public class MongoOrderRepositoryAdapter implements OrderRepositoryPort {
 
     /** Statuses of an order that is still open: not delivered nor cancelled. */
+    private static final Sort MOST_RECENT_FIRST = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.asc("_id"));
+
     static final List<String> OPEN_STATUSES = List.of(OrderStatus.CART.getCode(),
             OrderStatus.PENDING_PAYMENT.getCode(), OrderStatus.PAID.getCode(), OrderStatus.SHIPPED.getCode());
 
@@ -59,5 +65,20 @@ public class MongoOrderRepositoryAdapter implements OrderRepositoryPort {
     @Override
     public boolean existsOpenOrderWithProduct(String productId) {
         return orderRepository.existsByLinesProductIdAndStatusIn(productId, OPEN_STATUSES);
+    }
+
+    @Override
+    public ResultPage<Order> findPage(PageQuery page) {
+        return MongoPages.toResultPage(orderRepository.findAll(MongoPages.pageable(page, MOST_RECENT_FIRST)), page,
+                referenceResolver::toOrders);
+    }
+
+    @Override
+    public ResultPage<Order> findPageByProductIds(Collection<String> productIds, PageQuery page) {
+        if (productIds.isEmpty()) {
+            return new ResultPage<>(List.of(), page.page(), page.size(), 0);
+        }
+        return MongoPages.toResultPage(orderRepository.findByLinesProductIdIn(productIds,
+                MongoPages.pageable(page, MOST_RECENT_FIRST)), page, referenceResolver::toOrders);
     }
 }

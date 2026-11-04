@@ -3,10 +3,13 @@ package nexussMarket.domain.ports.in;
 import java.util.List;
 
 import nexussMarket.domain.models.InventoryItem;
+import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
+import nexussMarket.domain.valueobjects.PageQuery;
 import nexussMarket.domain.valueobjects.ProductStatus;
 import nexussMarket.domain.valueobjects.ProductVariant;
 
@@ -49,4 +52,13 @@ public interface SellerPort {
      * addresses). Email, role and status never change here.
      */
     User updateProfile(User user, User changes);
+
+    /** A page of orders, most recent first. Read-only. */
+    ResultPage<Order> listOrders(User user, PageQuery page);
+
+    /** A page of warehouses. Read-only. */
+    ResultPage<Warehouse> listWarehouses(User user, PageQuery page);
+
+    /** A page of inventory records. Read-only. */
+    ResultPage<InventoryItem> listInventory(User user, PageQuery page);
 }

@@ -143,6 +143,44 @@ class MongoVersioningIntegrationTest {
     }
 
     @Test
+    void thePagedQueriesFilterSortAndCount() {
+        Seller owner = new Seller("S-PAGE", "Page Seller", "page.seller@example.com", UserStatus.ACTIVE,
+                SellerStatus.ACTIVE);
+        Product product = storedProduct("P-PAGE", owner);
+        Warehouse warehouse = storedWarehouse("W-PAGE", owner);
+        Buyer buyer = storedBuyer("B-PAGE");
+        MongoOrderRepositoryAdapter orders = new MongoOrderRepositoryAdapter(
+                repositories.getRepository(OrderMongoRepository.class), resolver());
+        for (int i = 1; i <= 3; i++) {
+            orders.insert(new Order("O-PAGE-" + i, buyer, OrderStatus.PENDING_PAYMENT,
+                    List.of(new OrderLine(product, "Keyboard", 1, cop(1000), warehouse)),
+                    java.time.LocalDateTime.of(2026, 1, i, 10, 0)));
+        }
+        MongoInventoryRepositoryAdapter inventory = new MongoInventoryRepositoryAdapter(
+                repositories.getRepository(InventoryItemMongoRepository.class), resolver());
+        inventory.insert(new InventoryItem(product, warehouse, 7, 0, 0));
+        MongoWarehouseRepositoryAdapter warehouses = new MongoWarehouseRepositoryAdapter(
+                repositories.getRepository(WarehouseMongoRepository.class), resolver());
+        MongoUserRepositoryAdapter users = new MongoUserRepositoryAdapter(
+                repositories.getRepository(UserMongoRepository.class));
+
+        var firstOrders = orders.findPageByProductIds(List.of("P-PAGE"), new nexussMarket.domain.valueobjects.PageQuery(0, 2));
+        assertEquals(3, firstOrders.totalItems());
+        assertEquals(List.of("O-PAGE-3", "O-PAGE-2"),
+                firstOrders.items().stream().map(Order::getIdentifier).toList(), "most recent first");
+        assertEquals(1, orders.findPageByProductIds(List.of("P-PAGE"),
+                new nexussMarket.domain.valueobjects.PageQuery(1, 2)).items().size());
+        assertEquals(List.of("W-PAGE"), warehouses.findPageByOwnerId("S-PAGE",
+                nexussMarket.domain.valueobjects.PageQuery.first()).items().stream()
+                .map(Warehouse::getIdentifier).toList());
+        assertEquals(7, inventory.findPageByProductIds(List.of("P-PAGE"),
+                nexussMarket.domain.valueobjects.PageQuery.first()).items().get(0).getAvailableQuantity());
+        assertEquals(true, users.findPage(nexussMarket.domain.valueobjects.SystemRole.SELLER,
+                nexussMarket.domain.valueobjects.PageQuery.first()).items().stream()
+                .allMatch(user -> user.getRole() == nexussMarket.domain.valueobjects.SystemRole.SELLER));
+    }
+
+    @Test
     void staleCartDeleteFailsAndKeepsTheCart() {
         Product product = storedProduct("P-CART", seller);
         Buyer buyer = storedBuyer("B-CART");

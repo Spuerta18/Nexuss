@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import nexussMarket.adapters.in.rest.mappers.DomainReferences;
 import nexussMarket.adapters.in.rest.mappers.InventoryRestMapper;
 import nexussMarket.adapters.in.rest.mappers.OrderRestMapper;
+import nexussMarket.adapters.in.rest.mappers.PageRestMapper;
 import nexussMarket.adapters.in.rest.mappers.ShipmentRestMapper;
 import nexussMarket.adapters.in.rest.requests.AdvanceOrderStatusRequest;
 import nexussMarket.adapters.in.rest.requests.ChangePasswordRequest;
@@ -25,6 +27,7 @@ import nexussMarket.adapters.in.rest.requests.CreateShipmentRequest;
 import nexussMarket.adapters.in.rest.requests.InventoryMovementRequest;
 import nexussMarket.adapters.in.rest.responses.InventoryItemResponse;
 import nexussMarket.adapters.in.rest.responses.OrderResponse;
+import nexussMarket.adapters.in.rest.responses.PageResponse;
 import nexussMarket.adapters.in.rest.responses.ShipmentResponse;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.in.LogisticsOperatorPort;
@@ -120,5 +123,14 @@ public class LogisticsOperatorRestController {
     public void changePassword(@AuthenticationPrincipal(expression = "user") User actor,
                                @Valid @RequestBody ChangePasswordRequest request) {
         logisticsOperatorPort.changePassword(actor, request.currentPassword(), request.newPassword());
+    }
+
+    /** A page of orders, most recent first ({@code page} from 0, {@code size} 1-100, default 20). */
+    @GetMapping("/orders")
+    public PageResponse<OrderResponse> listOrders(@AuthenticationPrincipal(expression = "user") User actor,
+                                                  @RequestParam(defaultValue = "0") int page,
+                                                  @RequestParam(defaultValue = "20") int size) {
+        return PageRestMapper.toResponse(logisticsOperatorPort.listOrders(actor, PageRestMapper.query(page, size)),
+                OrderRestMapper::toResponse);
     }
 }

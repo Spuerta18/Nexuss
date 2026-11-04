@@ -3,6 +3,8 @@ package nexussMarket.adapters.out.persistence.mongodb.repositories;
 import java.util.Collection;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.OrderDocument;
@@ -13,4 +15,6 @@ public interface OrderMongoRepository extends MongoRepository<OrderDocument, Str
     List<OrderDocument> findAllByBuyerIdOrderByCreatedAtDesc(String buyerId);
 
     boolean existsByLinesProductIdAndStatusIn(String productId, Collection<String> statuses);
+
+    Page<OrderDocument> findByLinesProductIdIn(Collection<String> productIds, Pageable pageable);
 }

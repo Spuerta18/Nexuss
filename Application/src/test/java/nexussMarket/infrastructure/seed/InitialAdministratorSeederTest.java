@@ -101,6 +101,12 @@ class InitialAdministratorSeederTest {
         }
 
         @Override
+        public nexussMarket.domain.models.ResultPage<User> findPage(SystemRole role,
+                                                                    nexussMarket.domain.valueobjects.PageQuery page) {
+            throw new UnsupportedOperationException("not used by this test");
+        }
+
+        @Override
         public User save(User user) {
             saves++;
             byId.put(user.getIdentifier(), user);

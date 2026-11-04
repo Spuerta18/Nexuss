@@ -67,7 +67,17 @@ tests, 4 JaCoCo / guard tests / SETUP.md / Postman, 5 Docker, 6 closing campaign
     role ports (by the caller's role), like `GET /api/me` is shared. `DELETE /api/buyer/cart/items` →
     `ClearActiveCartService` (`ShoppingCart.clear()`, versioned save, audit `CART_CLEARING`, idempotent). Tests:
     `ProfileAndCartScenariosTest`, `ProfileRestControllerTest`, one more `EndToEndScenariosTest` case. 383 green.
-  - **Next:** step 4, paginated read-only lists, then step 5, reports.
+  - **Step 4 — paginated read-only lists, done.** `PageQuery` (page ≥ 0, size 1-100, default 20; else 400
+    `InvalidPageRequestException`) and `ResultPage<T>`; `PageResponse` (`items`, `page`, `size`, `totalItems`,
+    `totalPages`). Page queries on the user, order, warehouse and inventory ports (Mongo `Pageable` derived queries:
+    `findByUserType`, `findByLinesProductIdIn`, `findByOwnerId`, `findByProductIdIn`; memory: `InMemoryPages`).
+    Services `ListUsersService` (ADMIN, SUPERVISOR; `?role=`), `ListOrdersService` (ADMIN, SUPERVISOR, LOGISTICS: all,
+    most recent first; SELLER: orders with their products, showing only their own lines), `ListWarehousesService`
+    and `ListInventoryService` (ADMIN, SUPERVISOR: all; SELLER: own). Routes `GET /api/{admin|supervisor}/users|orders|
+    warehouses|inventory`, `GET /api/logistics/orders`, `GET /api/seller/orders|warehouses|inventory`. A query or path
+    parameter of the wrong type now answers 400 (`MethodArgumentTypeMismatchException`). Tests: `ListsScenariosTest`,
+    `ListsRestControllerTest`, Mongo paged queries in `MongoVersioningIntegrationTest`. 393 green; checked on 8081.
+  - **Next:** step 5, reports (`ReportPeriod`).
 - **After Block 2:** Block 4 (SETUP.md and Postman first; JaCoCo and guard tests last) → remaining Block 1, JaCoCo,
   Block 5, Block 6. Move the `demo-stable` tag to every green block commit.
 - Verify with `./mvnw -o clean test` from `Application/` (Maven is not on the PATH; use the wrapper). Scratchpad

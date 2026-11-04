@@ -4,17 +4,21 @@ import java.util.List;
 
 import nexussMarket.domain.models.Administrator;
 import nexussMarket.domain.models.AuditLog;
+import nexussMarket.domain.models.InventoryItem;
 import nexussMarket.domain.models.Invoice;
 import nexussMarket.domain.models.LogisticsOperator;
 import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Refund;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.ReturnRequest;
 import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.Supervisor;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
+import nexussMarket.domain.valueobjects.PageQuery;
 import nexussMarket.domain.valueobjects.SellerStatus;
+import nexussMarket.domain.valueobjects.SystemRole;
 import nexussMarket.domain.valueobjects.UserStatus;
 
 /**
@@ -74,4 +78,16 @@ public interface AdministratorPort {
      * addresses). Email, role and status never change here.
      */
     User updateProfile(User user, User changes);
+
+    /** A page of users, only those of {@code role} when it is not {@code null}. Read-only. */
+    ResultPage<User> listUsers(User user, SystemRole role, PageQuery page);
+
+    /** A page of orders, most recent first. Read-only. */
+    ResultPage<Order> listOrders(User user, PageQuery page);
+
+    /** A page of warehouses. Read-only. */
+    ResultPage<Warehouse> listWarehouses(User user, PageQuery page);
+
+    /** A page of inventory records. Read-only. */
+    ResultPage<InventoryItem> listInventory(User user, PageQuery page);
 }

@@ -1,11 +1,14 @@
 package nexussMarket.domain.ports.out;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 import nexussMarket.domain.exceptions.ConcurrentUpdateException;
 import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.models.InventoryItem;
+import nexussMarket.domain.models.ResultPage;
+import nexussMarket.domain.valueobjects.PageQuery;
 
 public interface InventoryRepositoryPort {
 
@@ -25,4 +28,10 @@ public interface InventoryRepositoryPort {
     Optional<InventoryItem> findByProductIdAndWarehouseId(String productId, String warehouseId);
 
     List<InventoryItem> findAllByProductId(String productId);
+
+    /** A page of every inventory record, ordered by identifier ({@code productId:warehouseId}). */
+    ResultPage<InventoryItem> findPage(PageQuery page);
+
+    /** A page of the inventory records of the given products, ordered by identifier. */
+    ResultPage<InventoryItem> findPageByProductIds(Collection<String> productIds, PageQuery page);
 }

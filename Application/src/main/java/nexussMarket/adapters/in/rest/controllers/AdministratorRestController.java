@@ -19,8 +19,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import nexussMarket.adapters.in.rest.mappers.AuditRestMapper;
 import nexussMarket.adapters.in.rest.mappers.DomainReferences;
+import nexussMarket.adapters.in.rest.mappers.InventoryRestMapper;
 import nexussMarket.adapters.in.rest.mappers.InvoiceRestMapper;
 import nexussMarket.adapters.in.rest.mappers.OrderRestMapper;
+import nexussMarket.adapters.in.rest.mappers.PageRestMapper;
 import nexussMarket.adapters.in.rest.mappers.ReturnRestMapper;
 import nexussMarket.adapters.in.rest.mappers.UserRestMapper;
 import nexussMarket.adapters.in.rest.mappers.WarehouseRestMapper;
@@ -30,9 +32,11 @@ import nexussMarket.adapters.in.rest.requests.RegisterWarehouseRequest;
 import nexussMarket.adapters.in.rest.requests.SellerStatusRequest;
 import nexussMarket.adapters.in.rest.requests.UserStatusRequest;
 import nexussMarket.adapters.in.rest.responses.AuditLogResponse;
+import nexussMarket.adapters.in.rest.responses.InventoryItemResponse;
 import nexussMarket.adapters.in.rest.responses.InvoiceResponse;
 import nexussMarket.adapters.in.rest.responses.OperationResponse;
 import nexussMarket.adapters.in.rest.responses.OrderResponse;
+import nexussMarket.adapters.in.rest.responses.PageResponse;
 import nexussMarket.adapters.in.rest.responses.RefundResponse;
 import nexussMarket.adapters.in.rest.responses.ReturnRequestResponse;
 import nexussMarket.adapters.in.rest.responses.UserResponse;
@@ -178,5 +182,42 @@ public class AdministratorRestController {
     public void changePassword(@AuthenticationPrincipal(expression = "user") User actor,
                                @Valid @RequestBody ChangePasswordRequest request) {
         administratorPort.changePassword(actor, request.currentPassword(), request.newPassword());
+    }
+
+    /** A page of users ({@code ?role=} filters by role; {@code page} from 0, {@code size} 1-100, default 20). */
+    @GetMapping("/users")
+    public PageResponse<UserResponse> listUsers(@AuthenticationPrincipal(expression = "user") User actor,
+                                                @RequestParam(required = false) String role,
+                                                @RequestParam(defaultValue = "0") int page,
+                                                @RequestParam(defaultValue = "20") int size) {
+        return PageRestMapper.toResponse(administratorPort.listUsers(actor, role != null ? UserRestMapper.role(role) : null,
+                PageRestMapper.query(page, size)), UserRestMapper::toResponse);
+    }
+
+    /** A page of orders, most recent first ({@code page} from 0, {@code size} 1-100, default 20). */
+    @GetMapping("/orders")
+    public PageResponse<OrderResponse> listOrders(@AuthenticationPrincipal(expression = "user") User actor,
+                                                  @RequestParam(defaultValue = "0") int page,
+                                                  @RequestParam(defaultValue = "20") int size) {
+        return PageRestMapper.toResponse(administratorPort.listOrders(actor, PageRestMapper.query(page, size)),
+                OrderRestMapper::toResponse);
+    }
+
+    /** A page of warehouses ({@code page} from 0, {@code size} 1-100, default 20). */
+    @GetMapping("/warehouses")
+    public PageResponse<WarehouseResponse> listWarehouses(@AuthenticationPrincipal(expression = "user") User actor,
+                                                          @RequestParam(defaultValue = "0") int page,
+                                                          @RequestParam(defaultValue = "20") int size) {
+        return PageRestMapper.toResponse(administratorPort.listWarehouses(actor, PageRestMapper.query(page, size)),
+                WarehouseRestMapper::toResponse);
+    }
+
+    /** A page of inventory records ({@code page} from 0, {@code size} 1-100, default 20). */
+    @GetMapping("/inventory")
+    public PageResponse<InventoryItemResponse> listInventory(@AuthenticationPrincipal(expression = "user") User actor,
+                                                             @RequestParam(defaultValue = "0") int page,
+                                                             @RequestParam(defaultValue = "20") int size) {
+        return PageRestMapper.toResponse(administratorPort.listInventory(actor, PageRestMapper.query(page, size)),
+                InventoryRestMapper::toResponse);
     }
 }

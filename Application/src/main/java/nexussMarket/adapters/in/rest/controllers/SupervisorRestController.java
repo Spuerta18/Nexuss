@@ -22,15 +22,19 @@ import nexussMarket.adapters.in.rest.mappers.DomainReferences;
 import nexussMarket.adapters.in.rest.mappers.InventoryRestMapper;
 import nexussMarket.adapters.in.rest.mappers.InvoiceRestMapper;
 import nexussMarket.adapters.in.rest.mappers.OrderRestMapper;
+import nexussMarket.adapters.in.rest.mappers.PageRestMapper;
 import nexussMarket.adapters.in.rest.mappers.UserRestMapper;
+import nexussMarket.adapters.in.rest.mappers.WarehouseRestMapper;
 import nexussMarket.adapters.in.rest.requests.ChangePasswordRequest;
 import nexussMarket.adapters.in.rest.responses.AuditLogResponse;
 import nexussMarket.adapters.in.rest.responses.InventoryItemResponse;
 import nexussMarket.adapters.in.rest.responses.InvoiceResponse;
 import nexussMarket.adapters.in.rest.responses.OperationResponse;
 import nexussMarket.adapters.in.rest.responses.OrderResponse;
+import nexussMarket.adapters.in.rest.responses.PageResponse;
 import nexussMarket.adapters.in.rest.responses.ProductResponse;
 import nexussMarket.adapters.in.rest.responses.UserResponse;
+import nexussMarket.adapters.in.rest.responses.WarehouseResponse;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.in.SupervisorPort;
 
@@ -105,5 +109,42 @@ public class SupervisorRestController {
     public void changePassword(@AuthenticationPrincipal(expression = "user") User actor,
                                @Valid @RequestBody ChangePasswordRequest request) {
         supervisorPort.changePassword(actor, request.currentPassword(), request.newPassword());
+    }
+
+    /** A page of users ({@code ?role=} filters by role; {@code page} from 0, {@code size} 1-100, default 20). */
+    @GetMapping("/users")
+    public PageResponse<UserResponse> listUsers(@AuthenticationPrincipal(expression = "user") User actor,
+                                                @RequestParam(required = false) String role,
+                                                @RequestParam(defaultValue = "0") int page,
+                                                @RequestParam(defaultValue = "20") int size) {
+        return PageRestMapper.toResponse(supervisorPort.listUsers(actor, role != null ? UserRestMapper.role(role) : null,
+                PageRestMapper.query(page, size)), UserRestMapper::toResponse);
+    }
+
+    /** A page of orders, most recent first ({@code page} from 0, {@code size} 1-100, default 20). */
+    @GetMapping("/orders")
+    public PageResponse<OrderResponse> listOrders(@AuthenticationPrincipal(expression = "user") User actor,
+                                                  @RequestParam(defaultValue = "0") int page,
+                                                  @RequestParam(defaultValue = "20") int size) {
+        return PageRestMapper.toResponse(supervisorPort.listOrders(actor, PageRestMapper.query(page, size)),
+                OrderRestMapper::toResponse);
+    }
+
+    /** A page of warehouses ({@code page} from 0, {@code size} 1-100, default 20). */
+    @GetMapping("/warehouses")
+    public PageResponse<WarehouseResponse> listWarehouses(@AuthenticationPrincipal(expression = "user") User actor,
+                                                          @RequestParam(defaultValue = "0") int page,
+                                                          @RequestParam(defaultValue = "20") int size) {
+        return PageRestMapper.toResponse(supervisorPort.listWarehouses(actor, PageRestMapper.query(page, size)),
+                WarehouseRestMapper::toResponse);
+    }
+
+    /** A page of inventory records ({@code page} from 0, {@code size} 1-100, default 20). */
+    @GetMapping("/inventory")
+    public PageResponse<InventoryItemResponse> listInventory(@AuthenticationPrincipal(expression = "user") User actor,
+                                                             @RequestParam(defaultValue = "0") int page,
+                                                             @RequestParam(defaultValue = "20") int size) {
+        return PageRestMapper.toResponse(supervisorPort.listInventory(actor, PageRestMapper.query(page, size)),
+                InventoryRestMapper::toResponse);
     }
 }

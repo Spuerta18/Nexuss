@@ -6,10 +6,12 @@ import nexussMarket.domain.models.InventoryItem;
 import nexussMarket.domain.models.LogisticsOperator;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.Shipment;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
 import nexussMarket.domain.valueobjects.OrderStatus;
+import nexussMarket.domain.valueobjects.PageQuery;
 
 /** Operations a {@link LogisticsOperator} can execute on orders, shipments and warehouse stock. */
 public interface LogisticsOperatorPort {
@@ -44,4 +46,7 @@ public interface LogisticsOperatorPort {
      * addresses). Email, role and status never change here.
      */
     User updateProfile(User user, User changes);
+
+    /** A page of orders, most recent first. Read-only. */
+    ResultPage<Order> listOrders(User user, PageQuery page);
 }

@@ -15,6 +15,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import nexussMarket.adapters.in.rest.responses.ErrorResponse;
@@ -159,6 +160,14 @@ public class GlobalExceptionHandler {
                 .toList();
         return RestErrors.response(HttpStatus.BAD_REQUEST, "Validation failed", request,
                 RestErrors.requestId(request), fieldErrors);
+    }
+
+    /** A query or path parameter of the wrong type, e.g. {@code ?page=abc}. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex,
+                                                            HttpServletRequest request) {
+        return RestErrors.response(HttpStatus.BAD_REQUEST, "Invalid value for parameter '" + ex.getName() + "'",
+                request);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

@@ -3,7 +3,9 @@ package nexussMarket.domain.ports.out;
 import java.util.Optional;
 
 import nexussMarket.domain.exceptions.DuplicateResourceException;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.Warehouse;
+import nexussMarket.domain.valueobjects.PageQuery;
 
 public interface WarehouseRepositoryPort {
 
@@ -17,4 +19,10 @@ public interface WarehouseRepositoryPort {
     Warehouse save(Warehouse warehouse);
 
     Optional<Warehouse> findById(String identifier);
+
+    /** A page of every warehouse, ordered by identifier. */
+    ResultPage<Warehouse> findPage(PageQuery page);
+
+    /** A page of the warehouses owned by seller {@code ownerId}, ordered by identifier. */
+    ResultPage<Warehouse> findPageByOwnerId(String ownerId, PageQuery page);
 }

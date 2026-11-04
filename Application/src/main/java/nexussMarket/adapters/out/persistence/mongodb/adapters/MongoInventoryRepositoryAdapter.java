@@ -1,10 +1,12 @@
 package nexussMarket.adapters.out.persistence.mongodb.adapters;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.InventoryItemDocument;
@@ -12,8 +14,10 @@ import nexussMarket.adapters.out.persistence.mongodb.mappers.InventoryItemMapper
 import nexussMarket.adapters.out.persistence.mongodb.repositories.InventoryItemMongoRepository;
 import nexussMarket.domain.models.InventoryItem;
 import nexussMarket.domain.models.Product;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.Warehouse;
 import nexussMarket.domain.ports.out.InventoryRepositoryPort;
+import nexussMarket.domain.valueobjects.PageQuery;
 
 /** Implements {@link InventoryRepositoryPort} on the {@code inventory_items} collection. */
 @Repository
@@ -63,6 +67,33 @@ public class MongoInventoryRepositoryAdapter implements InventoryRepositoryPort 
                 documents.stream().map(InventoryItemDocument::getWarehouseId).toList());
         return documents.stream()
                 .map(document -> InventoryItemMapper.toDomain(document, product,
+                        warehouses.get(document.getWarehouseId())))
+                .toList();
+    }
+
+    @Override
+    public ResultPage<InventoryItem> findPage(PageQuery page) {
+        return MongoPages.toResultPage(inventoryItemRepository.findAll(MongoPages.pageable(page, Sort.by("_id"))),
+                page, this::toDomain);
+    }
+
+    @Override
+    public ResultPage<InventoryItem> findPageByProductIds(Collection<String> productIds, PageQuery page) {
+        if (productIds.isEmpty()) {
+            return new ResultPage<>(List.of(), page.page(), page.size(), 0);
+        }
+        return MongoPages.toResultPage(inventoryItemRepository.findByProductIdIn(productIds,
+                MongoPages.pageable(page, Sort.by("_id"))), page, this::toDomain);
+    }
+
+    /** Builds {@code documents} into items, resolving their products and warehouses with one query each. */
+    private List<InventoryItem> toDomain(List<InventoryItemDocument> documents) {
+        Map<String, Product> products = referenceResolver.products(
+                documents.stream().map(InventoryItemDocument::getProductId).toList());
+        Map<String, Warehouse> warehouses = referenceResolver.warehouses(
+                documents.stream().map(InventoryItemDocument::getWarehouseId).toList());
+        return documents.stream()
+                .map(document -> InventoryItemMapper.toDomain(document, products.get(document.getProductId()),
                         warehouses.get(document.getWarehouseId())))
                 .toList();
     }

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,6 +22,8 @@ import lombok.RequiredArgsConstructor;
 import nexussMarket.adapters.in.rest.mappers.CatalogRestMapper;
 import nexussMarket.adapters.in.rest.mappers.DomainReferences;
 import nexussMarket.adapters.in.rest.mappers.InventoryRestMapper;
+import nexussMarket.adapters.in.rest.mappers.OrderRestMapper;
+import nexussMarket.adapters.in.rest.mappers.PageRestMapper;
 import nexussMarket.adapters.in.rest.mappers.WarehouseRestMapper;
 import nexussMarket.adapters.in.rest.requests.ChangePasswordRequest;
 import nexussMarket.adapters.in.rest.requests.InventoryAdjustmentRequest;
@@ -31,6 +34,8 @@ import nexussMarket.adapters.in.rest.requests.RegisterWarehouseRequest;
 import nexussMarket.adapters.in.rest.requests.UpdateProductRequest;
 import nexussMarket.adapters.in.rest.requests.VariantsRequest;
 import nexussMarket.adapters.in.rest.responses.InventoryItemResponse;
+import nexussMarket.adapters.in.rest.responses.OrderResponse;
+import nexussMarket.adapters.in.rest.responses.PageResponse;
 import nexussMarket.adapters.in.rest.responses.ProductResponse;
 import nexussMarket.adapters.in.rest.responses.WarehouseResponse;
 import nexussMarket.domain.models.User;
@@ -146,5 +151,32 @@ public class SellerRestController {
     public void changePassword(@AuthenticationPrincipal(expression = "user") User actor,
                                @Valid @RequestBody ChangePasswordRequest request) {
         sellerPort.changePassword(actor, request.currentPassword(), request.newPassword());
+    }
+
+    /** A page of orders, most recent first ({@code page} from 0, {@code size} 1-100, default 20). */
+    @GetMapping("/orders")
+    public PageResponse<OrderResponse> listOrders(@AuthenticationPrincipal(expression = "user") User actor,
+                                                  @RequestParam(defaultValue = "0") int page,
+                                                  @RequestParam(defaultValue = "20") int size) {
+        return PageRestMapper.toResponse(sellerPort.listOrders(actor, PageRestMapper.query(page, size)),
+                OrderRestMapper::toResponse);
+    }
+
+    /** A page of warehouses ({@code page} from 0, {@code size} 1-100, default 20). */
+    @GetMapping("/warehouses")
+    public PageResponse<WarehouseResponse> listWarehouses(@AuthenticationPrincipal(expression = "user") User actor,
+                                                          @RequestParam(defaultValue = "0") int page,
+                                                          @RequestParam(defaultValue = "20") int size) {
+        return PageRestMapper.toResponse(sellerPort.listWarehouses(actor, PageRestMapper.query(page, size)),
+                WarehouseRestMapper::toResponse);
+    }
+
+    /** A page of inventory records ({@code page} from 0, {@code size} 1-100, default 20). */
+    @GetMapping("/inventory")
+    public PageResponse<InventoryItemResponse> listInventory(@AuthenticationPrincipal(expression = "user") User actor,
+                                                             @RequestParam(defaultValue = "0") int page,
+                                                             @RequestParam(defaultValue = "20") int size) {
+        return PageRestMapper.toResponse(sellerPort.listInventory(actor, PageRestMapper.query(page, size)),
+                InventoryRestMapper::toResponse);
     }
 }

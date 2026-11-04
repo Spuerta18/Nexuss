@@ -2,6 +2,8 @@ package nexussMarket.adapters.out.persistence.mongodb.repositories;
 
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.UserDocument;
@@ -14,4 +16,6 @@ public interface UserMongoRepository extends MongoRepository<UserDocument, Strin
     boolean existsByEmail(String email);
 
     boolean existsByUserType(String userType);
+
+    Page<UserDocument> findByUserType(String userType, Pageable pageable);
 }

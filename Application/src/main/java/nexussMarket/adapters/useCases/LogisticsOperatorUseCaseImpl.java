@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import nexussMarket.domain.models.InventoryItem;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.Shipment;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
@@ -19,12 +20,14 @@ import nexussMarket.domain.services.ConsultInventoryService;
 import nexussMarket.domain.services.ConsultOrderService;
 import nexussMarket.domain.services.CreateShipmentService;
 import nexussMarket.domain.services.DispatchShipmentService;
+import nexussMarket.domain.services.ListOrdersService;
 import nexussMarket.domain.services.LogoutService;
 import nexussMarket.domain.services.PackShipmentService;
 import nexussMarket.domain.services.RegisterInventoryReturnService;
 import nexussMarket.domain.services.ReportDamagedInventoryService;
 import nexussMarket.domain.services.UpdateProfileService;
 import nexussMarket.domain.valueobjects.OrderStatus;
+import nexussMarket.domain.valueobjects.PageQuery;
 
 /** Implements {@link LogisticsOperatorPort} by delegating each operation to its domain service. */
 @Service
@@ -41,6 +44,7 @@ public class LogisticsOperatorUseCaseImpl implements LogisticsOperatorPort {
     private final RegisterInventoryReturnService registerInventoryReturnService;
     private final ConsultInventoryService consultInventoryService;
     private final LogoutService logoutService;
+    private final ListOrdersService listOrdersService;
     private final UpdateProfileService updateProfileService;
     private final ChangeUserPasswordService changeUserPasswordService;
 
@@ -102,5 +106,10 @@ public class LogisticsOperatorUseCaseImpl implements LogisticsOperatorPort {
     @Override
     public User updateProfile(User user, User changes) {
         return updateProfileService.execute(user, changes);
+    }
+
+    @Override
+    public ResultPage<Order> listOrders(User user, PageQuery page) {
+        return listOrdersService.execute(user, page);
     }
 }

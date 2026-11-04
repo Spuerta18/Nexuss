@@ -11,7 +11,9 @@ import nexussMarket.domain.models.Invoice;
 import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.User;
+import nexussMarket.domain.models.Warehouse;
 import nexussMarket.domain.ports.in.SupervisorPort;
 import nexussMarket.domain.services.ChangeUserPasswordService;
 import nexussMarket.domain.services.ConsultAuditLogsService;
@@ -21,9 +23,15 @@ import nexussMarket.domain.services.ConsultOrderInvoiceService;
 import nexussMarket.domain.services.ConsultOrderService;
 import nexussMarket.domain.services.ConsultProductService;
 import nexussMarket.domain.services.ConsultUserService;
+import nexussMarket.domain.services.ListInventoryService;
+import nexussMarket.domain.services.ListOrdersService;
 import nexussMarket.domain.services.ListPublishedProductsService;
+import nexussMarket.domain.services.ListUsersService;
+import nexussMarket.domain.services.ListWarehousesService;
 import nexussMarket.domain.services.LogoutService;
 import nexussMarket.domain.services.UpdateProfileService;
+import nexussMarket.domain.valueobjects.PageQuery;
+import nexussMarket.domain.valueobjects.SystemRole;
 
 /** Implements {@link SupervisorPort} by delegating each operation to its domain service. */
 @Service
@@ -39,6 +47,10 @@ public class SupervisorUseCaseImpl implements SupervisorPort {
     private final ListPublishedProductsService listPublishedProductsService;
     private final ConsultOrderInvoiceService consultOrderInvoiceService;
     private final LogoutService logoutService;
+    private final ListUsersService listUsersService;
+    private final ListOrdersService listOrdersService;
+    private final ListWarehousesService listWarehousesService;
+    private final ListInventoryService listInventoryService;
     private final UpdateProfileService updateProfileService;
     private final ChangeUserPasswordService changeUserPasswordService;
 
@@ -95,5 +107,25 @@ public class SupervisorUseCaseImpl implements SupervisorPort {
     @Override
     public User updateProfile(User user, User changes) {
         return updateProfileService.execute(user, changes);
+    }
+
+    @Override
+    public ResultPage<User> listUsers(User user, SystemRole role, PageQuery page) {
+        return listUsersService.execute(user, role, page);
+    }
+
+    @Override
+    public ResultPage<Order> listOrders(User user, PageQuery page) {
+        return listOrdersService.execute(user, page);
+    }
+
+    @Override
+    public ResultPage<Warehouse> listWarehouses(User user, PageQuery page) {
+        return listWarehousesService.execute(user, page);
+    }
+
+    @Override
+    public ResultPage<InventoryItem> listInventory(User user, PageQuery page) {
+        return listInventoryService.execute(user, page);
     }
 }

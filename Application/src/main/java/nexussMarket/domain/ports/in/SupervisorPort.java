@@ -8,8 +8,12 @@ import nexussMarket.domain.models.Invoice;
 import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
+import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.Supervisor;
 import nexussMarket.domain.models.User;
+import nexussMarket.domain.models.Warehouse;
+import nexussMarket.domain.valueobjects.PageQuery;
+import nexussMarket.domain.valueobjects.SystemRole;
 
 /**
  * Read-only operations a {@link Supervisor} can execute.
@@ -52,4 +56,16 @@ public interface SupervisorPort {
      * addresses). Email, role and status never change here.
      */
     User updateProfile(User user, User changes);
+
+    /** A page of users, only those of {@code role} when it is not {@code null}. Read-only. */
+    ResultPage<User> listUsers(User user, SystemRole role, PageQuery page);
+
+    /** A page of orders, most recent first. Read-only. */
+    ResultPage<Order> listOrders(User user, PageQuery page);
+
+    /** A page of warehouses. Read-only. */
+    ResultPage<Warehouse> listWarehouses(User user, PageQuery page);
+
+    /** A page of inventory records. Read-only. */
+    ResultPage<InventoryItem> listInventory(User user, PageQuery page);
 }
