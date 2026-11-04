@@ -2,6 +2,17 @@
 
 Guide for working in this repository. The code lives in `Application/` (Spring Boot 4, Java 17, MongoDB, JWT).
 
+## Resume here
+
+Branch `feature/parity-hardening` (from `feature/cart-order-flow` @ `ffbb6fb`), one commit + push per block. Plan:
+Block 0 state, 1 defects (stress-tests/REPORT.md F1-F7), 2 missing features, 3 `memory` profile + demo seed + E2E
+tests, 4 JaCoCo / guard tests / SETUP.md / Postman, 5 Docker, 6 closing campaign, docs, merge to `main`.
+
+- **Block 0 — done.** `feature/cart-order-flow` pushed to origin (269 tests green, 0 skipped).
+  `nexusmarket_demo` copied to `nexusmarket_demo_backup` (13 collections, counts match; nothing deleted).
+- **Next:** Block 1. Verify with `./mvnw -o clean test` from `Application/` (Maven is not on the PATH; use the
+  wrapper).
+
 ## Language Rule (permanent)
 
 **Every artifact is written in English, with no exceptions.** This covers code, names, Javadoc, comments, exception
@@ -12,8 +23,8 @@ or translations of any artifact.
 
 Run from `Application/`:
 
-- Compile: `mvn -o clean compile`
-- Tests (including the Spring context load): `mvn -o clean test`
+- Compile: `./mvnw -o clean compile` (Maven is not on the PATH; the wrapper uses `~/.m2/wrapper`)
+- Tests (including the Spring context load): `./mvnw -o clean test`
 
 `ApplicationTests.contextLoads` starts the full context without a running MongoDB: the driver logs
 `MongoSocketOpenException` in its monitor thread, but the context still loads. The test JWT secret is in
