@@ -170,6 +170,23 @@ class EndToEndScenariosTest {
     }
 
     @Test
+    void aUserEditsTheirProfileAndABuyerEmptiesTheCart() throws Exception {
+        String email = registerBuyer();
+        String buyer = login(email, PASSWORD);
+
+        JsonNode updated = call("PUT", "/api/me", buyer, "{\"fullName\":\"Renamed Buyer\",\"primaryAddress\":"
+                + "\"Calle 50\",\"email\":\"other@e2e.test\"}").expect(200).json();
+        assertEquals("Renamed Buyer", updated.get("fullName").asString());
+        assertEquals("Calle 50", updated.get("primaryAddress").asString());
+        assertEquals(email, call("GET", "/api/me", buyer, null).expect(200).json().get("email").asString());
+
+        call("POST", "/api/buyer/cart/items", buyer,
+                "{\"productId\":\"" + DemoDataSeeder.PHYSICAL_PRODUCT_IDS.get(0) + "\",\"quantity\":1}").expect(200);
+        assertTrue(call("DELETE", "/api/buyer/cart/items", buyer, null).expect(200).json().get("lines").isEmpty());
+        assertTrue(call("GET", "/api/buyer/cart", buyer, null).expect(200).json().get("lines").isEmpty());
+    }
+
+    @Test
     void everyRoleIsForbiddenOnTheRoutesOfTheOthers() throws Exception {
         Map<String, String> tokens = new LinkedHashMap<>();
         tokens.put("BUYER", login(DemoDataSeeder.BUYER_EMAIL, DEMO_PASSWORD));

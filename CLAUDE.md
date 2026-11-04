@@ -59,7 +59,15 @@ tests, 4 JaCoCo / guard tests / SETUP.md / Postman, 5 Docker, 6 closing campaign
     idempotent, second call records nothing; audit `PRODUCT_DISCONTINUATION`). Tests:
     `ProductManagementScenariosTest`, `ProductManagementRestControllerTest`, Mongo open-order query in
     `MongoVersioningIntegrationTest`. 373 tests green; checked on 8081.
-  - **Next:** step 3, `PUT /api/me` (name and, for buyers, addresses).
+  - **Step 3 — own profile and cart clearing, done.** `PUT /api/me` (`UpdateProfileRequest`: fullName; buyers also
+    primaryAddress / additionalAddresses, `null` keeps them; other roles sending addresses → 400; email, role and
+    status are never accepted) → `updateProfile(User, User)` on the 5 role ports → `UpdateProfileService` (active
+    actor via `ValidateUserAuthorizationStatusService`, versioned save, audit `PROFILE_UPDATE` with only the changed
+    field names, nothing recorded without changes). `ProfileRestController` is the one controller routing to several
+    role ports (by the caller's role), like `GET /api/me` is shared. `DELETE /api/buyer/cart/items` →
+    `ClearActiveCartService` (`ShoppingCart.clear()`, versioned save, audit `CART_CLEARING`, idempotent). Tests:
+    `ProfileAndCartScenariosTest`, `ProfileRestControllerTest`, one more `EndToEndScenariosTest` case. 383 green.
+  - **Next:** step 4, paginated read-only lists, then step 5, reports.
 - **After Block 2:** Block 4 (SETUP.md and Postman first; JaCoCo and guard tests last) → remaining Block 1, JaCoCo,
   Block 5, Block 6. Move the `demo-stable` tag to every green block commit.
 - Verify with `./mvnw -o clean test` from `Application/` (Maven is not on the PATH; use the wrapper). Scratchpad

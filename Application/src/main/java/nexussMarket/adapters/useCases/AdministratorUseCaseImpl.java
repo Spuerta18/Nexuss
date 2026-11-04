@@ -32,6 +32,7 @@ import nexussMarket.domain.services.RegisterSellerService;
 import nexussMarket.domain.services.RegisterSupervisorService;
 import nexussMarket.domain.services.RegisterWarehouseService;
 import nexussMarket.domain.services.RejectReturnService;
+import nexussMarket.domain.services.UpdateProfileService;
 import nexussMarket.domain.services.UpdateSellerStatusService;
 import nexussMarket.domain.services.UpdateUserStatusService;
 import nexussMarket.domain.valueobjects.SellerStatus;
@@ -58,6 +59,7 @@ public class AdministratorUseCaseImpl implements AdministratorPort {
     private final RegisterOrderPaymentService registerOrderPaymentService;
     private final ConsultOrderInvoiceService consultOrderInvoiceService;
     private final LogoutService logoutService;
+    private final UpdateProfileService updateProfileService;
     private final ChangeUserPasswordService changeUserPasswordService;
 
     @Override
@@ -143,5 +145,10 @@ public class AdministratorUseCaseImpl implements AdministratorPort {
     @Override
     public void changePassword(User user, String currentPassword, String newPassword) {
         changeUserPasswordService.execute(user, currentPassword, newPassword);
+    }
+
+    @Override
+    public User updateProfile(User user, User changes) {
+        return updateProfileService.execute(user, changes);
     }
 }

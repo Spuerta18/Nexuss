@@ -94,6 +94,11 @@ public class ShoppingCart {
     }
 
     /** Every product in the cart is priced in the same currency; a product without price cannot be added. */
+    /** Removes every line; the cart itself stays, empty. */
+    public void clear() {
+        lines.clear();
+    }
+
     private void requireCartCurrency(Product product) {
         if (product.getPrice() == null) {
             throw new ProductNotPurchasableException("Product " + product.getIdentifier() + " has no price");

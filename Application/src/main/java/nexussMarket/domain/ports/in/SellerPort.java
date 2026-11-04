@@ -43,4 +43,10 @@ public interface SellerPort {
 
     /** Changes {@code user}'s own password and revokes every access token issued to them. */
     void changePassword(User user, String currentPassword, String newPassword);
+
+    /**
+     * Changes the caller's own profile: {@code changes} carries the new full name (and, for a buyer, the
+     * addresses). Email, role and status never change here.
+     */
+    User updateProfile(User user, User changes);
 }

@@ -18,6 +18,7 @@ import nexussMarket.domain.services.AddActiveCartLineService;
 import nexussMarket.domain.services.AddCartLineService;
 import nexussMarket.domain.services.CancelOrderService;
 import nexussMarket.domain.services.ChangeUserPasswordService;
+import nexussMarket.domain.services.ClearActiveCartService;
 import nexussMarket.domain.services.ConfirmActiveCartService;
 import nexussMarket.domain.services.ConfirmOrderService;
 import nexussMarket.domain.services.ConsultActiveCartService;
@@ -36,6 +37,7 @@ import nexussMarket.domain.services.RemoveCartLineService;
 import nexussMarket.domain.services.RequestReturnService;
 import nexussMarket.domain.services.UpdateActiveCartLineQuantityService;
 import nexussMarket.domain.services.UpdateCartLineQuantityService;
+import nexussMarket.domain.services.UpdateProfileService;
 
 /** Implements {@link BuyerPort} by delegating each operation to its domain service. */
 @Service
@@ -62,7 +64,9 @@ public class BuyerUseCaseImpl implements BuyerPort {
     private final ConsultOrderInvoiceService consultOrderInvoiceService;
     private final ConsultOrderShipmentService consultOrderShipmentService;
     private final PayOrderService payOrderService;
+    private final ClearActiveCartService clearActiveCartService;
     private final LogoutService logoutService;
+    private final UpdateProfileService updateProfileService;
     private final ChangeUserPasswordService changeUserPasswordService;
 
     @Override
@@ -161,6 +165,11 @@ public class BuyerUseCaseImpl implements BuyerPort {
     }
 
     @Override
+    public ShoppingCart clearActiveCart(User user) {
+        return clearActiveCartService.execute(user);
+    }
+
+    @Override
     public Order payOrder(User user, Order order, String paymentToken) {
         return payOrderService.execute(user, order, paymentToken);
     }
@@ -173,5 +182,10 @@ public class BuyerUseCaseImpl implements BuyerPort {
     @Override
     public void changePassword(User user, String currentPassword, String newPassword) {
         changeUserPasswordService.execute(user, currentPassword, newPassword);
+    }
+
+    @Override
+    public User updateProfile(User user, User changes) {
+        return updateProfileService.execute(user, changes);
     }
 }

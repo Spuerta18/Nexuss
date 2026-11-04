@@ -24,6 +24,7 @@ import nexussMarket.domain.services.RegisterWarehouseService;
 import nexussMarket.domain.services.UpdateProductService;
 import nexussMarket.domain.services.UpdateProductStatusService;
 import nexussMarket.domain.services.UpdateProductVariantsService;
+import nexussMarket.domain.services.UpdateProfileService;
 import nexussMarket.domain.valueobjects.ProductStatus;
 import nexussMarket.domain.valueobjects.ProductVariant;
 
@@ -44,6 +45,7 @@ public class SellerUseCaseImpl implements SellerPort {
     private final AdjustInventoryService adjustInventoryService;
     private final ConsultInventoryService consultInventoryService;
     private final LogoutService logoutService;
+    private final UpdateProfileService updateProfileService;
     private final ChangeUserPasswordService changeUserPasswordService;
 
     @Override
@@ -109,5 +111,10 @@ public class SellerUseCaseImpl implements SellerPort {
     @Override
     public void changePassword(User user, String currentPassword, String newPassword) {
         changeUserPasswordService.execute(user, currentPassword, newPassword);
+    }
+
+    @Override
+    public User updateProfile(User user, User changes) {
+        return updateProfileService.execute(user, changes);
     }
 }

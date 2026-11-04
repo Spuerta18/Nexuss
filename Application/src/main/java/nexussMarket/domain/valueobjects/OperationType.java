@@ -26,6 +26,8 @@ public final class OperationType extends DomainCatalog {
             new OperationType("USER_LOGOUT", "User Logout", "A user logged out; every token issued before is revoked.");
     public static final OperationType PASSWORD_CHANGE = new OperationType("PASSWORD_CHANGE", "Password Change",
             "A user changed their password; every token issued before is revoked.");
+    public static final OperationType PROFILE_UPDATE = new OperationType("PROFILE_UPDATE", "Profile Update",
+            "A user changed their own name or, for a buyer, their addresses.");
     public static final OperationType USER_STATUS_CHANGE = new OperationType("USER_STATUS_CHANGE",
             "User Status Change", "An administrator changed the operational status of a user.");
     public static final OperationType SELLER_STATUS_CHANGE = new OperationType("SELLER_STATUS_CHANGE",
@@ -66,6 +68,8 @@ public final class OperationType extends DomainCatalog {
             "Cart Line Quantity Update", "The quantity of a cart line changed.");
     public static final OperationType CART_LINE_REMOVAL =
             new OperationType("CART_LINE_REMOVAL", "Cart Line Removal", "A product was removed from a cart.");
+    public static final OperationType CART_CLEARING =
+            new OperationType("CART_CLEARING", "Cart Clearing", "Every line of a buyer's active cart was removed.");
     public static final OperationType ORDER_CONFIRMATION = new OperationType("ORDER_CONFIRMATION",
             "Order Confirmation", "A cart was turned into an order and its stock reserved.");
     public static final OperationType ORDER_CANCELLATION = new OperationType("ORDER_CANCELLATION",
@@ -108,12 +112,12 @@ public final class OperationType extends DomainCatalog {
     /** Returns the full {@code OperationType} value list. */
     public static List<OperationType> values() {
         return List.of(BUYER_REGISTRATION, SELLER_REGISTRATION, SUPERVISOR_REGISTRATION,
-                LOGISTICS_OPERATOR_REGISTRATION, USER_LOGIN, USER_LOGOUT, PASSWORD_CHANGE, USER_STATUS_CHANGE,
+                LOGISTICS_OPERATOR_REGISTRATION, USER_LOGIN, USER_LOGOUT, PASSWORD_CHANGE, PROFILE_UPDATE, USER_STATUS_CHANGE,
                 SELLER_STATUS_CHANGE, PRODUCT_PUBLICATION, PRODUCT_STATUS_CHANGE, PRODUCT_VARIANTS_UPDATE,
                 PRODUCT_UPDATE, PRODUCT_DISCONTINUATION,
                 WAREHOUSE_REGISTRATION, WAREHOUSE_DEACTIVATION, INVENTORY_INBOUND, INVENTORY_ADJUSTMENT,
                 INVENTORY_DAMAGE_REPORT, INVENTORY_RETURN, CART_CREATION, CART_LINE_ADDITION,
-                CART_LINE_QUANTITY_UPDATE, CART_LINE_REMOVAL, ORDER_CONFIRMATION, ORDER_CANCELLATION,
+                CART_LINE_QUANTITY_UPDATE, CART_LINE_REMOVAL, CART_CLEARING, ORDER_CONFIRMATION, ORDER_CANCELLATION,
                 ORDER_STATUS_ADVANCE, SHIPMENT_CREATION, SHIPMENT_PACKING, SHIPMENT_DISPATCH, SHIPMENT_DELIVERY,
                 RETURN_REQUEST, RETURN_APPROVAL, RETURN_REJECTION, REFUND_PROCESSING, ORDER_PAYMENT,
                 PAYMENT_DECLINED, DIGITAL_ORDER_FULFILLMENT);

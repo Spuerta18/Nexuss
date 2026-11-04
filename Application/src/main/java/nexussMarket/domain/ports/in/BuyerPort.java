@@ -61,6 +61,9 @@ public interface BuyerPort {
     /** The shipment of one of the buyer's orders. */
     Shipment consultOrderShipment(User user, Order order);
 
+    /** Removes every line of the buyer's active cart. */
+    ShoppingCart clearActiveCart(User user);
+
     /** Pays one of the buyer's {@code PENDING_PAYMENT} orders through the payment gateway. */
     Order payOrder(User user, Order order, String paymentToken);
 
@@ -69,4 +72,10 @@ public interface BuyerPort {
 
     /** Changes {@code user}'s own password and revokes every access token issued to them. */
     void changePassword(User user, String currentPassword, String newPassword);
+
+    /**
+     * Changes the caller's own profile: {@code changes} carries the new full name (and, for a buyer, the
+     * addresses). Email, role and status never change here.
+     */
+    User updateProfile(User user, User changes);
 }

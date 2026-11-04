@@ -23,6 +23,7 @@ import nexussMarket.domain.services.ConsultProductService;
 import nexussMarket.domain.services.ConsultUserService;
 import nexussMarket.domain.services.ListPublishedProductsService;
 import nexussMarket.domain.services.LogoutService;
+import nexussMarket.domain.services.UpdateProfileService;
 
 /** Implements {@link SupervisorPort} by delegating each operation to its domain service. */
 @Service
@@ -38,6 +39,7 @@ public class SupervisorUseCaseImpl implements SupervisorPort {
     private final ListPublishedProductsService listPublishedProductsService;
     private final ConsultOrderInvoiceService consultOrderInvoiceService;
     private final LogoutService logoutService;
+    private final UpdateProfileService updateProfileService;
     private final ChangeUserPasswordService changeUserPasswordService;
 
     @Override
@@ -88,5 +90,10 @@ public class SupervisorUseCaseImpl implements SupervisorPort {
     @Override
     public void changePassword(User user, String currentPassword, String newPassword) {
         changeUserPasswordService.execute(user, currentPassword, newPassword);
+    }
+
+    @Override
+    public User updateProfile(User user, User changes) {
+        return updateProfileService.execute(user, changes);
     }
 }

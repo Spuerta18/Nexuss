@@ -184,6 +184,12 @@ public class BuyerRestController {
         return ShipmentRestMapper.toResponse(buyerPort.consultOrderShipment(actor, DomainReferences.order(orderId)));
     }
 
+    /** Removes every line of the caller's active cart; the cart stays, empty. */
+    @DeleteMapping("/cart/items")
+    public CartResponse clearActiveCart(@AuthenticationPrincipal(expression = "user") User actor) {
+        return CartRestMapper.toResponse(buyerPort.clearActiveCart(actor));
+    }
+
     /**
      * Pays one of the caller's {@code PENDING_PAYMENT} orders: {@code 200} with the order {@code PAID} (or
      * {@code DELIVERED} when it holds only digital products), {@code 402} when the gateway declines it.

@@ -23,6 +23,7 @@ import nexussMarket.domain.services.LogoutService;
 import nexussMarket.domain.services.PackShipmentService;
 import nexussMarket.domain.services.RegisterInventoryReturnService;
 import nexussMarket.domain.services.ReportDamagedInventoryService;
+import nexussMarket.domain.services.UpdateProfileService;
 import nexussMarket.domain.valueobjects.OrderStatus;
 
 /** Implements {@link LogisticsOperatorPort} by delegating each operation to its domain service. */
@@ -40,6 +41,7 @@ public class LogisticsOperatorUseCaseImpl implements LogisticsOperatorPort {
     private final RegisterInventoryReturnService registerInventoryReturnService;
     private final ConsultInventoryService consultInventoryService;
     private final LogoutService logoutService;
+    private final UpdateProfileService updateProfileService;
     private final ChangeUserPasswordService changeUserPasswordService;
 
     @Override
@@ -95,5 +97,10 @@ public class LogisticsOperatorUseCaseImpl implements LogisticsOperatorPort {
     @Override
     public void changePassword(User user, String currentPassword, String newPassword) {
         changeUserPasswordService.execute(user, currentPassword, newPassword);
+    }
+
+    @Override
+    public User updateProfile(User user, User changes) {
+        return updateProfileService.execute(user, changes);
     }
 }
