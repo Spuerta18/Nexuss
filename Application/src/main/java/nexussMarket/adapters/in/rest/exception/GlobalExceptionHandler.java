@@ -2,6 +2,7 @@ package nexussMarket.adapters.in.rest.exception;
 
 import java.util.List;
 
+import org.apache.catalina.connector.ClientAbortException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -13,6 +14,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import nexussMarket.adapters.in.rest.responses.ErrorResponse;
@@ -176,8 +178,29 @@ public class GlobalExceptionHandler {
                 "The resource was changed by another request; reload it and try again", request);
     }
 
+    /**
+     * The client closed the connection before the response was written (a closed browser tab, a cancelled
+     * request). Not an error of the application: logged at most at {@code DEBUG}, in one line and without a stack
+     * trace, and no response is written, since nobody is left to read it. An
+     * {@link AsyncRequestNotUsableException} that does not come from an aborted connection is a real failure and
+     * is handled as an unexpected error.
+     */
+    @ExceptionHandler({ClientAbortException.class, AsyncRequestNotUsableException.class})
+    public ResponseEntity<ErrorResponse> handleClientDisconnect(Exception ex, HttpServletRequest request) {
+        if (!isClientDisconnect(ex)) {
+            return handleUnexpected(ex, request);
+        }
+        logClientDisconnect(ex, request);
+        return null;
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex, HttpServletRequest request) {
+        // A disconnection can also arrive wrapped, e.g. in a failure to write the response body.
+        if (isClientDisconnect(ex)) {
+            logClientDisconnect(ex, request);
+            return null;
+        }
         // Spring MVC's own exceptions (unknown route, wrong method, missing parameter...) keep their status.
         if (ex instanceof org.springframework.web.ErrorResponse springError) {
             String detail = springError.getBody().getDetail();
@@ -189,5 +212,26 @@ public class GlobalExceptionHandler {
                 ex);
         return RestErrors.response(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error", request, requestId,
                 List.of());
+    }
+
+    /** Whether {@code ex}, or one of its causes, is Tomcat's signal that the client aborted the connection. */
+    static boolean isClientDisconnect(Throwable ex) {
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ClientAbortException) {
+                return true;
+            }
+            if (cause.getCause() == cause) {
+                break;
+            }
+        }
+        return false;
+    }
+
+    private static void logClientDisconnect(Exception ex, HttpServletRequest request) {
+        if (log.isDebugEnabled()) {
+            log.debug("Client disconnected before the response was written [requestId={}] on {} {}: {}",
+                    RestErrors.requestId(request), request.getMethod(), request.getRequestURI(),
+                    String.valueOf(ex.getMessage()).replaceAll("\\s+", " "));
+        }
     }
 }
