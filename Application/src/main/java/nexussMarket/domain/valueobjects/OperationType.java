@@ -36,6 +36,10 @@ public final class OperationType extends DomainCatalog {
             new OperationType("PRODUCT_PUBLICATION", "Product Publication", "A seller published a product.");
     public static final OperationType PRODUCT_STATUS_CHANGE = new OperationType("PRODUCT_STATUS_CHANGE",
             "Product Status Change", "The publication status of a product changed.");
+    public static final OperationType PRODUCT_UPDATE = new OperationType("PRODUCT_UPDATE", "Product Update",
+            "A seller changed the name or the price of a product.");
+    public static final OperationType PRODUCT_DISCONTINUATION = new OperationType("PRODUCT_DISCONTINUATION",
+            "Product Discontinuation", "A product was removed from sale for good (logical deletion).");
     public static final OperationType PRODUCT_VARIANTS_UPDATE = new OperationType("PRODUCT_VARIANTS_UPDATE",
             "Product Variants Update", "The variants of a product were replaced.");
 
@@ -106,6 +110,7 @@ public final class OperationType extends DomainCatalog {
         return List.of(BUYER_REGISTRATION, SELLER_REGISTRATION, SUPERVISOR_REGISTRATION,
                 LOGISTICS_OPERATOR_REGISTRATION, USER_LOGIN, USER_LOGOUT, PASSWORD_CHANGE, USER_STATUS_CHANGE,
                 SELLER_STATUS_CHANGE, PRODUCT_PUBLICATION, PRODUCT_STATUS_CHANGE, PRODUCT_VARIANTS_UPDATE,
+                PRODUCT_UPDATE, PRODUCT_DISCONTINUATION,
                 WAREHOUSE_REGISTRATION, WAREHOUSE_DEACTIVATION, INVENTORY_INBOUND, INVENTORY_ADJUSTMENT,
                 INVENTORY_DAMAGE_REPORT, INVENTORY_RETURN, CART_CREATION, CART_LINE_ADDITION,
                 CART_LINE_QUANTITY_UPDATE, CART_LINE_REMOVAL, ORDER_CONFIRMATION, ORDER_CANCELLATION,

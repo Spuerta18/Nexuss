@@ -15,11 +15,13 @@ import nexussMarket.domain.services.AdjustInventoryService;
 import nexussMarket.domain.services.ChangeUserPasswordService;
 import nexussMarket.domain.services.ConsultInventoryService;
 import nexussMarket.domain.services.ConsultProductService;
+import nexussMarket.domain.services.DiscontinueProductService;
 import nexussMarket.domain.services.ListSellerProductsService;
 import nexussMarket.domain.services.LogoutService;
 import nexussMarket.domain.services.PublishProductService;
 import nexussMarket.domain.services.RegisterInventoryInboundService;
 import nexussMarket.domain.services.RegisterWarehouseService;
+import nexussMarket.domain.services.UpdateProductService;
 import nexussMarket.domain.services.UpdateProductStatusService;
 import nexussMarket.domain.services.UpdateProductVariantsService;
 import nexussMarket.domain.valueobjects.ProductStatus;
@@ -33,6 +35,8 @@ public class SellerUseCaseImpl implements SellerPort {
     private final PublishProductService publishProductService;
     private final UpdateProductStatusService updateProductStatusService;
     private final UpdateProductVariantsService updateProductVariantsService;
+    private final UpdateProductService updateProductService;
+    private final DiscontinueProductService discontinueProductService;
     private final ListSellerProductsService listSellerProductsService;
     private final ConsultProductService consultProductService;
     private final RegisterWarehouseService registerWarehouseService;
@@ -55,6 +59,16 @@ public class SellerUseCaseImpl implements SellerPort {
     @Override
     public Product updateProductVariants(User user, Product product, List<ProductVariant> variants) {
         return updateProductVariantsService.execute(user, product, variants);
+    }
+
+    @Override
+    public Product updateProduct(User user, Product product) {
+        return updateProductService.execute(user, product);
+    }
+
+    @Override
+    public Product discontinueProduct(User user, Product product) {
+        return discontinueProductService.execute(user, product);
     }
 
     @Override

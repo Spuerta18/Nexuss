@@ -11,11 +11,16 @@ import nexussMarket.adapters.out.persistence.mongodb.documents.OrderDocument;
 import nexussMarket.adapters.out.persistence.mongodb.mappers.OrderMapper;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.ports.out.OrderRepositoryPort;
+import nexussMarket.domain.valueobjects.OrderStatus;
 
 /** {@link OrderRepositoryPort} on the in-memory {@code orders} collection (versioned). */
 @Repository
 @Profile("memory")
 public class InMemoryOrderRepositoryAdapter implements OrderRepositoryPort {
+
+    /** Statuses of an order that is still open: not delivered nor cancelled. */
+    static final List<String> OPEN_STATUSES = List.of(OrderStatus.CART.getCode(),
+            OrderStatus.PENDING_PAYMENT.getCode(), OrderStatus.PAID.getCode(), OrderStatus.SHIPPED.getCode());
 
     private final InMemoryDatabase database;
     private final InMemoryReferenceResolver referenceResolver;
@@ -50,5 +55,11 @@ public class InMemoryOrderRepositoryAdapter implements OrderRepositoryPort {
     public List<Order> findAllByBuyerId(String buyerId) {
         return referenceResolver.toOrders(database.orders.find(document -> buyerId.equals(document.getBuyerId()))
                 .stream().sorted(Comparator.comparing(OrderDocument::getCreatedAt).reversed()).toList());
+    }
+
+    @Override
+    public boolean existsOpenOrderWithProduct(String productId) {
+        return database.orders.exists(document -> OPEN_STATUSES.contains(document.getStatus())
+                && document.getLines().stream().anyMatch(line -> productId.equals(line.getProductId())));
     }
 }

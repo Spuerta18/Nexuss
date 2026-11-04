@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +28,7 @@ import nexussMarket.adapters.in.rest.requests.InventoryMovementRequest;
 import nexussMarket.adapters.in.rest.requests.ProductStatusRequest;
 import nexussMarket.adapters.in.rest.requests.PublishProductRequest;
 import nexussMarket.adapters.in.rest.requests.RegisterWarehouseRequest;
+import nexussMarket.adapters.in.rest.requests.UpdateProductRequest;
 import nexussMarket.adapters.in.rest.requests.VariantsRequest;
 import nexussMarket.adapters.in.rest.responses.InventoryItemResponse;
 import nexussMarket.adapters.in.rest.responses.ProductResponse;
@@ -68,6 +70,25 @@ public class SellerRestController {
     }
 
     /** The products of the authenticated seller, in every status. */
+    /** Changes the name and the price of one of the caller's products. */
+    @PutMapping("/products/{productId}")
+    public ProductResponse updateProduct(@AuthenticationPrincipal(expression = "user") User actor,
+                                         @PathVariable String productId,
+                                         @Valid @RequestBody UpdateProductRequest request) {
+        return CatalogRestMapper.toResponse(sellerPort.updateProduct(actor,
+                CatalogRestMapper.productChanges(productId, request)));
+    }
+
+    /**
+     * Deletes one of the caller's products logically: it becomes {@code DISCONTINUED} and leaves the catalog.
+     * {@code 409} while an open order holds it; calling it again answers the same product.
+     */
+    @DeleteMapping("/products/{productId}")
+    public ProductResponse discontinueProduct(@AuthenticationPrincipal(expression = "user") User actor,
+                                              @PathVariable String productId) {
+        return CatalogRestMapper.toResponse(sellerPort.discontinueProduct(actor, DomainReferences.product(productId)));
+    }
+
     @GetMapping("/products")
     public List<ProductResponse> listOwnProducts(@AuthenticationPrincipal(expression = "user") User actor) {
         return CatalogRestMapper.toResponses(

@@ -10,11 +10,16 @@ import nexussMarket.adapters.out.persistence.mongodb.mappers.OrderMapper;
 import nexussMarket.adapters.out.persistence.mongodb.repositories.OrderMongoRepository;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.ports.out.OrderRepositoryPort;
+import nexussMarket.domain.valueobjects.OrderStatus;
 
 /** Implements {@link OrderRepositoryPort} on the {@code orders} collection. */
 @Repository
 @Profile("!memory")
 public class MongoOrderRepositoryAdapter implements OrderRepositoryPort {
+
+    /** Statuses of an order that is still open: not delivered nor cancelled. */
+    static final List<String> OPEN_STATUSES = List.of(OrderStatus.CART.getCode(),
+            OrderStatus.PENDING_PAYMENT.getCode(), OrderStatus.PAID.getCode(), OrderStatus.SHIPPED.getCode());
 
     private final OrderMongoRepository orderRepository;
     private final MongoReferenceResolver referenceResolver;
@@ -49,5 +54,10 @@ public class MongoOrderRepositoryAdapter implements OrderRepositoryPort {
     @Override
     public List<Order> findAllByBuyerId(String buyerId) {
         return referenceResolver.toOrders(orderRepository.findAllByBuyerIdOrderByCreatedAtDesc(buyerId));
+    }
+
+    @Override
+    public boolean existsOpenOrderWithProduct(String productId) {
+        return orderRepository.existsByLinesProductIdAndStatusIn(productId, OPEN_STATUSES);
     }
 }

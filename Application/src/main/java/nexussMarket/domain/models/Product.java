@@ -3,6 +3,8 @@ package nexussMarket.domain.models;
 import java.util.ArrayList;
 import java.util.List;
 
+import nexussMarket.domain.exceptions.InvalidProductPriceException;
+import nexussMarket.domain.exceptions.ProductDiscontinuedException;
 import nexussMarket.domain.valueobjects.Money;
 import nexussMarket.domain.valueobjects.ProductStatus;
 import nexussMarket.domain.valueobjects.ProductType;
@@ -20,12 +22,12 @@ import nexussMarket.domain.valueobjects.ProductVariant;
 public class Product {
 
     private final String identifier;
-    private final String name;
+    private String name;
     private final ProductType productType;
     private List<ProductVariant> variants;
     private ProductStatus status;
     private final Seller seller;
-    private final Money price;
+    private Money price;
 
     /** A reference or a new product without seller, price or variants yet. */
     public Product(String identifier, String name, ProductType productType, ProductStatus status) {
@@ -94,5 +96,24 @@ public class Product {
     /** Replaces every variant of the product; {@code null} leaves it without variants. */
     public void replaceVariants(List<ProductVariant> newVariants) {
         variants = copyOf(newVariants);
+    }
+
+    /**
+     * Changes the commercial name and the price. The price follows the rule of
+     * publication (present and greater than zero); a discontinued product can
+     * no longer be changed. Orders keep the price they were confirmed with.
+     */
+    public void updateDetails(String newName, Money newPrice) {
+        if (status == ProductStatus.DISCONTINUED) {
+            throw new ProductDiscontinuedException("Product " + identifier + " is discontinued and cannot be changed");
+        }
+        if (newName == null || newName.isBlank()) {
+            throw new IllegalArgumentException("Product " + identifier + " name must not be blank");
+        }
+        if (newPrice == null || !newPrice.isPositive()) {
+            throw new InvalidProductPriceException("Product " + identifier + " must have a price greater than zero");
+        }
+        name = newName.trim();
+        price = newPrice;
     }
 }

@@ -50,7 +50,16 @@ tests, 4 JaCoCo / guard tests / SETUP.md / Postman, 5 Docker, 6 closing campaign
     moves a digital-only order PAID → SHIPPED → DELIVERED after either payment path (`DIGITAL_ORDER_FULFILLMENT`).
     Before this, confirming a digital product failed with insufficient stock. Tests: `BuyerPaymentScenariosTest`,
     `BuyerPaymentRestControllerTest`, two new `EndToEndScenariosTest` cases. 362 tests green; checked on 8081.
-  - **Next:** step 2, `PUT /api/seller/products/{id}` and `DELETE` (logical, `DISCONTINUED`).
+  - **Step 2 — product edit and logical delete, done.** `PUT /api/seller/products/{productId}`
+    (`UpdateProductRequest`: name + price) → `UpdateProductService` (ownership through
+    `AuthorizeProductOwnershipService`, seller `ACTIVE`, price > 0 via `Product.updateDetails`, discontinued → 409
+    `ProductDiscontinuedException`, audit `PRODUCT_UPDATE`; confirmed orders keep their price).
+    `DELETE /api/seller/products/{productId}` → `DiscontinueProductService` (`DISCONTINUED`; 409
+    `ProductInOpenOrderException` while an open order holds it, via `OrderRepositoryPort.existsOpenOrderWithProduct`;
+    idempotent, second call records nothing; audit `PRODUCT_DISCONTINUATION`). Tests:
+    `ProductManagementScenariosTest`, `ProductManagementRestControllerTest`, Mongo open-order query in
+    `MongoVersioningIntegrationTest`. 373 tests green; checked on 8081.
+  - **Next:** step 3, `PUT /api/me` (name and, for buyers, addresses).
 - **After Block 2:** Block 4 (SETUP.md and Postman first; JaCoCo and guard tests last) → remaining Block 1, JaCoCo,
   Block 5, Block 6. Move the `demo-stable` tag to every green block commit.
 - Verify with `./mvnw -o clean test` from `Application/` (Maven is not on the PATH; use the wrapper). Scratchpad

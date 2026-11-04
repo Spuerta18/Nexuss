@@ -19,6 +19,12 @@ public interface SellerPort {
 
     Product updateProductVariants(User user, Product product, List<ProductVariant> variants);
 
+    /** Changes the name and the price of one of the seller's products ({@code product} carries the new values). */
+    Product updateProduct(User user, Product product);
+
+    /** Deletes one of the seller's products logically ({@code DISCONTINUED}); idempotent. */
+    Product discontinueProduct(User user, Product product);
+
     List<Product> listSellerProducts(User user, Seller seller);
 
     Product consultProduct(User user, Product product);

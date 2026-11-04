@@ -125,6 +125,24 @@ class MongoVersioningIntegrationTest {
     }
 
     @Test
+    void openOrdersHoldingAProductAreFoundByTheNestedLineQuery() {
+        Product product = storedProduct("P-OPEN", seller);
+        Warehouse warehouse = storedWarehouse("W-OPEN", seller);
+        Buyer buyer = storedBuyer("B-OPEN");
+        MongoOrderRepositoryAdapter orders = new MongoOrderRepositoryAdapter(
+                repositories.getRepository(OrderMongoRepository.class), resolver());
+        orders.insert(new Order("O-OPEN", buyer, OrderStatus.PENDING_PAYMENT,
+                List.of(new OrderLine(product, "Keyboard", 1, cop(1000), warehouse))));
+
+        assertEquals(true, orders.existsOpenOrderWithProduct("P-OPEN"));
+        assertEquals(false, orders.existsOpenOrderWithProduct("P-NONE"));
+        Order order = orders.findById("O-OPEN").orElseThrow();
+        order.cancel();
+        orders.save(order);
+        assertEquals(false, orders.existsOpenOrderWithProduct("P-OPEN"), "a cancelled order is not open");
+    }
+
+    @Test
     void staleCartDeleteFailsAndKeepsTheCart() {
         Product product = storedProduct("P-CART", seller);
         Buyer buyer = storedBuyer("B-CART");

@@ -25,4 +25,9 @@ public interface OrderRepositoryPort {
     Optional<Order> findById(String identifier);
 
     List<Order> findAllByBuyerId(String buyerId);
+
+    /**
+     * Whether an open order (not yet delivered nor cancelled) holds {@code productId} in one of its lines.
+     */
+    boolean existsOpenOrderWithProduct(String productId);
 }

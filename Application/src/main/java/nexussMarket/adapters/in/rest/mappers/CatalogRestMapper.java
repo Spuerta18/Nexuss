@@ -5,6 +5,7 @@ import java.util.List;
 import nexussMarket.adapters.in.rest.exception.InvalidRequestException;
 import nexussMarket.adapters.in.rest.requests.MoneyRequest;
 import nexussMarket.adapters.in.rest.requests.PublishProductRequest;
+import nexussMarket.adapters.in.rest.requests.UpdateProductRequest;
 import nexussMarket.adapters.in.rest.requests.VariantRequest;
 import nexussMarket.adapters.in.rest.responses.MoneyResponse;
 import nexussMarket.adapters.in.rest.responses.ProductResponse;
@@ -34,6 +35,11 @@ public final class CatalogRestMapper {
         return new Product(request.identifier(), request.name(),
                 RestCodes.resolve(ProductType::fromCode, request.productType(), "product type"), null, null,
                 toMoney(request.price()), toVariants(request.variants()));
+    }
+
+    /** The new name and price of product {@code productId}, as a reference carrying only those values. */
+    public static Product productChanges(String productId, UpdateProductRequest request) {
+        return new Product(productId, request.name(), null, null, null, toMoney(request.price()), null);
     }
 
     public static ProductStatus productStatus(String code) {

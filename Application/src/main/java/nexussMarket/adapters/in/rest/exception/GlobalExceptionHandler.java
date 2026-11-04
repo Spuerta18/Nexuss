@@ -42,6 +42,8 @@ import nexussMarket.domain.exceptions.OperationNotAllowedException;
 import nexussMarket.domain.exceptions.OrderNotShippableException;
 import nexussMarket.domain.exceptions.OrderStatusRequiresShipmentException;
 import nexussMarket.domain.exceptions.PaymentDeclinedException;
+import nexussMarket.domain.exceptions.ProductDiscontinuedException;
+import nexussMarket.domain.exceptions.ProductInOpenOrderException;
 import nexussMarket.domain.exceptions.ProductNotPurchasableException;
 import nexussMarket.domain.exceptions.RefundAlreadyProcessedException;
 import nexussMarket.domain.exceptions.ReturnAlreadyDecidedException;
@@ -88,7 +90,8 @@ public class GlobalExceptionHandler {
             EmptyCartException.class, ProductNotPurchasableException.class, CurrencyMismatchException.class,
             OrderNotShippableException.class, EmptyOrderException.class, ReturnNotEligibleException.class,
             ReturnAlreadyDecidedException.class, RefundAlreadyProcessedException.class,
-            InactiveWarehouseException.class, InventoryNotTrackedException.class, ConcurrentUpdateException.class})
+            InactiveWarehouseException.class, InventoryNotTrackedException.class, ConcurrentUpdateException.class,
+            ProductDiscontinuedException.class, ProductInOpenOrderException.class})
     public ResponseEntity<ErrorResponse> handleConflict(DomainException ex, HttpServletRequest request) {
         return RestErrors.response(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
