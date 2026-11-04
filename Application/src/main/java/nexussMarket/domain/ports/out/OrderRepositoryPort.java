@@ -1,5 +1,6 @@
 package nexussMarket.domain.ports.out;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +34,9 @@ public interface OrderRepositoryPort {
      * Whether an open order (not yet delivered nor cancelled) holds {@code productId} in one of its lines.
      */
     boolean existsOpenOrderWithProduct(String productId);
+
+    /** Every order created from {@code from} (included) to {@code to} (excluded). */
+    List<Order> findAllCreatedBetween(LocalDateTime from, LocalDateTime to);
 
     /** A page of every order, most recent first. */
     ResultPage<Order> findPage(PageQuery page);

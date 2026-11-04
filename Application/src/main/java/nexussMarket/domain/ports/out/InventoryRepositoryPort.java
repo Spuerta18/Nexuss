@@ -29,6 +29,9 @@ public interface InventoryRepositoryPort {
 
     List<InventoryItem> findAllByProductId(String productId);
 
+    /** Every inventory record. */
+    List<InventoryItem> findAll();
+
     /** A page of every inventory record, ordered by identifier ({@code productId:warehouseId}). */
     ResultPage<InventoryItem> findPage(PageQuery page);
 

@@ -12,10 +12,16 @@ import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.ResultPage;
+import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
+import nexussMarket.domain.models.reports.CommercialReport;
+import nexussMarket.domain.models.reports.InventoryReport;
+import nexussMarket.domain.models.reports.LogisticsReport;
+import nexussMarket.domain.models.reports.SellerPerformanceReport;
 import nexussMarket.domain.ports.in.SupervisorPort;
 import nexussMarket.domain.services.ChangeUserPasswordService;
+import nexussMarket.domain.services.CommercialReportService;
 import nexussMarket.domain.services.ConsultAuditLogsService;
 import nexussMarket.domain.services.ConsultInventoryService;
 import nexussMarket.domain.services.ConsultOperationsService;
@@ -23,14 +29,18 @@ import nexussMarket.domain.services.ConsultOrderInvoiceService;
 import nexussMarket.domain.services.ConsultOrderService;
 import nexussMarket.domain.services.ConsultProductService;
 import nexussMarket.domain.services.ConsultUserService;
+import nexussMarket.domain.services.InventoryReportService;
 import nexussMarket.domain.services.ListInventoryService;
 import nexussMarket.domain.services.ListOrdersService;
 import nexussMarket.domain.services.ListPublishedProductsService;
 import nexussMarket.domain.services.ListUsersService;
 import nexussMarket.domain.services.ListWarehousesService;
+import nexussMarket.domain.services.LogisticsReportService;
 import nexussMarket.domain.services.LogoutService;
+import nexussMarket.domain.services.SellerPerformanceReportService;
 import nexussMarket.domain.services.UpdateProfileService;
 import nexussMarket.domain.valueobjects.PageQuery;
+import nexussMarket.domain.valueobjects.ReportPeriod;
 import nexussMarket.domain.valueobjects.SystemRole;
 
 /** Implements {@link SupervisorPort} by delegating each operation to its domain service. */
@@ -47,6 +57,10 @@ public class SupervisorUseCaseImpl implements SupervisorPort {
     private final ListPublishedProductsService listPublishedProductsService;
     private final ConsultOrderInvoiceService consultOrderInvoiceService;
     private final LogoutService logoutService;
+    private final CommercialReportService commercialReportService;
+    private final InventoryReportService inventoryReportService;
+    private final LogisticsReportService logisticsReportService;
+    private final SellerPerformanceReportService sellerPerformanceReportService;
     private final ListUsersService listUsersService;
     private final ListOrdersService listOrdersService;
     private final ListWarehousesService listWarehousesService;
@@ -127,5 +141,25 @@ public class SupervisorUseCaseImpl implements SupervisorPort {
     @Override
     public ResultPage<InventoryItem> listInventory(User user, PageQuery page) {
         return listInventoryService.execute(user, page);
+    }
+
+    @Override
+    public CommercialReport commercialReport(User user, ReportPeriod period) {
+        return commercialReportService.execute(user, period);
+    }
+
+    @Override
+    public InventoryReport inventoryReport(User user, int lowStockThreshold) {
+        return inventoryReportService.execute(user, lowStockThreshold);
+    }
+
+    @Override
+    public LogisticsReport logisticsReport(User user, ReportPeriod period) {
+        return logisticsReportService.execute(user, period);
+    }
+
+    @Override
+    public SellerPerformanceReport sellerPerformanceReport(User user, Seller seller, ReportPeriod period) {
+        return sellerPerformanceReportService.execute(user, seller, period);
     }
 }

@@ -1,5 +1,7 @@
 package nexussMarket.adapters.out.persistence.memory;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -53,5 +55,12 @@ public class InMemoryShipmentRepositoryAdapter implements ShipmentRepositoryPort
 
     private Shipment toDomain(ShipmentDocument document) {
         return ShipmentMapper.toDomain(document, referenceResolver.order(document.getOrderId()));
+    }
+
+    @Override
+    public List<Shipment> findAllCreatedBetween(LocalDateTime from, LocalDateTime to) {
+        return database.shipments.find(document -> document.getCreatedAt() != null
+                        && !document.getCreatedAt().isBefore(from) && document.getCreatedAt().isBefore(to))
+                .stream().map(this::toDomain).toList();
     }
 }

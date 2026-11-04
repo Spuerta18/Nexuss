@@ -1,7 +1,9 @@
 package nexussMarket.adapters.in.rest.controllers;
 
+import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,6 +26,7 @@ import nexussMarket.adapters.in.rest.mappers.DomainReferences;
 import nexussMarket.adapters.in.rest.mappers.InventoryRestMapper;
 import nexussMarket.adapters.in.rest.mappers.OrderRestMapper;
 import nexussMarket.adapters.in.rest.mappers.PageRestMapper;
+import nexussMarket.adapters.in.rest.mappers.ReportRestMapper;
 import nexussMarket.adapters.in.rest.mappers.WarehouseRestMapper;
 import nexussMarket.adapters.in.rest.requests.ChangePasswordRequest;
 import nexussMarket.adapters.in.rest.requests.InventoryAdjustmentRequest;
@@ -37,6 +40,7 @@ import nexussMarket.adapters.in.rest.responses.InventoryItemResponse;
 import nexussMarket.adapters.in.rest.responses.OrderResponse;
 import nexussMarket.adapters.in.rest.responses.PageResponse;
 import nexussMarket.adapters.in.rest.responses.ProductResponse;
+import nexussMarket.adapters.in.rest.responses.ReportResponses.SellerPerformanceReportResponse;
 import nexussMarket.adapters.in.rest.responses.WarehouseResponse;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.in.SellerPort;
@@ -178,5 +182,13 @@ public class SellerRestController {
                                                              @RequestParam(defaultValue = "20") int size) {
         return PageRestMapper.toResponse(sellerPort.listInventory(actor, PageRestMapper.query(page, size)),
                 InventoryRestMapper::toResponse);
+    }
+
+    /** The caller's own results between {@code from} and {@code to} (ISO dates; default the last 30 days). */
+    @GetMapping("/reports/performance")
+    public SellerPerformanceReportResponse performanceReport(@AuthenticationPrincipal(expression = "user") User actor,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ReportRestMapper.toResponse(sellerPort.performanceReport(actor, ReportRestMapper.period(from, to)));
     }
 }

@@ -9,9 +9,11 @@ import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
+import nexussMarket.domain.models.reports.SellerPerformanceReport;
 import nexussMarket.domain.valueobjects.PageQuery;
 import nexussMarket.domain.valueobjects.ProductStatus;
 import nexussMarket.domain.valueobjects.ProductVariant;
+import nexussMarket.domain.valueobjects.ReportPeriod;
 
 /** Operations a {@link Seller} can execute on their own catalog, warehouses and inventory. */
 public interface SellerPort {
@@ -61,4 +63,7 @@ public interface SellerPort {
 
     /** A page of inventory records. Read-only. */
     ResultPage<InventoryItem> listInventory(User user, PageQuery page);
+
+    /** The seller's own results in a period. Read-only. */
+    SellerPerformanceReport performanceReport(User user, ReportPeriod period);
 }

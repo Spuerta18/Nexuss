@@ -18,18 +18,25 @@ import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.Supervisor;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
+import nexussMarket.domain.models.reports.CommercialReport;
+import nexussMarket.domain.models.reports.InventoryReport;
+import nexussMarket.domain.models.reports.LogisticsReport;
+import nexussMarket.domain.models.reports.SellerPerformanceReport;
 import nexussMarket.domain.ports.in.AdministratorPort;
 import nexussMarket.domain.services.ApproveReturnService;
 import nexussMarket.domain.services.ChangeUserPasswordService;
+import nexussMarket.domain.services.CommercialReportService;
 import nexussMarket.domain.services.ConsultAuditLogsService;
 import nexussMarket.domain.services.ConsultOperationsService;
 import nexussMarket.domain.services.ConsultOrderInvoiceService;
 import nexussMarket.domain.services.ConsultUserService;
 import nexussMarket.domain.services.DeactivateWarehouseService;
+import nexussMarket.domain.services.InventoryReportService;
 import nexussMarket.domain.services.ListInventoryService;
 import nexussMarket.domain.services.ListOrdersService;
 import nexussMarket.domain.services.ListUsersService;
 import nexussMarket.domain.services.ListWarehousesService;
+import nexussMarket.domain.services.LogisticsReportService;
 import nexussMarket.domain.services.LogoutService;
 import nexussMarket.domain.services.ProcessRefundService;
 import nexussMarket.domain.services.RegisterLogisticsOperatorService;
@@ -38,10 +45,12 @@ import nexussMarket.domain.services.RegisterSellerService;
 import nexussMarket.domain.services.RegisterSupervisorService;
 import nexussMarket.domain.services.RegisterWarehouseService;
 import nexussMarket.domain.services.RejectReturnService;
+import nexussMarket.domain.services.SellerPerformanceReportService;
 import nexussMarket.domain.services.UpdateProfileService;
 import nexussMarket.domain.services.UpdateSellerStatusService;
 import nexussMarket.domain.services.UpdateUserStatusService;
 import nexussMarket.domain.valueobjects.PageQuery;
+import nexussMarket.domain.valueobjects.ReportPeriod;
 import nexussMarket.domain.valueobjects.SellerStatus;
 import nexussMarket.domain.valueobjects.SystemRole;
 import nexussMarket.domain.valueobjects.UserStatus;
@@ -67,6 +76,10 @@ public class AdministratorUseCaseImpl implements AdministratorPort {
     private final RegisterOrderPaymentService registerOrderPaymentService;
     private final ConsultOrderInvoiceService consultOrderInvoiceService;
     private final LogoutService logoutService;
+    private final CommercialReportService commercialReportService;
+    private final InventoryReportService inventoryReportService;
+    private final LogisticsReportService logisticsReportService;
+    private final SellerPerformanceReportService sellerPerformanceReportService;
     private final ListUsersService listUsersService;
     private final ListOrdersService listOrdersService;
     private final ListWarehousesService listWarehousesService;
@@ -182,5 +195,25 @@ public class AdministratorUseCaseImpl implements AdministratorPort {
     @Override
     public ResultPage<InventoryItem> listInventory(User user, PageQuery page) {
         return listInventoryService.execute(user, page);
+    }
+
+    @Override
+    public CommercialReport commercialReport(User user, ReportPeriod period) {
+        return commercialReportService.execute(user, period);
+    }
+
+    @Override
+    public InventoryReport inventoryReport(User user, int lowStockThreshold) {
+        return inventoryReportService.execute(user, lowStockThreshold);
+    }
+
+    @Override
+    public LogisticsReport logisticsReport(User user, ReportPeriod period) {
+        return logisticsReportService.execute(user, period);
+    }
+
+    @Override
+    public SellerPerformanceReport sellerPerformanceReport(User user, Seller seller, ReportPeriod period) {
+        return sellerPerformanceReportService.execute(user, seller, period);
     }
 }

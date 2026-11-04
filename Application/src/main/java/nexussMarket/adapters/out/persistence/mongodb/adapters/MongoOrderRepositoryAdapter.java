@@ -1,5 +1,6 @@
 package nexussMarket.adapters.out.persistence.mongodb.adapters;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -80,5 +81,10 @@ public class MongoOrderRepositoryAdapter implements OrderRepositoryPort {
         }
         return MongoPages.toResultPage(orderRepository.findByLinesProductIdIn(productIds,
                 MongoPages.pageable(page, MOST_RECENT_FIRST)), page, referenceResolver::toOrders);
+    }
+
+    @Override
+    public List<Order> findAllCreatedBetween(LocalDateTime from, LocalDateTime to) {
+        return referenceResolver.toOrders(orderRepository.findCreatedBetween(from, to));
     }
 }

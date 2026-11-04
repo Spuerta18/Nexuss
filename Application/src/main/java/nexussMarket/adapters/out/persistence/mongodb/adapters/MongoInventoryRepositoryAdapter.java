@@ -97,4 +97,9 @@ public class MongoInventoryRepositoryAdapter implements InventoryRepositoryPort 
                         warehouses.get(document.getWarehouseId())))
                 .toList();
     }
+
+    @Override
+    public List<InventoryItem> findAll() {
+        return toDomain(inventoryItemRepository.findAll(Sort.by("_id")));
+    }
 }

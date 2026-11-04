@@ -11,7 +11,9 @@ import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.ResultPage;
 import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.User;
+import nexussMarket.domain.models.UserFactory;
 import nexussMarket.domain.models.Warehouse;
+import nexussMarket.domain.models.reports.SellerPerformanceReport;
 import nexussMarket.domain.ports.in.SellerPort;
 import nexussMarket.domain.services.AdjustInventoryService;
 import nexussMarket.domain.services.ChangeUserPasswordService;
@@ -26,6 +28,7 @@ import nexussMarket.domain.services.LogoutService;
 import nexussMarket.domain.services.PublishProductService;
 import nexussMarket.domain.services.RegisterInventoryInboundService;
 import nexussMarket.domain.services.RegisterWarehouseService;
+import nexussMarket.domain.services.SellerPerformanceReportService;
 import nexussMarket.domain.services.UpdateProductService;
 import nexussMarket.domain.services.UpdateProductStatusService;
 import nexussMarket.domain.services.UpdateProductVariantsService;
@@ -33,6 +36,8 @@ import nexussMarket.domain.services.UpdateProfileService;
 import nexussMarket.domain.valueobjects.PageQuery;
 import nexussMarket.domain.valueobjects.ProductStatus;
 import nexussMarket.domain.valueobjects.ProductVariant;
+import nexussMarket.domain.valueobjects.ReportPeriod;
+import nexussMarket.domain.valueobjects.SystemRole;
 
 /** Implements {@link SellerPort} by delegating each operation to its domain service. */
 @Service
@@ -51,6 +56,7 @@ public class SellerUseCaseImpl implements SellerPort {
     private final AdjustInventoryService adjustInventoryService;
     private final ConsultInventoryService consultInventoryService;
     private final LogoutService logoutService;
+    private final SellerPerformanceReportService sellerPerformanceReportService;
     private final ListOrdersService listOrdersService;
     private final ListWarehousesService listWarehousesService;
     private final ListInventoryService listInventoryService;
@@ -140,5 +146,11 @@ public class SellerUseCaseImpl implements SellerPort {
     @Override
     public ResultPage<InventoryItem> listInventory(User user, PageQuery page) {
         return listInventoryService.execute(user, page);
+    }
+
+    @Override
+    public SellerPerformanceReport performanceReport(User user, ReportPeriod period) {
+        return sellerPerformanceReportService.execute(user, (Seller) UserFactory.reference(SystemRole.SELLER,
+                user.getIdentifier()), period);
     }
 }

@@ -1,5 +1,7 @@
 package nexussMarket.adapters.out.persistence.mongodb.adapters;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Profile;
@@ -53,5 +55,11 @@ public class MongoShipmentRepositoryAdapter implements ShipmentRepositoryPort {
 
     private Shipment toDomain(ShipmentDocument document) {
         return ShipmentMapper.toDomain(document, referenceResolver.order(document.getOrderId()));
+    }
+
+    @Override
+    public List<Shipment> findAllCreatedBetween(LocalDateTime from, LocalDateTime to) {
+        return shipmentRepository.findCreatedBetween(from, to).stream()
+                .map(this::toDomain).toList();
     }
 }

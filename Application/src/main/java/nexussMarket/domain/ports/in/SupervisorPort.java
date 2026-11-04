@@ -9,10 +9,16 @@ import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.Order;
 import nexussMarket.domain.models.Product;
 import nexussMarket.domain.models.ResultPage;
+import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.Supervisor;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.models.Warehouse;
+import nexussMarket.domain.models.reports.CommercialReport;
+import nexussMarket.domain.models.reports.InventoryReport;
+import nexussMarket.domain.models.reports.LogisticsReport;
+import nexussMarket.domain.models.reports.SellerPerformanceReport;
 import nexussMarket.domain.valueobjects.PageQuery;
+import nexussMarket.domain.valueobjects.ReportPeriod;
 import nexussMarket.domain.valueobjects.SystemRole;
 
 /**
@@ -68,4 +74,16 @@ public interface SupervisorPort {
 
     /** A page of inventory records. Read-only. */
     ResultPage<InventoryItem> listInventory(User user, PageQuery page);
+
+    /** Orders and sales of a period. Read-only. */
+    CommercialReport commercialReport(User user, ReportPeriod period);
+
+    /** Current stock per warehouse and records at or below {@code lowStockThreshold}. Read-only. */
+    InventoryReport inventoryReport(User user, int lowStockThreshold);
+
+    /** Shipments of a period per status. Read-only. */
+    LogisticsReport logisticsReport(User user, ReportPeriod period);
+
+    /** Results of one seller in a period. Read-only. */
+    SellerPerformanceReport sellerPerformanceReport(User user, Seller seller, ReportPeriod period);
 }

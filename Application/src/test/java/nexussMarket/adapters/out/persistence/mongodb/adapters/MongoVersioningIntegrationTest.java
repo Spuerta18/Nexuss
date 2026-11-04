@@ -168,6 +168,16 @@ class MongoVersioningIntegrationTest {
         assertEquals(3, firstOrders.totalItems());
         assertEquals(List.of("O-PAGE-3", "O-PAGE-2"),
                 firstOrders.items().stream().map(Order::getIdentifier).toList(), "most recent first");
+        assertEquals(List.of("O-PAGE-2"), orders.findAllCreatedBetween(java.time.LocalDateTime.of(2026, 1, 2, 0, 0),
+                java.time.LocalDateTime.of(2026, 1, 3, 0, 0)).stream().map(Order::getIdentifier).toList(),
+                "from included, to excluded");
+        MongoShipmentRepositoryAdapter shipments = new MongoShipmentRepositoryAdapter(
+                repositories.getRepository(nexussMarket.adapters.out.persistence.mongodb.repositories
+                        .ShipmentMongoRepository.class), resolver());
+        shipments.insert(new nexussMarket.domain.models.Shipment("SHP-PAGE", orders.findById("O-PAGE-1").orElseThrow()));
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        assertEquals(List.of("SHP-PAGE"), shipments.findAllCreatedBetween(now.minusMinutes(5), now.plusMinutes(5))
+                .stream().map(nexussMarket.domain.models.Shipment::getIdentifier).toList());
         assertEquals(1, orders.findPageByProductIds(List.of("P-PAGE"),
                 new nexussMarket.domain.valueobjects.PageQuery(1, 2)).items().size());
         assertEquals(List.of("W-PAGE"), warehouses.findPageByOwnerId("S-PAGE",

@@ -1,5 +1,6 @@
 package nexussMarket.adapters.out.persistence.memory;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -79,5 +80,11 @@ public class InMemoryOrderRepositoryAdapter implements OrderRepositoryPort {
         return InMemoryPages.page(database.orders.find(document -> document.getLines().stream()
                         .anyMatch(line -> productIds.contains(line.getProductId()))),
                 MOST_RECENT_FIRST, page, referenceResolver::toOrders);
+    }
+
+    @Override
+    public List<Order> findAllCreatedBetween(LocalDateTime from, LocalDateTime to) {
+        return referenceResolver.toOrders(database.orders.find(document -> document.getCreatedAt() != null
+                && !document.getCreatedAt().isBefore(from) && document.getCreatedAt().isBefore(to)));
     }
 }

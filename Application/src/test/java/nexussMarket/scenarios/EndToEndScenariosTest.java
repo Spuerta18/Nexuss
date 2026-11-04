@@ -187,6 +187,30 @@ class EndToEndScenariosTest {
     }
 
     @Test
+    void reportsAndListsReflectASale() throws Exception {
+        String admin = login(DemoDataSeeder.ADMIN_EMAIL, DEMO_PASSWORD);
+        String seller = login(DemoDataSeeder.SELLER_EMAIL, DEMO_PASSWORD);
+        String buyer = login(registerBuyer(), PASSWORD);
+        long unitsBefore = call("GET", "/api/seller/reports/performance", seller, null).expect(200).json()
+                .get("unitsSold").asLong();
+
+        call("POST", "/api/buyer/cart/items", buyer,
+                "{\"productId\":\"" + DemoDataSeeder.PHYSICAL_PRODUCT_IDS.get(2) + "\",\"quantity\":1}").expect(200);
+        String orderId = call("POST", "/api/buyer/orders", buyer, null).expect(201).json().get("identifier")
+                .asString();
+        call("POST", "/api/buyer/orders/" + orderId + "/payment", buyer, "{\"paymentToken\":\"tok_test_visa\"}")
+                .expect(200);
+
+        assertEquals(unitsBefore + 1, call("GET", "/api/seller/reports/performance", seller, null).expect(200)
+                .json().get("unitsSold").asLong());
+        assertTrue(call("GET", "/api/admin/reports/commercial", admin, null).expect(200).json()
+                .get("ordersByStatus").get("PAID").asLong() >= 1);
+        assertEquals(orderId, call("GET", "/api/seller/orders?size=1", seller, null).expect(200).json()
+                .get("items").get(0).get("identifier").asString(), "most recent first");
+        call("GET", "/api/admin/reports/inventory?lowStockThreshold=100", admin, null).expect(200);
+    }
+
+    @Test
     void everyRoleIsForbiddenOnTheRoutesOfTheOthers() throws Exception {
         Map<String, String> tokens = new LinkedHashMap<>();
         tokens.put("BUYER", login(DemoDataSeeder.BUYER_EMAIL, DEMO_PASSWORD));

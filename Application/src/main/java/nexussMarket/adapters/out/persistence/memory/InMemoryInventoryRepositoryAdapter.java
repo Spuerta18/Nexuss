@@ -92,4 +92,10 @@ public class InMemoryInventoryRepositoryAdapter implements InventoryRepositoryPo
                         warehouses.get(document.getWarehouseId())))
                 .toList();
     }
+
+    @Override
+    public List<InventoryItem> findAll() {
+        return toDomain(database.inventoryItems.findAll().stream()
+                .sorted(Comparator.comparing(InventoryItemDocument::getId)).toList());
+    }
 }

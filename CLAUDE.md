@@ -39,8 +39,8 @@ tests, 4 JaCoCo / guard tests / SETUP.md / Postman, 5 Docker, 6 closing campaign
   all roles, product lifecycle, sale to delivery + invoice, return + refund, 403 matrix, duplicate id 409,
   logout / password change, 60 buyers over HTTP for 10 units → 10), `DemoDataSeederTest`. The rejected-payment
   scenario comes with Block 2.
-- **Block 2 — in progress (user order: payment → PUT/DELETE product → PUT /api/me → lists and reports; commit +
-  push after every step; verify on port 8081 only, never 8080, which the user uses for manual demos).**
+- **Block 2 — done, 405 tests green (user order: payment → PUT/DELETE product → PUT /api/me → lists → reports;
+  commit + push after every step; verify on port 8081 only, never 8080, which the user uses for manual demos).**
   - **Step 1 — buyer payment, done.** `PaymentGatewayPort` + `SimulatedPaymentGatewayAdapter` (approves, reference
     `SIM-<orderId>`; the test token `DECLINED` is always declined). `PayOrderService` (BUYER + ownership through
     `AuthorizeOrderAccessService`; only `PENDING_PAYMENT`, else 409; declined → `PaymentDeclinedException` 402, order
@@ -77,8 +77,18 @@ tests, 4 JaCoCo / guard tests / SETUP.md / Postman, 5 Docker, 6 closing campaign
     warehouses|inventory`, `GET /api/logistics/orders`, `GET /api/seller/orders|warehouses|inventory`. A query or path
     parameter of the wrong type now answers 400 (`MethodArgumentTypeMismatchException`). Tests: `ListsScenariosTest`,
     `ListsRestControllerTest`, Mongo paged queries in `MongoVersioningIntegrationTest`. 393 green; checked on 8081.
-  - **Next:** step 5, reports (`ReportPeriod`).
-- **After Block 2:** Block 4 (SETUP.md and Postman first; JaCoCo and guard tests last) → remaining Block 1, JaCoCo,
+  - **Step 5 — reports, done.** `ReportPeriod` (from/to ISO dates, both included; from ≤ to; at most 366 days; default
+    the last 30 days ending today; else 400 `InvalidReportPeriodException`). Read-only services: `CommercialReportService`
+    (orders per status, sales of PAID/SHIPPED/DELIVERED orders per currency and per product), `InventoryReportService`
+    (current snapshot: stock per warehouse, low stock of products not discontinued, `lowStockThreshold` default 5),
+    `LogisticsReportService` (shipments per status), `SellerPerformanceReportService` (sold/pending/cancelled orders,
+    units, revenue; a seller always gets their own). ADMINISTRATOR and SUPERVISOR: `GET /api/{admin|supervisor}/reports/
+    commercial|inventory|logistics|sellers/{sellerId}`; SELLER: `GET /api/seller/reports/performance`. New port queries
+    `OrderRepositoryPort.findAllCreatedBetween`, `ShipmentRepositoryPort.findAllCreatedBetween` (Mongo `@Query`, since
+    Spring Data cannot derive two conditions on one field — caught by the integration test), `InventoryRepositoryPort
+    .findAll`. Tests: `ReportsScenariosTest`, `ReportsRestControllerTest`, one more `EndToEndScenariosTest` case, Mongo
+    period queries in `MongoVersioningIntegrationTest`. Checked on 8081. `demo-stable` moved to the Block 2 commit.
+- **Next: Block 4**  (SETUP.md and Postman first; JaCoCo and guard tests last) → remaining Block 1, JaCoCo,
   Block 5, Block 6. Move the `demo-stable` tag to every green block commit.
 - Verify with `./mvnw -o clean test` from `Application/` (Maven is not on the PATH; use the wrapper). Scratchpad
   launchers: `run-app.sh <db> <port> <log>` (Mongo) and `run-memory-8081.sh` (memory profile on 8081).

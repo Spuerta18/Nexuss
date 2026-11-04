@@ -1,5 +1,7 @@
 package nexussMarket.domain.ports.out;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import nexussMarket.domain.exceptions.ConcurrentUpdateException;
@@ -24,4 +26,7 @@ public interface ShipmentRepositoryPort {
     Optional<Shipment> findById(String identifier);
 
     Optional<Shipment> findByOrderId(String orderId);
+
+    /** Every shipment created from {@code from} (included) to {@code to} (excluded). */
+    List<Shipment> findAllCreatedBetween(LocalDateTime from, LocalDateTime to);
 }
