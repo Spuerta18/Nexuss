@@ -9,6 +9,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
 import org.springframework.data.mongodb.core.index.IndexOperations;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.ShoppingCartDocument;
@@ -31,6 +32,7 @@ import nexussMarket.adapters.out.persistence.mongodb.documents.ShoppingCartDocum
  * MongoDB server.</p>
  */
 @Component
+@Profile("!memory")
 @ConditionalOnProperty(name = "spring.data.mongodb.auto-index-creation", havingValue = "true")
 public class ActiveCartIndexInitializer implements InitializingBean {
 

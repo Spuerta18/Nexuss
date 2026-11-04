@@ -2,6 +2,7 @@ package nexussMarket.adapters.out.persistence.mongodb.adapters;
 
 import java.util.Optional;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.InvoiceDocument;
@@ -13,6 +14,7 @@ import nexussMarket.domain.ports.out.InvoiceRepositoryPort;
 
 /** Implements {@link InvoiceRepositoryPort} on the {@code invoices} collection. */
 @Repository
+@Profile("!memory")
 public class MongoInvoiceRepositoryAdapter implements InvoiceRepositoryPort {
 
     private final InvoiceMongoRepository invoiceRepository;
@@ -24,9 +26,11 @@ public class MongoInvoiceRepositoryAdapter implements InvoiceRepositoryPort {
         this.referenceResolver = referenceResolver;
     }
 
+    /** A real {@code insert}: an existing invoice is never replaced. */
     @Override
-    public Invoice save(Invoice invoice) {
-        invoiceRepository.save(InvoiceMapper.toDocument(invoice));
+    public Invoice insert(Invoice invoice) {
+        MongoInsertion.insert(() -> invoiceRepository.insert(InvoiceMapper.toDocument(invoice)),
+                "An invoice with id " + invoice.getIdentifier() + " already exists");
         return invoice;
     }
 

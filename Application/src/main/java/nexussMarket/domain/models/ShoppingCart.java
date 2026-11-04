@@ -26,6 +26,7 @@ public class ShoppingCart {
     private final String identifier;
     private final Buyer buyer;
     private final List<CartLine> lines;
+    private long version;
 
     /** A reference or a new, empty cart. */
     public ShoppingCart(String identifier, Buyer buyer) {
@@ -127,5 +128,23 @@ public class ShoppingCart {
     private InvalidQuantityException invalidQuantity(Product product, InvalidQuantityException cause) {
         return new InvalidQuantityException("Invalid quantity for product " + product.getIdentifier()
                 + " in cart " + identifier + ": " + cause.getMessage());
+    }
+
+    /**
+     * Optimistic-locking version of the stored {@code cart}: the number of
+     * times it has been saved. A save whose version is not the stored one
+     * fails with {@code ConcurrentUpdateException}, so two concurrent changes
+     * never overwrite each other. Unrelated to {@code authTokenVersion}.
+     */
+    public long getVersion() {
+        return version;
+    }
+
+    /** Sets the stored version; only for persistence adapters, after loading or saving. */
+    public void restoreVersion(long version) {
+        if (version < 0) {
+            throw new IllegalArgumentException("version must never be negative");
+        }
+        this.version = version;
     }
 }

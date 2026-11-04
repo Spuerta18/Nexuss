@@ -4,6 +4,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -28,6 +29,7 @@ import nexussMarket.domain.valueobjects.CustomerStatus;
 import nexussMarket.domain.valueobjects.SellerStatus;
 import nexussMarket.domain.valueobjects.UserStatus;
 import nexussMarket.infrastructure.security.JwtProvider;
+import nexussMarket.infrastructure.security.LoginAttemptLimiter;
 
 /**
  * Shared setup of the REST controller tests: the full application context
@@ -50,6 +52,9 @@ abstract class RestControllerTestSupport {
     @Autowired
     private JwtProvider jwtProvider;
 
+    @Autowired
+    private LoginAttemptLimiter loginAttemptLimiter;
+
     @MockitoBean
     protected PublicAccessPort publicAccessPort;
 
@@ -70,6 +75,12 @@ abstract class RestControllerTestSupport {
 
     @MockitoBean
     protected UserRepositoryPort userRepositoryPort;
+
+    /** Every test starts with no failed logins counted (the context, and so the limiter, is shared). */
+    @BeforeEach
+    void forgetFailedLogins() {
+        loginAttemptLimiter.reset();
+    }
 
     protected static Buyer buyer() {
         Buyer buyer = new Buyer("B-1", "Ana Buyer", "buyer@example.com", UserStatus.ACTIVE, CustomerStatus.ENABLED);

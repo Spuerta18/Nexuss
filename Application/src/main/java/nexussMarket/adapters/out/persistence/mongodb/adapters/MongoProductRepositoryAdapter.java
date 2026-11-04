@@ -3,6 +3,7 @@ package nexussMarket.adapters.out.persistence.mongodb.adapters;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.mappers.ProductMapper;
@@ -13,6 +14,7 @@ import nexussMarket.domain.valueobjects.ProductStatus;
 
 /** Implements {@link ProductRepositoryPort} on the {@code products} collection. */
 @Repository
+@Profile("!memory")
 public class MongoProductRepositoryAdapter implements ProductRepositoryPort {
 
     private final ProductMongoRepository productRepository;

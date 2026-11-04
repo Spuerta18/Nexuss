@@ -1,6 +1,7 @@
 package nexussMarket.adapters.out.persistence.mongodb.documents;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -31,6 +32,13 @@ public class InventoryItemDocument {
     private int availableQuantity;
     private int reservedQuantity;
     private int damagedQuantity;
+
+    /**
+     * Optimistic-locking version ({@code @Version}): a save matches only the version it read and increments it.
+     * Documents stored before versioning get {@code 0} from {@code VersionFieldMigration} at startup.
+     */
+    @Version
+    private Long version;
 
     /** Identifier of the inventory document for {@code productId} held in {@code warehouseId}. */
     public static String idOf(String productId, String warehouseId) {

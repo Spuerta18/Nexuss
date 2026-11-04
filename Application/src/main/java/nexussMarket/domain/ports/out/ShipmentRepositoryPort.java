@@ -2,6 +2,7 @@ package nexussMarket.domain.ports.out;
 
 import java.util.Optional;
 
+import nexussMarket.domain.exceptions.ConcurrentUpdateException;
 import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.models.Shipment;
 
@@ -13,7 +14,11 @@ public interface ShipmentRepositoryPort {
      */
     Shipment insert(Shipment shipment);
 
-    /** Stores the changes of an existing shipment. */
+    /**
+     * Stores the changes of an existing shipment. Fails with {@link ConcurrentUpdateException} if it was saved by
+     * someone else since it was read (its version changed); nothing is stored then. The new version is set on the
+     * argument.
+     */
     Shipment save(Shipment shipment);
 
     Optional<Shipment> findById(String identifier);

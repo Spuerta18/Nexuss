@@ -4,6 +4,8 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -16,6 +18,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import nexussMarket.adapters.in.rest.responses.ErrorResponse;
 import nexussMarket.adapters.in.rest.responses.ErrorResponse.FieldViolation;
 import nexussMarket.domain.exceptions.BuyerNotEnabledException;
+import nexussMarket.domain.exceptions.ConcurrentUpdateException;
 import nexussMarket.domain.exceptions.CurrencyMismatchException;
 import nexussMarket.domain.exceptions.DomainException;
 import nexussMarket.domain.exceptions.DuplicateResourceException;
@@ -82,7 +85,7 @@ public class GlobalExceptionHandler {
             EmptyCartException.class, ProductNotPurchasableException.class, CurrencyMismatchException.class,
             OrderNotShippableException.class, EmptyOrderException.class, ReturnNotEligibleException.class,
             ReturnAlreadyDecidedException.class, RefundAlreadyProcessedException.class,
-            InactiveWarehouseException.class, InventoryNotTrackedException.class})
+            InactiveWarehouseException.class, InventoryNotTrackedException.class, ConcurrentUpdateException.class})
     public ResponseEntity<ErrorResponse> handleConflict(DomainException ex, HttpServletRequest request) {
         return RestErrors.response(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
@@ -148,7 +151,29 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex,
                                                               HttpServletRequest request) {
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            if (cause instanceof RequestBodyTooLargeException tooLarge) {
+                return RestErrors.response(HttpStatus.CONTENT_TOO_LARGE, tooLarge.getMessage(), request);
+            }
+        }
         return RestErrors.response(HttpStatus.BAD_REQUEST, "Malformed or unreadable request body", request);
+    }
+
+    /**
+     * A unique index rejected a write that no service check caught (two concurrent registrations of the same
+     * email, for example). The index names are not echoed back.
+     */
+    @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateKey(DuplicateKeyException ex, HttpServletRequest request) {
+        return RestErrors.response(HttpStatus.CONFLICT, "The resource already exists", request);
+    }
+
+    /** A versioned write that lost a race and was not translated by an adapter. */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLocking(OptimisticLockingFailureException ex,
+                                                                 HttpServletRequest request) {
+        return RestErrors.response(HttpStatus.CONFLICT,
+                "The resource was changed by another request; reload it and try again", request);
     }
 
     @ExceptionHandler(Exception.class)

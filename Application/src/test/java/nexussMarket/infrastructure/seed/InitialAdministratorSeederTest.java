@@ -96,6 +96,11 @@ class InitialAdministratorSeederTest {
         private int queries;
 
         @Override
+        public User insert(User user) {
+            return save(user);
+        }
+
+        @Override
         public User save(User user) {
             saves++;
             byId.put(user.getIdentifier(), user);

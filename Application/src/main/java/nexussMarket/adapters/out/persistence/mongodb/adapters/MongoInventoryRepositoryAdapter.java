@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.InventoryItemDocument;
@@ -16,6 +17,7 @@ import nexussMarket.domain.ports.out.InventoryRepositoryPort;
 
 /** Implements {@link InventoryRepositoryPort} on the {@code inventory_items} collection. */
 @Repository
+@Profile("!memory")
 public class MongoInventoryRepositoryAdapter implements InventoryRepositoryPort {
 
     private final InventoryItemMongoRepository inventoryItemRepository;
@@ -27,9 +29,19 @@ public class MongoInventoryRepositoryAdapter implements InventoryRepositoryPort 
         this.referenceResolver = referenceResolver;
     }
 
+    /** A real {@code insert}: the record of a product in a warehouse is created once and never replaced. */
+    @Override
+    public InventoryItem insert(InventoryItem item) {
+        MongoInsertion.insert(() -> inventoryItemRepository.insert(InventoryItemMapper.toDocument(item)),
+                "An inventory item for product " + item.getProduct().getIdentifier() + " in warehouse "
+                        + item.getWarehouse().getIdentifier() + " already exists");
+        return item;
+    }
+
     @Override
     public InventoryItem save(InventoryItem item) {
-        inventoryItemRepository.save(InventoryItemMapper.toDocument(item));
+        item.restoreVersion(MongoVersioning.save(() -> inventoryItemRepository.save(InventoryItemMapper.toDocument(item)),
+                "Inventory item " + item.getIdentifier()).getVersion());
         return item;
     }
 

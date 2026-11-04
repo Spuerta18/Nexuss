@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.springframework.data.domain.Sort;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.AuditLogDocument;
@@ -20,6 +21,7 @@ import nexussMarket.domain.ports.out.AuditLogRepositoryPort;
  * every performer with a single query.
  */
 @Repository
+@Profile("!memory")
 public class MongoAuditLogRepositoryAdapter implements AuditLogRepositoryPort {
 
     private static final Sort MOST_RECENT_FIRST = Sort.by(Sort.Direction.DESC, "operationDate");

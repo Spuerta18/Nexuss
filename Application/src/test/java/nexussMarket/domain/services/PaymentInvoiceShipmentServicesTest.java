@@ -58,7 +58,7 @@ class PaymentInvoiceShipmentServicesTest extends AuditedServiceTestSupport {
     @BeforeEach
     void repositoriesReturnWhatTheyStore() {
         when(orderRepositoryPort.save(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
-        when(invoiceRepositoryPort.save(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
+        when(invoiceRepositoryPort.insert(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
     }
 
     @Test
@@ -70,7 +70,7 @@ class PaymentInvoiceShipmentServicesTest extends AuditedServiceTestSupport {
 
         assertEquals(OrderStatus.PAID, paid.getStatus());
         ArgumentCaptor<Invoice> issued = ArgumentCaptor.forClass(Invoice.class);
-        verify(invoiceRepositoryPort).save(issued.capture());
+        verify(invoiceRepositoryPort).insert(issued.capture());
         assertEquals("INV-O-1", issued.getValue().getIdentifier());
         assertEquals(cop(2000), issued.getValue().getTotalAmount());
         AuditLog entry = assertAudited(OperationType.ORDER_STATUS_ADVANCE, admin, AffectedEntityType.ORDER, "O-1");

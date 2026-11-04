@@ -24,6 +24,7 @@ public class Shipment {
     private LocalDateTime packedAt;
     private LocalDateTime dispatchedAt;
     private LocalDateTime deliveredAt;
+    private long version;
 
     /** A new shipment for {@code order}, {@code CREATED} now. */
     public Shipment(String identifier, Order order) {
@@ -103,5 +104,23 @@ public class Shipment {
             throw new InvalidShipmentStatusTransitionException("Cannot transition shipment " + identifier
                     + " from " + status.getCode() + " to " + target.getCode());
         }
+    }
+
+    /**
+     * Optimistic-locking version of the stored {@code shipment}: the number of
+     * times it has been saved. A save whose version is not the stored one
+     * fails with {@code ConcurrentUpdateException}, so two concurrent changes
+     * never overwrite each other. Unrelated to {@code authTokenVersion}.
+     */
+    public long getVersion() {
+        return version;
+    }
+
+    /** Sets the stored version; only for persistence adapters, after loading or saving. */
+    public void restoreVersion(long version) {
+        if (version < 0) {
+            throw new IllegalArgumentException("version must never be negative");
+        }
+        this.version = version;
     }
 }

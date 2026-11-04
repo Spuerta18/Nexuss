@@ -19,6 +19,9 @@ import nexussMarket.domain.valueobjects.SystemRole;
  * Cancels an order and releases the stock reserved for its lines. Only an
  * administrator or the buyer who placed the order may cancel it; supervisors
  * can consult orders but never cancel them.
+ *
+ * <p>Order of effects: versioned order save, stock release (retried on
+ * conflicts), audit.</p>
  */
 @Service
 public class CancelOrderService {
@@ -50,10 +53,12 @@ public class CancelOrderService {
         authorizeOrderAccessService.execute(actor, order);
         OrderStatus previousStatus = order.getStatus();
         order.cancel();
+        // Saved with its version before any stock moves: of two concurrent cancellations only one gets past
+        // this line, so a reservation is never released twice.
+        Order saved = orderRepositoryPort.save(order);
         for (OrderLine line : order.getLines()) {
             releaseInventoryReservationService.execute(line.getProduct(), line.getWarehouse(), line.getQuantity());
         }
-        Order saved = orderRepositoryPort.save(order);
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.ORDER_CANCELLATION, actor, AffectedEntityType.ORDER, orderId),
                 AuditDetails.of("previousStatus", previousStatus.getCode(),

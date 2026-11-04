@@ -20,6 +20,9 @@ import nexussMarket.domain.valueobjects.SystemRole;
 /**
  * Dispatches a packed shipment: the stock reserved for each order line leaves
  * its warehouse, and the order moves to {@code SHIPPED}.
+ *
+ * <p>Order of effects: versioned shipment save, order save (re-read and
+ * retried on a conflict), stock outbound (retried on conflicts), audit.</p>
  */
 @Service
 public class DispatchShipmentService {
@@ -52,11 +55,12 @@ public class DispatchShipmentService {
         // Both transitions are validated before any stock leaves a warehouse.
         shipment.dispatch();
         order.advanceTo(OrderStatus.SHIPPED);
+        // Saved with its version before any side effect: of two concurrent dispatches only one gets past here.
+        Shipment saved = shipmentRepositoryPort.save(shipment);
+        order = OrderFollowUp.save(orderRepositoryPort, order, OrderStatus.SHIPPED);
         for (OrderLine line : order.getLines()) {
             confirmInventoryOutboundService.execute(line.getProduct(), line.getWarehouse(), line.getQuantity());
         }
-        orderRepositoryPort.save(order);
-        Shipment saved = shipmentRepositoryPort.save(shipment);
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.SHIPMENT_DISPATCH, actor, AffectedEntityType.SHIPMENT, shipmentId),
                 AuditDetails.of("previousStatus", previousStatus.getCode(),

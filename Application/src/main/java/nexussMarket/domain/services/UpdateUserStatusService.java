@@ -3,6 +3,7 @@ package nexussMarket.domain.services;
 import org.springframework.stereotype.Service;
 
 import nexussMarket.domain.exceptions.EntityNotFoundException;
+import nexussMarket.domain.exceptions.OperationNotAllowedException;
 import nexussMarket.domain.models.Operation;
 import nexussMarket.domain.models.User;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
@@ -29,6 +30,10 @@ public class UpdateUserStatusService {
 
     public User execute(User actor, User target, UserStatus status) {
         validateRoleAuthorizationService.execute(actor, SystemRole.ADMINISTRATOR);
+        // An administrator could otherwise lock themselves out, or reactivate themselves after being blocked.
+        if (actor.getIdentifier() != null && actor.getIdentifier().equals(target.getIdentifier())) {
+            throw new OperationNotAllowedException("An administrator cannot change their own status");
+        }
         User user = userRepositoryPort.findById(target.getIdentifier())
                 .orElseThrow(() -> new EntityNotFoundException("No user found with id " + target.getIdentifier()));
         UserStatus previousStatus = user.getStatus();

@@ -2,6 +2,7 @@ package nexussMarket.domain.services;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -84,7 +85,7 @@ class IdentifierCollisionTest extends AuditedServiceTestSupport {
         verifyNoInteractions(reserveInventoryService, releaseService);
         verify(orderRepositoryPort, never()).insert(any());
         verify(orderRepositoryPort, never()).save(any());
-        verify(cartRepositoryPort, never()).deleteById(any());
+        verify(cartRepositoryPort, never()).delete(any());
         assertNothingAudited();
     }
 
@@ -104,7 +105,10 @@ class IdentifierCollisionTest extends AuditedServiceTestSupport {
 
         verify(releaseService).execute(product, warehouse, 2);
         verify(orderRepositoryPort, never()).save(any());
-        verify(cartRepositoryPort, never()).deleteById(any());
+        // The cart was taken (deleted at its version) before reserving, and is put back after the failure.
+        verify(cartRepositoryPort).delete(any());
+        verify(cartRepositoryPort).insert(argThat(restored -> "C-1".equals(restored.getIdentifier())
+                && restored.getLines().size() == 1));
         assertNothingAudited();
     }
 

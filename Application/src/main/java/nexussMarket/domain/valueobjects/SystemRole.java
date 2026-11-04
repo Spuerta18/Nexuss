@@ -22,6 +22,19 @@ public final class SystemRole extends DomainCatalog {
         super(code, name, description);
     }
 
+    /**
+     * A role outside the standard catalog, for a new kind of user registered in
+     * {@code UserFactory}. It is not returned by {@link #values()} nor
+     * {@link #fromCode(String)}; resolve it with {@code UserFactory.role(code)}.
+     * No existing authorization rule grants it anything.
+     */
+    public static SystemRole extension(String code, String name, String description) {
+        if (fromCode(code) != null) {
+            throw new IllegalArgumentException("Role " + code + " is already part of the standard catalog");
+        }
+        return new SystemRole(code, name, description);
+    }
+
     /** Returns all allowed {@code SystemRole} values. */
     public static List<SystemRole> values() {
         return List.of(BUYER, SELLER, LOGISTICS_OPERATOR, ADMINISTRATOR, SUPERVISOR);

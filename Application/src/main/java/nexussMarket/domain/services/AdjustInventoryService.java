@@ -37,20 +37,24 @@ public class AdjustInventoryService {
     public InventoryItem execute(User actor, Product product, Warehouse warehouse, int quantityDelta) {
         String productId = product.getIdentifier();
         String warehouseId = warehouse.getIdentifier();
-        InventoryItem item = inventoryRepositoryPort
-                .findByProductIdAndWarehouseId(productId, warehouseId)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "No inventory item found for product " + productId + " in warehouse " + warehouseId));
-        authorizeWarehouseOperationService.execute(actor, item.getWarehouse());
-        int previousAvailable = item.getAvailableQuantity();
-        item.adjust(quantityDelta);
-        InventoryItem saved = inventoryRepositoryPort.save(item);
+        int[] previousAvailable = new int[1];
+        InventoryItem item = OptimisticRetry.run(() -> {
+            InventoryItem current = inventoryRepositoryPort
+                    .findByProductIdAndWarehouseId(productId, warehouseId)
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "No inventory item found for product " + productId + " in warehouse " + warehouseId));
+            authorizeWarehouseOperationService.execute(actor, current.getWarehouse());
+            previousAvailable[0] = current.getAvailableQuantity();
+            current.adjust(quantityDelta);
+            return inventoryRepositoryPort.save(current);
+        });
+        InventoryItem saved = item;
         inventoryMovementRepositoryPort.save(
                 InventoryMovement.of(item, InventoryMovementType.ADJUSTMENT, quantityDelta));
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.INVENTORY_ADJUSTMENT, actor, AffectedEntityType.INVENTORY_ITEM, item.getIdentifier()),
                 AuditDetails.of("productId", productId, "warehouseId", warehouseId,
-                        "quantityDelta", quantityDelta, "previousAvailableQuantity", previousAvailable,
+                        "quantityDelta", quantityDelta, "previousAvailableQuantity", previousAvailable[0],
                         "newAvailableQuantity", item.getAvailableQuantity()));
         return saved;
     }

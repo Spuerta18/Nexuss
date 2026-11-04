@@ -27,6 +27,7 @@ public final class ShoppingCartMapper {
         document.setId(cart.getIdentifier());
         document.setBuyerId(cart.getBuyer().getIdentifier());
         document.setLines(cart.getLines().stream().map(ShoppingCartMapper::toDocument).toList());
+        document.setVersion(cart.getVersion());
         return document;
     }
 
@@ -35,9 +36,11 @@ public final class ShoppingCartMapper {
      * holds, by identifier, every product referenced by the cart lines.
      */
     public static ShoppingCart toDomain(ShoppingCartDocument document, Buyer buyer, Map<String, Product> productsById) {
-        return new ShoppingCart(document.getId(), buyer, document.getLines().stream()
+        ShoppingCart cart = new ShoppingCart(document.getId(), buyer, document.getLines().stream()
                 .map(line -> new CartLine(productsById.get(line.getProductId()), line.getQuantity()))
                 .collect(Collectors.toCollection(ArrayList::new)));
+        cart.restoreVersion(VersionedDocuments.versionOf(document.getVersion()));
+        return cart;
     }
 
     /** Identifiers of every product referenced by the cart lines. */

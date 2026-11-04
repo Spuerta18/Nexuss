@@ -20,6 +20,7 @@ public class ReturnRequest {
     private final LocalDateTime requestedAt;
     private LocalDateTime decidedAt;
     private User decidedBy;
+    private long version;
 
     /** A new return request, {@code REQUESTED} now. */
     public ReturnRequest(String identifier, Order order, Buyer buyer, String reason) {
@@ -97,5 +98,23 @@ public class ReturnRequest {
         status = decision;
         decidedAt = LocalDateTime.now();
         decidedBy = decider;
+    }
+
+    /**
+     * Optimistic-locking version of the stored {@code return request}: the number of
+     * times it has been saved. A save whose version is not the stored one
+     * fails with {@code ConcurrentUpdateException}, so two concurrent changes
+     * never overwrite each other. Unrelated to {@code authTokenVersion}.
+     */
+    public long getVersion() {
+        return version;
+    }
+
+    /** Sets the stored version; only for persistence adapters, after loading or saving. */
+    public void restoreVersion(long version) {
+        if (version < 0) {
+            throw new IllegalArgumentException("version must never be negative");
+        }
+        this.version = version;
     }
 }

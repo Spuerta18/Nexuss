@@ -1,5 +1,7 @@
 package nexussMarket.adapters.in.rest.mappers;
 
+import java.util.Map;
+
 import nexussMarket.adapters.in.rest.requests.RegisterBuyerRequest;
 import nexussMarket.adapters.in.rest.requests.RegisterStaffRequest;
 import nexussMarket.adapters.in.rest.responses.AuthResponse;
@@ -10,6 +12,7 @@ import nexussMarket.domain.models.LogisticsOperator;
 import nexussMarket.domain.models.Seller;
 import nexussMarket.domain.models.Supervisor;
 import nexussMarket.domain.models.User;
+import nexussMarket.domain.models.UserFactory;
 import nexussMarket.domain.valueobjects.CustomerStatus;
 import nexussMarket.domain.valueobjects.SellerStatus;
 import nexussMarket.domain.valueobjects.SystemRole;
@@ -61,18 +64,12 @@ public final class UserRestMapper {
     }
 
     public static UserResponse toResponse(User user) {
-        String commercialStatus = null;
-        String primaryAddress = null;
-        String sellerStatus = null;
-        if (user instanceof Buyer buyer) {
-            commercialStatus = RestCodes.code(buyer.getCommercialStatus());
-            primaryAddress = buyer.getPrimaryAddress();
-        } else if (user instanceof Seller seller) {
-            sellerStatus = RestCodes.code(seller.getSellerStatus());
-        }
+        Map<String, Object> attributes = UserFactory.attributesOf(user);
         return new UserResponse(user.getIdentifier(), user.getFullName(), user.getEmail(),
-                RestCodes.code(user.getRole()), RestCodes.code(user.getStatus()), commercialStatus, primaryAddress,
-                sellerStatus);
+                RestCodes.code(user.getRole()), RestCodes.code(user.getStatus()),
+                (String) attributes.get(UserFactory.COMMERCIAL_STATUS),
+                (String) attributes.get(UserFactory.PRIMARY_ADDRESS),
+                (String) attributes.get(UserFactory.SELLER_STATUS));
     }
 
     public static AuthResponse toResponse(AuthenticationResult result) {

@@ -25,6 +25,9 @@ import nexussMarket.domain.valueobjects.SystemRole;
  * ({@link DispatchShipmentService}, {@link ConfirmDeliveryService}). Only
  * logistics operators and administrators may advance an order; its buyer may
  * not.
+ *
+ * <p>Order of effects: versioned order save (only one of two concurrent
+ * payments passes it), invoice insert, audit.</p>
  */
 @Service
 public class AdvanceOrderStatusService {
@@ -55,10 +58,11 @@ public class AdvanceOrderStatusService {
                 .orElseThrow(() -> new EntityNotFoundException("No order found with id " + orderId));
         OrderStatus previousStatus = order.getStatus();
         order.advanceTo(targetStatus);
+        // Saved with its version before the invoice exists, so a concurrent second payment fails here (409).
         Order saved = orderRepositoryPort.save(order);
         String invoiceId = null;
         if (order.getStatus() == OrderStatus.PAID) {
-            invoiceId = invoiceRepositoryPort.save(invoiceFor(order)).getIdentifier();
+            invoiceId = invoiceRepositoryPort.insert(invoiceFor(order)).getIdentifier();
         }
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.ORDER_STATUS_ADVANCE, actor, AffectedEntityType.ORDER, orderId),

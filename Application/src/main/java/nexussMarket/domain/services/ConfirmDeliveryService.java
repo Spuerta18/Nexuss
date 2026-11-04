@@ -16,7 +16,11 @@ import nexussMarket.domain.valueobjects.OrderStatus;
 import nexussMarket.domain.valueobjects.ShipmentStatus;
 import nexussMarket.domain.valueobjects.SystemRole;
 
-/** Confirms that a dispatched shipment reached the buyer, and moves its order to {@code DELIVERED}. */
+/**
+ * Confirms that a dispatched shipment reached the buyer, and moves its order to {@code DELIVERED}.
+ *
+ * <p>Order of effects: versioned shipment save, order save (re-read and retried on a conflict), audit.</p>
+ */
 @Service
 public class ConfirmDeliveryService {
 
@@ -43,8 +47,9 @@ public class ConfirmDeliveryService {
         ShipmentStatus previousStatus = shipment.getStatus();
         shipment.confirmDelivery();
         order.advanceTo(OrderStatus.DELIVERED);
-        orderRepositoryPort.save(order);
+        // Saved with its version before any side effect: of two concurrent confirmations only one gets past here.
         Shipment saved = shipmentRepositoryPort.save(shipment);
+        order = OrderFollowUp.save(orderRepositoryPort, order, OrderStatus.DELIVERED);
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.SHIPMENT_DELIVERY, actor, AffectedEntityType.SHIPMENT, shipmentId),
                 AuditDetails.of("previousStatus", previousStatus.getCode(),

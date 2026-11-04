@@ -3,6 +3,7 @@ package nexussMarket.adapters.out.persistence.mongodb.adapters;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.mappers.ReturnRequestMapper;
@@ -12,6 +13,7 @@ import nexussMarket.domain.ports.out.ReturnRequestRepositoryPort;
 
 /** Implements {@link ReturnRequestRepositoryPort} on the {@code return_requests} collection. */
 @Repository
+@Profile("!memory")
 public class MongoReturnRequestRepositoryAdapter implements ReturnRequestRepositoryPort {
 
     private final ReturnRequestMongoRepository returnRequestRepository;
@@ -34,7 +36,8 @@ public class MongoReturnRequestRepositoryAdapter implements ReturnRequestReposit
 
     @Override
     public ReturnRequest save(ReturnRequest returnRequest) {
-        returnRequestRepository.save(ReturnRequestMapper.toDocument(returnRequest));
+        returnRequest.restoreVersion(MongoVersioning.save(() -> returnRequestRepository.save(ReturnRequestMapper.toDocument(returnRequest)),
+                "Return request " + returnRequest.getIdentifier()).getVersion());
         return returnRequest;
     }
 

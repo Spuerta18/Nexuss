@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -32,6 +33,13 @@ public class OrderDocument {
     private String status;
     private LocalDateTime createdAt;
     private List<OrderLineDocument> lines = new ArrayList<>();
+
+    /**
+     * Optimistic-locking version ({@code @Version}): a save matches only the version it read and increments it.
+     * Documents stored before versioning get {@code 0} from {@code VersionFieldMigration} at startup.
+     */
+    @Version
+    private Long version;
 
     /** Embedded {@code OrderLine}. */
     @Getter

@@ -52,7 +52,7 @@ class CartOrderAuditTest extends AuditedServiceTestSupport {
         when(cartRepositoryPort.insert(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
         when(orderRepositoryPort.save(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
         when(orderRepositoryPort.insert(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
-        when(invoiceRepositoryPort.save(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
+        when(invoiceRepositoryPort.insert(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
         when(productRepositoryPort.findById("P-1")).thenReturn(Optional.of(product));
         when(userRepositoryPort.findById("B-1")).thenReturn(Optional.of(buyer));
     }

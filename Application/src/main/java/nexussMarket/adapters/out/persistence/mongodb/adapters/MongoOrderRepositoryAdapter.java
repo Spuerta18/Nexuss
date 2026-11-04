@@ -3,6 +3,7 @@ package nexussMarket.adapters.out.persistence.mongodb.adapters;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.mappers.OrderMapper;
@@ -12,6 +13,7 @@ import nexussMarket.domain.ports.out.OrderRepositoryPort;
 
 /** Implements {@link OrderRepositoryPort} on the {@code orders} collection. */
 @Repository
+@Profile("!memory")
 public class MongoOrderRepositoryAdapter implements OrderRepositoryPort {
 
     private final OrderMongoRepository orderRepository;
@@ -32,7 +34,8 @@ public class MongoOrderRepositoryAdapter implements OrderRepositoryPort {
 
     @Override
     public Order save(Order order) {
-        orderRepository.save(OrderMapper.toDocument(order));
+        order.restoreVersion(MongoVersioning.save(() -> orderRepository.save(OrderMapper.toDocument(order)),
+                "Order " + order.getIdentifier()).getVersion());
         return order;
     }
 

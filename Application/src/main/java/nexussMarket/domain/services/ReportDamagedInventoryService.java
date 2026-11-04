@@ -37,21 +37,25 @@ public class ReportDamagedInventoryService {
     public InventoryItem execute(User actor, Product product, Warehouse warehouse, int quantity) {
         String productId = product.getIdentifier();
         String warehouseId = warehouse.getIdentifier();
-        InventoryItem item = inventoryRepositoryPort
-                .findByProductIdAndWarehouseId(productId, warehouseId)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "No inventory item found for product " + productId + " in warehouse " + warehouseId));
-        authorizeWarehouseOperationService.execute(actor, item.getWarehouse());
-        int previousDamaged = item.getDamagedQuantity();
-        item.markDamaged(quantity);
-        InventoryItem saved = inventoryRepositoryPort.save(item);
+        int[] previousDamaged = new int[1];
+        InventoryItem item = OptimisticRetry.run(() -> {
+            InventoryItem current = inventoryRepositoryPort
+                    .findByProductIdAndWarehouseId(productId, warehouseId)
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "No inventory item found for product " + productId + " in warehouse " + warehouseId));
+            authorizeWarehouseOperationService.execute(actor, current.getWarehouse());
+            previousDamaged[0] = current.getDamagedQuantity();
+            current.markDamaged(quantity);
+            return inventoryRepositoryPort.save(current);
+        });
+        InventoryItem saved = item;
         // Damaged units leave the sellable stock, so they are recorded as a negative ADJUSTMENT.
         inventoryMovementRepositoryPort.save(
                 InventoryMovement.of(item, InventoryMovementType.ADJUSTMENT, -quantity));
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.INVENTORY_DAMAGE_REPORT, actor, AffectedEntityType.INVENTORY_ITEM, item.getIdentifier()),
                 AuditDetails.of("productId", productId, "warehouseId", warehouseId,
-                        "quantity", quantity, "previousDamagedQuantity", previousDamaged,
+                        "quantity", quantity, "previousDamagedQuantity", previousDamaged[0],
                         "newDamagedQuantity", item.getDamagedQuantity()));
         return saved;
     }

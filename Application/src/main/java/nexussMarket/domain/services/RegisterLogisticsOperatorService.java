@@ -42,7 +42,7 @@ public class RegisterLogisticsOperatorService {
         LogisticsOperator newLogisticsOperator = new LogisticsOperator(logisticsOperator.getIdentifier(), logisticsOperator.getFullName(),
                 logisticsOperator.getEmail(), UserStatus.ACTIVE);
         newLogisticsOperator.setPasswordHash(passwordHasherPort.hash(password));
-        LogisticsOperator saved = (LogisticsOperator) userRepositoryPort.save(newLogisticsOperator);
+        LogisticsOperator saved = (LogisticsOperator) userRepositoryPort.insert(newLogisticsOperator);
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.LOGISTICS_OPERATOR_REGISTRATION, actor, AffectedEntityType.USER, saved.getIdentifier()),
                 AuditDetails.of("newStatus", saved.getStatus().getCode()));

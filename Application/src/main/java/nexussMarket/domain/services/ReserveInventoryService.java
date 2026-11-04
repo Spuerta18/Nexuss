@@ -26,17 +26,22 @@ public class ReserveInventoryService {
 
     /**
      * Reserves {@code quantity} units of {@code productId} from the first active
-     * warehouse with enough available (non-damaged) stock.
+     * warehouse with enough available (non-damaged) stock. The stock is read
+     * again on every attempt: a save that loses a concurrent race is retried
+     * ({@link OptimisticRetry}), so two buyers never reserve the same units.
      */
     public InventoryItem reserve(String productId, int quantity) {
+        InventoryItem saved = OptimisticRetry.run(() -> reserveOnce(productId, quantity));
+        inventoryMovementRepositoryPort.save(InventoryMovement.of(saved, InventoryMovementType.RESERVATION, quantity));
+        return saved;
+    }
+
+    private InventoryItem reserveOnce(String productId, int quantity) {
         List<InventoryItem> items = inventoryRepositoryPort.findAllByProductId(productId);
         for (InventoryItem item : items) {
             if (item.getWarehouse().isActive() && item.getAvailableQuantity() >= quantity) {
                 item.reserve(quantity);
-                InventoryItem saved = inventoryRepositoryPort.save(item);
-                inventoryMovementRepositoryPort.save(
-                        InventoryMovement.of(item, InventoryMovementType.RESERVATION, quantity));
-                return saved;
+                return inventoryRepositoryPort.save(item);
             }
         }
         throw new InsufficientStockException(

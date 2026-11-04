@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
@@ -35,7 +37,7 @@ class UserServicesAuditTest extends AuditedServiceTestSupport {
 
     @BeforeEach
     void repositoriesReturnWhatTheyStore() {
-        when(userRepositoryPort.save(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
+        when(userRepositoryPort.insert(any())).thenAnswer(AdditionalAnswers.returnsFirstArg());
         when(passwordHasherPort.hash(any())).thenReturn("hashed");
     }
 
@@ -83,6 +85,17 @@ class UserServicesAuditTest extends AuditedServiceTestSupport {
         AuditLog entry = assertAudited(OperationType.USER_STATUS_CHANGE, admin, AffectedEntityType.USER, "B-1");
         assertEquals("ACTIVE", entry.getDetails().get("previousStatus"));
         assertEquals("BLOCKED", entry.getDetails().get("newStatus"));
+    }
+
+    @Test
+    void anAdministratorCannotChangeTheirOwnStatus() {
+        when(userRepositoryPort.findById(admin.getIdentifier())).thenReturn(Optional.of(admin));
+
+        assertThrows(OperationNotAllowedException.class, () -> new UpdateUserStatusService(userRepositoryPort,
+                validateRole, audit).execute(admin, admin, UserStatus.BLOCKED));
+
+        verify(userRepositoryPort, never()).save(any());
+        assertNothingAudited();
     }
 
     @Test

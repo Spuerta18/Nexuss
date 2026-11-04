@@ -31,8 +31,8 @@ class AuthenticateUserServiceTest extends AuditedServiceTestSupport {
 
     private final InMemoryUsers users = new InMemoryUsers();
     private final CountingTokens tokens = new CountingTokens();
-    private final AuthenticateUserService service = new AuthenticateUserService(users, new PlainHasher(), tokens,
-            audit);
+    private final PlainHasher hasher = new PlainHasher();
+    private final AuthenticateUserService service = new AuthenticateUserService(users, hasher, tokens, audit);
 
     @Test
     void activeUserWithTheRightPasswordGetsAToken() {
@@ -68,6 +68,29 @@ class AuthenticateUserServiceTest extends AuditedServiceTestSupport {
         assertNothingAudited();
     }
 
+    @Test
+    void anUnknownEmailCostsThePasswordComparisonToo() {
+        users.save(buyer(UserStatus.ACTIVE));
+
+        failure("nobody@example.com", PASSWORD);
+        int afterUnknownEmail = hasher.comparisons;
+        failure("ana@example.com", "Wrong-Pass-1");
+
+        // One comparison per attempt whether or not the account exists, so the timing does not tell them apart.
+        assertEquals(1, afterUnknownEmail);
+        assertEquals(2, hasher.comparisons);
+    }
+
+    @Test
+    void theLoginEmailIsNormalized() {
+        Buyer buyer = buyer(UserStatus.ACTIVE);
+        users.save(buyer);
+
+        AuthenticationResult result = service.execute("  ANA@Example.COM ", PASSWORD);
+
+        assertSame(buyer, result.getUser());
+    }
+
     private String failure(String email, String password) {
         return assertThrows(InvalidCredentialsException.class, () -> service.execute(email, password)).getMessage();
     }
@@ -81,6 +104,8 @@ class AuthenticateUserServiceTest extends AuditedServiceTestSupport {
     /** Deterministic stand-in for BCrypt: the hash is {@code "hash:" + password}. */
     private static final class PlainHasher implements PasswordHasherPort {
 
+        private int comparisons;
+
         @Override
         public String hash(String rawPassword) {
             return "hash:" + rawPassword;
@@ -88,6 +113,7 @@ class AuthenticateUserServiceTest extends AuditedServiceTestSupport {
 
         @Override
         public boolean matches(String rawPassword, String passwordHash) {
+            comparisons++;
             return passwordHash.equals("hash:" + rawPassword);
         }
     }
@@ -106,6 +132,11 @@ class AuthenticateUserServiceTest extends AuditedServiceTestSupport {
     private static final class InMemoryUsers implements UserRepositoryPort {
 
         private final Map<String, User> byId = new HashMap<>();
+
+        @Override
+        public User insert(User user) {
+            return save(user);
+        }
 
         @Override
         public User save(User user) {

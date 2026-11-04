@@ -23,13 +23,16 @@ public final class RefundMapper {
         document.setStatus(refund.getStatus().getCode());
         document.setCreatedAt(refund.getCreatedAt());
         document.setProcessedAt(refund.getProcessedAt());
+        document.setVersion(refund.getVersion());
         return document;
     }
 
     /** {@code returnRequest} is the return request referenced by {@code returnRequestId}. */
     public static Refund toDomain(RefundDocument document, ReturnRequest returnRequest) {
-        return new Refund(document.getId(), returnRequest, MoneyMapper.toDomain(document.getAmount()),
+        Refund refund = new Refund(document.getId(), returnRequest, MoneyMapper.toDomain(document.getAmount()),
                 CatalogCodes.resolve(RefundStatus::fromCode, document.getStatus(), "RefundStatus"),
                 document.getCreatedAt(), document.getProcessedAt());
+        refund.restoreVersion(VersionedDocuments.versionOf(document.getVersion()));
+        return refund;
     }
 }

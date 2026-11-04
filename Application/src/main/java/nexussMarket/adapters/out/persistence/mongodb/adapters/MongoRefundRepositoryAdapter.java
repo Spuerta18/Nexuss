@@ -2,6 +2,7 @@ package nexussMarket.adapters.out.persistence.mongodb.adapters;
 
 import java.util.Optional;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.RefundDocument;
@@ -12,6 +13,7 @@ import nexussMarket.domain.ports.out.RefundRepositoryPort;
 
 /** Implements {@link RefundRepositoryPort} on the {@code refunds} collection. */
 @Repository
+@Profile("!memory")
 public class MongoRefundRepositoryAdapter implements RefundRepositoryPort {
 
     private final RefundMongoRepository refundRepository;
@@ -34,7 +36,8 @@ public class MongoRefundRepositoryAdapter implements RefundRepositoryPort {
 
     @Override
     public Refund save(Refund refund) {
-        refundRepository.save(RefundMapper.toDocument(refund));
+        refund.restoreVersion(MongoVersioning.save(() -> refundRepository.save(RefundMapper.toDocument(refund)),
+                "Refund " + refund.getIdentifier()).getVersion());
         return refund;
     }
 

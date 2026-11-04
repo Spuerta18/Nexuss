@@ -2,6 +2,7 @@ package nexussMarket.adapters.out.persistence.mongodb.adapters;
 
 import java.util.Optional;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.mappers.WarehouseMapper;
@@ -11,6 +12,7 @@ import nexussMarket.domain.ports.out.WarehouseRepositoryPort;
 
 /** Implements {@link WarehouseRepositoryPort} on the {@code warehouses} collection. */
 @Repository
+@Profile("!memory")
 public class MongoWarehouseRepositoryAdapter implements WarehouseRepositoryPort {
 
     private final WarehouseMongoRepository warehouseRepository;

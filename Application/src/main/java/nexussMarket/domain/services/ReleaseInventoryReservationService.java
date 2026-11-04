@@ -23,18 +23,21 @@ public class ReleaseInventoryReservationService {
         this.inventoryMovementRepositoryPort = inventoryMovementRepositoryPort;
     }
 
+    /** Read, changed and saved again on every attempt that loses a concurrent race ({@link OptimisticRetry}). */
     public InventoryItem execute(Product product, Warehouse warehouse, int quantity) {
         String productId = product.getIdentifier();
         String warehouseId = warehouse.getIdentifier();
-        InventoryItem item = inventoryRepositoryPort
-                .findByProductIdAndWarehouseId(productId, warehouseId)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "No inventory item found for product " + productId + " in warehouse " + warehouseId));
-        item.releaseReservation(quantity);
-        InventoryItem saved = inventoryRepositoryPort.save(item);
+        InventoryItem saved = OptimisticRetry.run(() -> {
+            InventoryItem item = inventoryRepositoryPort
+                    .findByProductIdAndWarehouseId(productId, warehouseId)
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "No inventory item found for product " + productId + " in warehouse " + warehouseId));
+            item.releaseReservation(quantity);
+            return inventoryRepositoryPort.save(item);
+        });
         // A released reservation is recorded as a negative RESERVATION movement.
         inventoryMovementRepositoryPort.save(
-                InventoryMovement.of(item, InventoryMovementType.RESERVATION, -quantity));
+                InventoryMovement.of(saved, InventoryMovementType.RESERVATION, -quantity));
         return saved;
     }
 }

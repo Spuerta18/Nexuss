@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import lombok.Getter;
@@ -28,6 +29,13 @@ public class ShoppingCartDocument {
     private String buyerId;
 
     private List<CartLineDocument> lines = new ArrayList<>();
+
+    /**
+     * Optimistic-locking version ({@code @Version}): a save matches only the version it read and increments it.
+     * Documents stored before versioning get {@code 0} from {@code VersionFieldMigration} at startup.
+     */
+    @Version
+    private Long version;
 
     /** Embedded {@code CartLine}. */
     @Getter

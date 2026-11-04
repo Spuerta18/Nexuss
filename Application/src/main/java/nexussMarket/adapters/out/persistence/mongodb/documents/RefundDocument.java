@@ -3,6 +3,7 @@ package nexussMarket.adapters.out.persistence.mongodb.documents;
 import java.time.LocalDateTime;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -32,4 +33,11 @@ public class RefundDocument {
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime processedAt;
+
+    /**
+     * Optimistic-locking version ({@code @Version}): a save matches only the version it read and increments it.
+     * Documents stored before versioning get {@code 0} from {@code VersionFieldMigration} at startup.
+     */
+    @Version
+    private Long version;
 }

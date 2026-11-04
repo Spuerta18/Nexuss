@@ -42,7 +42,7 @@ public class RegisterSupervisorService {
         Supervisor newSupervisor = new Supervisor(supervisor.getIdentifier(), supervisor.getFullName(),
                 supervisor.getEmail(), UserStatus.ACTIVE);
         newSupervisor.setPasswordHash(passwordHasherPort.hash(password));
-        Supervisor saved = (Supervisor) userRepositoryPort.save(newSupervisor);
+        Supervisor saved = (Supervisor) userRepositoryPort.insert(newSupervisor);
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.SUPERVISOR_REGISTRATION, actor, AffectedEntityType.USER, saved.getIdentifier()),
                 AuditDetails.of("newStatus", saved.getStatus().getCode()));

@@ -30,6 +30,7 @@ public final class OrderMapper {
         document.setStatus(order.getStatus().getCode());
         document.setCreatedAt(order.getCreatedAt());
         document.setLines(order.getLines().stream().map(OrderMapper::toDocument).toList());
+        document.setVersion(order.getVersion());
         return document;
     }
 
@@ -45,9 +46,11 @@ public final class OrderMapper {
                         line.getQuantity(), MoneyMapper.toDomain(line.getUnitPrice()),
                         warehousesById.get(line.getWarehouseId())))
                 .toList();
-        return new Order(document.getId(), buyer,
+        Order order = new Order(document.getId(), buyer,
                 CatalogCodes.resolve(OrderStatus::fromCode, document.getStatus(), "OrderStatus"),
                 lines, document.getCreatedAt());
+        order.restoreVersion(VersionedDocuments.versionOf(document.getVersion()));
+        return order;
     }
 
     /** Identifiers of every product referenced by the order lines. */

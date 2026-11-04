@@ -2,6 +2,7 @@ package nexussMarket.domain.ports.out;
 
 import java.util.Optional;
 
+import nexussMarket.domain.exceptions.ConcurrentUpdateException;
 import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.models.Refund;
 
@@ -13,7 +14,11 @@ public interface RefundRepositoryPort {
      */
     Refund insert(Refund refund);
 
-    /** Stores the changes of an existing refund. */
+    /**
+     * Stores the changes of an existing refund. Fails with {@link ConcurrentUpdateException} if it was saved by
+     * someone else since it was read (its version changed); nothing is stored then. The new version is set on the
+     * argument.
+     */
     Refund save(Refund refund);
 
     Optional<Refund> findById(String identifier);

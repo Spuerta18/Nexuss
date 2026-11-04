@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.ShoppingCartDocument;
@@ -16,6 +17,7 @@ import nexussMarket.domain.ports.out.CartRepositoryPort;
 
 /** Implements {@link CartRepositoryPort} on the {@code shopping_carts} collection. */
 @Repository
+@Profile("!memory")
 public class MongoCartRepositoryAdapter implements CartRepositoryPort {
 
     private final ShoppingCartMongoRepository shoppingCartRepository;
@@ -38,7 +40,8 @@ public class MongoCartRepositoryAdapter implements CartRepositoryPort {
 
     @Override
     public ShoppingCart save(ShoppingCart cart) {
-        shoppingCartRepository.save(ShoppingCartMapper.toDocument(cart));
+        cart.restoreVersion(MongoVersioning.save(() -> shoppingCartRepository.save(ShoppingCartMapper.toDocument(cart)),
+                "Shopping cart " + cart.getIdentifier()).getVersion());
         return cart;
     }
 
@@ -53,8 +56,10 @@ public class MongoCartRepositoryAdapter implements CartRepositoryPort {
     }
 
     @Override
-    public void deleteById(String identifier) {
-        shoppingCartRepository.deleteById(identifier);
+    public void delete(ShoppingCart cart) {
+        // Spring Data deletes a versioned document only at its version, and fails when nothing matched.
+        MongoVersioning.delete(() -> shoppingCartRepository.delete(ShoppingCartMapper.toDocument(cart)),
+                "Shopping cart " + cart.getIdentifier());
     }
 
     /** Builds {@code documents} into carts, resolving every reference with a single query per collection. */

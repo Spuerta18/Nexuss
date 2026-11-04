@@ -21,6 +21,9 @@ import nexussMarket.domain.valueobjects.SystemRole;
  * was shipped from, and a {@code PENDING} {@link Refund} for the order total
  * is created. Only administrators may approve: an order can hold lines of
  * several sellers, so no single seller has authority over the whole return.
+ *
+ * <p>Order of effects: versioned return request save, refund insert, stock
+ * returns (retried on conflicts), audit.</p>
  */
 @Service
 public class ApproveReturnService {
@@ -50,15 +53,17 @@ public class ApproveReturnService {
                 .orElseThrow(() -> new EntityNotFoundException(
                         "No return request found with id " + returnRequestId));
         ReturnStatus previousStatus = returnRequest.getStatus();
-        // Validated before any stock is returned: a request already decided fails here.
+        // Validated before anything is stored: a request already decided fails here.
         returnRequest.approve(actor);
-        for (OrderLine line : returnRequest.getOrder().getLines()) {
-            registerInventoryReturnService.execute(actor, line.getProduct(), line.getWarehouse(), line.getQuantity());
-        }
+        // Saved with its version before any side effect: of two concurrent approvals only one gets past this line,
+        // so stock is returned and a refund created exactly once.
         ReturnRequest saved = returnRequestRepositoryPort.save(returnRequest);
         // One refund per return request, so its identifier derives from the request's.
         Refund refund = refundRepositoryPort.insert(new Refund("REF-" + returnRequest.getIdentifier(), returnRequest,
                 OrderTotals.totalOf(returnRequest.getOrder())));
+        for (OrderLine line : returnRequest.getOrder().getLines()) {
+            registerInventoryReturnService.execute(actor, line.getProduct(), line.getWarehouse(), line.getQuantity());
+        }
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.RETURN_APPROVAL, actor, AffectedEntityType.RETURN_REQUEST, returnRequestId),
                 AuditDetails.of("previousStatus", previousStatus.getCode(),

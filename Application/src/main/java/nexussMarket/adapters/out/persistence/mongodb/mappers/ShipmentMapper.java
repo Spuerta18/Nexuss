@@ -23,14 +23,17 @@ public final class ShipmentMapper {
         document.setPackedAt(shipment.getPackedAt());
         document.setDispatchedAt(shipment.getDispatchedAt());
         document.setDeliveredAt(shipment.getDeliveredAt());
+        document.setVersion(shipment.getVersion());
         return document;
     }
 
     /** {@code order} is the order referenced by {@code orderId}. */
     public static Shipment toDomain(ShipmentDocument document, Order order) {
-        return new Shipment(document.getId(), order,
+        Shipment shipment = new Shipment(document.getId(), order,
                 CatalogCodes.resolve(ShipmentStatus::fromCode, document.getStatus(), "ShipmentStatus"),
                 document.getCreatedAt(), document.getPackedAt(), document.getDispatchedAt(),
                 document.getDeliveredAt());
+        shipment.restoreVersion(VersionedDocuments.versionOf(document.getVersion()));
+        return shipment;
     }
 }

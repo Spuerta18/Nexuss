@@ -224,7 +224,7 @@ class BusinessRuleExceptionsTest extends AuditedServiceTestSupport {
     private void assertNothingSaved() {
         verify(orderRepositoryPort, never()).save(any());
         verify(orderRepositoryPort, never()).insert(any());
-        verify(cartRepositoryPort, never()).deleteById(any());
+        verify(cartRepositoryPort, never()).delete(any());
         assertNothingAudited();
     }
 }

@@ -2,6 +2,7 @@ package nexussMarket.adapters.out.persistence.mongodb.adapters;
 
 import java.util.Optional;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.ShipmentDocument;
@@ -12,6 +13,7 @@ import nexussMarket.domain.ports.out.ShipmentRepositoryPort;
 
 /** Implements {@link ShipmentRepositoryPort} on the {@code shipments} collection. */
 @Repository
+@Profile("!memory")
 public class MongoShipmentRepositoryAdapter implements ShipmentRepositoryPort {
 
     private final ShipmentMongoRepository shipmentRepository;
@@ -34,7 +36,8 @@ public class MongoShipmentRepositoryAdapter implements ShipmentRepositoryPort {
 
     @Override
     public Shipment save(Shipment shipment) {
-        shipmentRepository.save(ShipmentMapper.toDocument(shipment));
+        shipment.restoreVersion(MongoVersioning.save(() -> shipmentRepository.save(ShipmentMapper.toDocument(shipment)),
+                "Shipment " + shipment.getIdentifier()).getVersion());
         return shipment;
     }
 

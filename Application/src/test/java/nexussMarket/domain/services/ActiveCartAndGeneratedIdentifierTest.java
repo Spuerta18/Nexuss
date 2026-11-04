@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -187,7 +188,7 @@ class ActiveCartAndGeneratedIdentifierTest extends AuditedServiceTestSupport {
 
         assertTrue(order.getIdentifier().matches("ORD-[0-9a-f]{8}"), order.getIdentifier());
         assertEquals(cop(3000), order.getTotal().orElseThrow());
-        verify(cartRepositoryPort).deleteById("C-1");
+        verify(cartRepositoryPort).delete(argThat(deleted -> "C-1".equals(deleted.getIdentifier())));
     }
 
     @Test

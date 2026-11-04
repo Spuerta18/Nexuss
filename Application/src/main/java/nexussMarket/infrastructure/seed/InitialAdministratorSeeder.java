@@ -5,9 +5,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 
+import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.models.Administrator;
 import nexussMarket.domain.ports.out.PasswordHasherPort;
 import nexussMarket.domain.ports.out.UserRepositoryPort;
+import nexussMarket.domain.valueobjects.EmailAddress;
 import nexussMarket.domain.valueobjects.SystemRole;
 import nexussMarket.domain.valueobjects.UserStatus;
 
@@ -38,7 +40,7 @@ public class InitialAdministratorSeeder implements ApplicationRunner {
                                       String email, String password) {
         this.userRepositoryPort = userRepositoryPort;
         this.passwordHasherPort = passwordHasherPort;
-        this.email = email;
+        this.email = EmailAddress.normalize(email);
         this.password = password;
     }
 
@@ -60,7 +62,12 @@ public class InitialAdministratorSeeder implements ApplicationRunner {
         }
         Administrator administrator = new Administrator(IDENTIFIER, FULL_NAME, email, UserStatus.ACTIVE);
         administrator.setPasswordHash(passwordHasherPort.hash(password));
-        userRepositoryPort.save(administrator);
+        try {
+            userRepositoryPort.insert(administrator);
+        } catch (DuplicateResourceException e) {
+            log.info("Initial administrator not created: another instance created it first");
+            return;
+        }
         log.info("Initial administrator created with email {}", email);
     }
 

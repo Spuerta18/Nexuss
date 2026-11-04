@@ -1,7 +1,11 @@
 package nexussMarket.domain.services;
 
+import java.util.Optional;
+
 import org.springframework.stereotype.Service;
 
+import nexussMarket.domain.exceptions.ConcurrentUpdateException;
+import nexussMarket.domain.exceptions.DuplicateResourceException;
 import nexussMarket.domain.exceptions.EntityNotFoundException;
 import nexussMarket.domain.exceptions.InactiveWarehouseException;
 import nexussMarket.domain.exceptions.InventoryNotTrackedException;
@@ -53,25 +57,44 @@ public class RegisterInventoryInboundService {
     public InventoryItem execute(User actor, Product product, Warehouse warehouse, int quantity) {
         String productId = product.getIdentifier();
         String warehouseId = warehouse.getIdentifier();
-        InventoryItem item = inventoryRepositoryPort
-                .findByProductIdAndWarehouseId(productId, warehouseId)
-                .orElseGet(() -> newInventoryItem(productId, warehouseId));
-        authorizeWarehouseOperationService.execute(actor, item.getWarehouse());
-        if (!item.getWarehouse().isActive()) {
-            throw new InactiveWarehouseException(
-                    "Warehouse " + warehouseId + " is inactive and cannot receive stock");
-        }
-        int previousAvailable = item.getAvailableQuantity();
-        item.receive(quantity);
-        InventoryItem saved = inventoryRepositoryPort.save(item);
+        int[] previousAvailable = new int[1];
+        InventoryItem item = OptimisticRetry.run(() -> receiveOnce(actor, productId, warehouseId, quantity,
+                previousAvailable));
+        InventoryItem saved = item;
         inventoryMovementRepositoryPort.save(
                 InventoryMovement.of(item, InventoryMovementType.INBOUND, quantity));
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.INVENTORY_INBOUND, actor, AffectedEntityType.INVENTORY_ITEM, item.getIdentifier()),
                 AuditDetails.of("productId", productId, "warehouseId", warehouseId,
-                        "quantity", quantity, "previousAvailableQuantity", previousAvailable,
+                        "quantity", quantity, "previousAvailableQuantity", previousAvailable[0],
                         "newAvailableQuantity", item.getAvailableQuantity()));
         return saved;
+    }
+
+    /**
+     * One read-change-save attempt. The first inbound of a product into a
+     * warehouse inserts its item; if a concurrent inbound inserted it first,
+     * the attempt is retried and updates the stored one instead.
+     */
+    private InventoryItem receiveOnce(User actor, String productId, String warehouseId, int quantity,
+                                      int[] previousAvailable) {
+        Optional<InventoryItem> stored = inventoryRepositoryPort.findByProductIdAndWarehouseId(productId, warehouseId);
+        InventoryItem item = stored.orElseGet(() -> newInventoryItem(productId, warehouseId));
+        authorizeWarehouseOperationService.execute(actor, item.getWarehouse());
+        if (!item.getWarehouse().isActive()) {
+            throw new InactiveWarehouseException(
+                    "Warehouse " + warehouseId + " is inactive and cannot receive stock");
+        }
+        previousAvailable[0] = item.getAvailableQuantity();
+        item.receive(quantity);
+        if (stored.isPresent()) {
+            return inventoryRepositoryPort.save(item);
+        }
+        try {
+            return inventoryRepositoryPort.insert(item);
+        } catch (DuplicateResourceException e) {
+            throw new ConcurrentUpdateException("Inventory item " + item.getIdentifier() + " was created concurrently");
+        }
     }
 
     private InventoryItem newInventoryItem(String productId, String warehouseId) {

@@ -24,12 +24,15 @@ public final class InventoryItemMapper {
         document.setAvailableQuantity(item.getAvailableQuantity());
         document.setReservedQuantity(item.getReservedQuantity());
         document.setDamagedQuantity(item.getDamagedQuantity());
+        document.setVersion(item.getVersion());
         return document;
     }
 
     /** {@code product} and {@code warehouse} are the entities referenced by the document. */
     public static InventoryItem toDomain(InventoryItemDocument document, Product product, Warehouse warehouse) {
-        return new InventoryItem(product, warehouse, document.getAvailableQuantity(), document.getReservedQuantity(),
+        InventoryItem item = new InventoryItem(product, warehouse, document.getAvailableQuantity(), document.getReservedQuantity(),
                 document.getDamagedQuantity());
+        item.restoreVersion(VersionedDocuments.versionOf(document.getVersion()));
+        return item;
     }
 }

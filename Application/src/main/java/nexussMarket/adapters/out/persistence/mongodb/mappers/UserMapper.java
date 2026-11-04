@@ -1,24 +1,25 @@
 package nexussMarket.adapters.out.persistence.mongodb.mappers;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.UserDocument;
-import nexussMarket.domain.models.Administrator;
-import nexussMarket.domain.models.Buyer;
-import nexussMarket.domain.models.LogisticsOperator;
-import nexussMarket.domain.models.Seller;
-import nexussMarket.domain.models.Supervisor;
 import nexussMarket.domain.models.User;
-import nexussMarket.domain.valueobjects.CustomerStatus;
-import nexussMarket.domain.valueobjects.SellerStatus;
-import nexussMarket.domain.valueobjects.SystemRole;
+import nexussMarket.domain.models.UserFactory;
+import nexussMarket.domain.models.UserFactory.UserData;
 import nexussMarket.domain.valueobjects.UserStatus;
 
 /**
  * Converts every {@link User} specialization to and from {@link UserDocument},
- * using {@code userType} (the {@link SystemRole} code) as the discriminator.
- * Inverse lists ({@code Buyer.carts} / {@code orders}, {@code Seller.warehouses}
- * / {@code products}) are not stored and are rebuilt empty.
+ * using {@code userType} (the {@code SystemRole} code) as the discriminator.
+ * Users are built through {@link UserFactory}, so a newly registered user type
+ * needs no change here: its type-specific attributes are stored in the
+ * buyer / seller fields when they have one, and in {@code attributes}
+ * otherwise. Inverse lists ({@code Buyer.carts} / {@code orders},
+ * {@code Seller.warehouses} / {@code products}) are not stored and are rebuilt
+ * empty.
  */
 public final class UserMapper {
 
@@ -34,49 +35,44 @@ public final class UserMapper {
         document.setStatus(user.getStatus().getCode());
         document.setPasswordHash(user.getPasswordHash());
         document.setAuthTokenVersion(user.getAuthTokenVersion());
-        if (user instanceof Buyer buyer) {
-            document.setPrimaryAddress(buyer.getPrimaryAddress());
-            document.setAdditionalAddresses(new ArrayList<>(buyer.getAdditionalAddresses()));
-            document.setCommercialStatus(buyer.getCommercialStatus().getCode());
-        } else if (user instanceof Seller seller) {
-            document.setSellerStatus(seller.getSellerStatus().getCode());
-        }
+        document.setVersion(user.getVersion());
+        Map<String, Object> others = new LinkedHashMap<>();
+        UserFactory.attributesOf(user).forEach((name, value) -> {
+            switch (name) {
+                case UserFactory.PRIMARY_ADDRESS -> document.setPrimaryAddress((String) value);
+                case UserFactory.ADDITIONAL_ADDRESSES -> document.setAdditionalAddresses(stringList(value));
+                case UserFactory.COMMERCIAL_STATUS -> document.setCommercialStatus((String) value);
+                case UserFactory.SELLER_STATUS -> document.setSellerStatus((String) value);
+                default -> others.put(name, value);
+            }
+        });
+        document.setAttributes(others.isEmpty() ? null : others);
         return document;
     }
 
     public static User toDomain(UserDocument document) {
-        User user = newUser(document);
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        if (document.getAttributes() != null) {
+            attributes.putAll(document.getAttributes());
+        }
+        attributes.put(UserFactory.PRIMARY_ADDRESS, document.getPrimaryAddress());
+        attributes.put(UserFactory.ADDITIONAL_ADDRESSES, document.getAdditionalAddresses());
+        attributes.put(UserFactory.COMMERCIAL_STATUS, document.getCommercialStatus());
+        attributes.put(UserFactory.SELLER_STATUS, document.getSellerStatus());
+        UserStatus status = CatalogCodes.resolve(UserStatus::fromCode, document.getStatus(), "UserStatus");
+        User user = UserFactory.create(document.getUserType(), new UserData(document.getId(),
+                document.getFullName(), document.getEmail(), status, attributes));
         user.setPasswordHash(document.getPasswordHash());
         user.restoreAuthTokenVersion(document.getAuthTokenVersion() != null ? document.getAuthTokenVersion() : 0);
+        user.restoreVersion(VersionedDocuments.versionOf(document.getVersion()));
         return user;
     }
 
-    private static User newUser(UserDocument document) {
-        String id = document.getId();
-        String fullName = document.getFullName();
-        String email = document.getEmail();
-        UserStatus status = CatalogCodes.resolve(UserStatus::fromCode, document.getStatus(), "UserStatus");
-        SystemRole role = SystemRole.fromCode(document.getUserType());
-        if (role == SystemRole.BUYER) {
-            Buyer buyer = new Buyer(id, fullName, email, status,
-                    CatalogCodes.resolve(CustomerStatus::fromCode, document.getCommercialStatus(), "CustomerStatus"));
-            buyer.setPrimaryAddress(document.getPrimaryAddress());
-            buyer.setAdditionalAddresses(document.getAdditionalAddresses());
-            return buyer;
+    private static List<String> stringList(Object value) {
+        List<String> list = new ArrayList<>();
+        if (value instanceof List<?> values) {
+            values.forEach(element -> list.add(String.valueOf(element)));
         }
-        if (role == SystemRole.SELLER) {
-            return new Seller(id, fullName, email, status,
-                    CatalogCodes.resolve(SellerStatus::fromCode, document.getSellerStatus(), "SellerStatus"));
-        }
-        if (role == SystemRole.LOGISTICS_OPERATOR) {
-            return new LogisticsOperator(id, fullName, email, status);
-        }
-        if (role == SystemRole.ADMINISTRATOR) {
-            return new Administrator(id, fullName, email, status);
-        }
-        if (role == SystemRole.SUPERVISOR) {
-            return new Supervisor(id, fullName, email, status);
-        }
-        throw new IllegalStateException("User " + id + " has unknown userType " + document.getUserType());
+        return list;
     }
 }

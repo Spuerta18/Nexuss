@@ -37,10 +37,16 @@ import nexussMarket.domain.valueobjects.UserStatus;
  * stock is left reserved for an order that was never created. The order is
  * inserted, never saved over an existing one: a taken identifier is rejected
  * before reserving, and if the insert still loses a race every reservation is
- * released; the stored order is left untouched either way. The cart is
- * deleted once the order is stored. Only the buyer who owns the cart, or an
- * administrator, may confirm it. Without an identifier the server generates
- * one ({@code ORD-xxxxxxxx}).
+ * released; the stored order is left untouched either way. Only the buyer
+ * who owns the cart, or an administrator, may confirm it. Without an
+ * identifier the server generates one ({@code ORD-xxxxxxxx}).
+ *
+ * <p>Order of effects: the cart is deleted at the version it was read with
+ * (of two concurrent confirmations of the same cart only one gets past this
+ * step, 409 for the other), stock is reserved line by line (retried on
+ * conflicts), the order is inserted, and the operation is audited. If a
+ * reservation or the insert fails, the reservations already made are
+ * released and the cart is restored.</p>
  */
 @Service
 public class ConfirmOrderService {
@@ -90,20 +96,26 @@ public class ConfirmOrderService {
         if (orderRepositoryPort.findById(orderId).isPresent()) {
             throw new DuplicateResourceException("An order with id " + orderId + " already exists");
         }
-        List<OrderLine> reservedLines = reserveLines(cart);
-        Order order = new Order(orderId, cart.getBuyer(), OrderStatus.PENDING_PAYMENT, reservedLines);
+        // The guard: deleted only at the version read above, before any stock is reserved.
+        cartRepositoryPort.delete(cart);
         Order saved;
         try {
-            saved = orderRepositoryPort.insert(order);
+            List<OrderLine> reservedLines = reserveLines(cart);
+            Order order = new Order(orderId, cart.getBuyer(), OrderStatus.PENDING_PAYMENT, reservedLines);
+            try {
+                saved = orderRepositoryPort.insert(order);
+            } catch (RuntimeException e) {
+                reservedLines.forEach(this::release);
+                throw e;
+            }
         } catch (RuntimeException e) {
-            reservedLines.forEach(this::release);
+            restore(cart);
             throw e;
         }
-        cartRepositoryPort.deleteById(cart.getIdentifier());
         registerOperationAndAuditService.execute(
-                Operation.of(OperationType.ORDER_CONFIRMATION, actor, AffectedEntityType.ORDER, order.getIdentifier()),
-                AuditDetails.of("cartId", cartId, "newStatus", order.getStatus().getCode(),
-                        "lineCount", order.getLines().size()));
+                Operation.of(OperationType.ORDER_CONFIRMATION, actor, AffectedEntityType.ORDER, saved.getIdentifier()),
+                AuditDetails.of("cartId", cartId, "newStatus", saved.getStatus().getCode(),
+                        "lineCount", saved.getLines().size()));
         return saved;
     }
 
@@ -121,6 +133,18 @@ public class ConfirmOrderService {
             throw e;
         }
         return orderLines;
+    }
+
+    /**
+     * Puts the cart back after a failed confirmation. If the buyer already has another cart the old one is not
+     * restored (one cart per buyer); the original failure is what the caller reports either way.
+     */
+    private void restore(ShoppingCart cart) {
+        try {
+            cartRepositoryPort.insert(new ShoppingCart(cart.getIdentifier(), cart.getBuyer(), cart.getLines()));
+        } catch (DuplicateResourceException ignored) {
+            // The buyer created a new cart meanwhile; it is kept.
+        }
     }
 
     private void release(OrderLine line) {

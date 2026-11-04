@@ -2,6 +2,7 @@ package nexussMarket.adapters.out.persistence.mongodb.adapters;
 
 import java.util.List;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import nexussMarket.adapters.out.persistence.mongodb.documents.InventoryMovementDocument;
@@ -17,6 +18,7 @@ import nexussMarket.domain.ports.out.InventoryMovementRepositoryPort;
  * {@code inventory_movements} collection: movements are only ever inserted.
  */
 @Repository
+@Profile("!memory")
 public class MongoInventoryMovementRepositoryAdapter implements InventoryMovementRepositoryPort {
 
     private final InventoryMovementMongoRepository inventoryMovementRepository;

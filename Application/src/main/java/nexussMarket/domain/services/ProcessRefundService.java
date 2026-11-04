@@ -13,7 +13,11 @@ import nexussMarket.domain.valueobjects.OperationType;
 import nexussMarket.domain.valueobjects.RefundStatus;
 import nexussMarket.domain.valueobjects.SystemRole;
 
-/** Pays a pending refund back to the buyer. Only administrators may process refunds. */
+/**
+ * Pays a pending refund back to the buyer. Only administrators may process refunds.
+ *
+ * <p>Order of effects: versioned refund save (only one of two concurrent calls passes it), audit.</p>
+ */
 @Service
 public class ProcessRefundService {
 

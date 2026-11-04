@@ -10,8 +10,31 @@ tests, 4 JaCoCo / guard tests / SETUP.md / Postman, 5 Docker, 6 closing campaign
 
 - **Block 0 — done.** `feature/cart-order-flow` pushed to origin (269 tests green, 0 skipped).
   `nexusmarket_demo` copied to `nexusmarket_demo_backup` (13 collections, counts match; nothing deleted).
-- **Next:** Block 1. Verify with `./mvnw -o clean test` from `Application/` (Maven is not on the PATH; use the
-  wrapper).
+- **Block 1 — core done, 332 tests green.** Optimistic locking: `long version` on `InventoryItem`, `Order`,
+  `Shipment`, `ReturnRequest`, `Refund`, `ShoppingCart`, `User` (`getVersion` / `restoreVersion`); Mongo documents
+  carry `@Version Long version`, adapters translate `OptimisticLockingFailureException` into
+  `ConcurrentUpdateException` (409) via `MongoVersioning`. `VersionFieldMigration` (startup, idempotent,
+  `nexus.mongo.migrations.enabled`) adds `version: 0` and normalizes emails; run on `nexusmarket_migration_check`
+  (copy of the demo backup): 22 documents versioned, 0 left. `OptimisticRetry` (10 retries, random 1-20 ms) on every
+  inventory write. Guard-first order in Cancel / Advance / ApproveReturn / ProcessRefund / Dispatch / ConfirmDelivery /
+  ConfirmOrder (versioned cart delete, cart restored on failure); `OrderFollowUp` for the order after a shipment step.
+  Insert-only `insert` on users, inventory, invoices. Login: dummy BCrypt, email normalized (`EmailAddress`),
+  `LoginThrottleFilter` + `LoginAttemptLimiter` (429 + Retry-After), `RequestBodyLimitFilter` (413), DuplicateKey and
+  OptimisticLocking → 409, path-prefix role rules + `denyAll`. Admin cannot change own status (403). `UserFactory`
+  registry (+ `SystemRole.extension`) replaces role if-chains. In-memory adapters (`adapters/out/persistence/memory`,
+  profile `memory`) with insert-only and versioning; `DocumentReferenceResolver` shared with Mongo.
+  Tests: `ConcurrencyScenariosTest` (60 buyers / 10 units → 10), `PersistenceGuaranteesTest`,
+  `MongoVersioningIntegrationTest`, `SecurityHardeningRestControllerTest`, `RequestLimitsTest`, `UserFactoryTest`.
+- **Block 1 — pending (deferred by the user to the end):** restart the app on `nexusmarket_migration_check` once more
+  and confirm no migration log line (idempotence on real data; already covered by the integration test); SDD updates
+  for Block 1 (Domain Model, Output-ports, Persistence, Rest-security-cors, services); verify the demo flow on the
+  migrated `nexusmarket_demo`.
+- **New priority order (user, 2026-11-04):** Block 3 (memory profile startup, demo seed, E2E scenarios) → Block 2
+  (buyer payment with simulated gateway, PUT/DELETE product, PUT /api/me, lists and reports) → Block 4 (SETUP.md and
+  Postman first; JaCoCo and guard tests last) → remaining Block 1, JaCoCo, Block 5, Block 6. Commit + push after each
+  block and move the `demo-stable` tag to every green block commit.
+- **Next:** Block 3. Verify with `./mvnw -o clean test` from `Application/` (Maven is not on the PATH; use the
+  wrapper). Scratchpad launcher `run-app.sh <db> <port> <log>` runs the app with `java -cp`.
 
 ## Language Rule (permanent)
 

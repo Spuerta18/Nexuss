@@ -27,6 +27,7 @@ public final class ReturnRequestMapper {
         document.setRequestedAt(returnRequest.getRequestedAt());
         document.setDecidedAt(returnRequest.getDecidedAt());
         document.setDecidedById(returnRequest.getDecidedBy() != null ? returnRequest.getDecidedBy().getIdentifier() : null);
+        document.setVersion(returnRequest.getVersion());
         return document;
     }
 
@@ -36,8 +37,10 @@ public final class ReturnRequestMapper {
      * {@code null} while the request is undecided.
      */
     public static ReturnRequest toDomain(ReturnRequestDocument document, Order order, Buyer buyer, User decidedBy) {
-        return new ReturnRequest(document.getId(), order, buyer, document.getReason(),
+        ReturnRequest returnRequest = new ReturnRequest(document.getId(), order, buyer, document.getReason(),
                 CatalogCodes.resolve(ReturnStatus::fromCode, document.getStatus(), "ReturnStatus"),
                 document.getRequestedAt(), document.getDecidedAt(), decidedBy);
+        returnRequest.restoreVersion(VersionedDocuments.versionOf(document.getVersion()));
+        return returnRequest;
     }
 }

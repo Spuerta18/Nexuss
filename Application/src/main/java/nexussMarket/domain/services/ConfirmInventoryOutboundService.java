@@ -23,17 +23,20 @@ public class ConfirmInventoryOutboundService {
         this.inventoryMovementRepositoryPort = inventoryMovementRepositoryPort;
     }
 
+    /** Read, changed and saved again on every attempt that loses a concurrent race ({@link OptimisticRetry}). */
     public InventoryItem execute(Product product, Warehouse warehouse, int quantity) {
         String productId = product.getIdentifier();
         String warehouseId = warehouse.getIdentifier();
-        InventoryItem item = inventoryRepositoryPort
-                .findByProductIdAndWarehouseId(productId, warehouseId)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "No inventory item found for product " + productId + " in warehouse " + warehouseId));
-        item.confirmOutbound(quantity);
-        InventoryItem saved = inventoryRepositoryPort.save(item);
+        InventoryItem saved = OptimisticRetry.run(() -> {
+            InventoryItem item = inventoryRepositoryPort
+                    .findByProductIdAndWarehouseId(productId, warehouseId)
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "No inventory item found for product " + productId + " in warehouse " + warehouseId));
+            item.confirmOutbound(quantity);
+            return inventoryRepositoryPort.save(item);
+        });
         inventoryMovementRepositoryPort.save(
-                InventoryMovement.of(item, InventoryMovementType.SALE_OUTBOUND, quantity));
+                InventoryMovement.of(saved, InventoryMovementType.SALE_OUTBOUND, quantity));
         return saved;
     }
 }

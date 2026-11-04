@@ -37,7 +37,7 @@ public class RegisterBuyerService {
                 UserStatus.ACTIVE, CustomerStatus.ENABLED);
         newBuyer.setPrimaryAddress(buyer.getPrimaryAddress());
         newBuyer.setPasswordHash(passwordHasherPort.hash(password));
-        Buyer saved = (Buyer) userRepositoryPort.save(newBuyer);
+        Buyer saved = (Buyer) userRepositoryPort.insert(newBuyer);
         // Self-registration: the new buyer is the one who performs it.
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.BUYER_REGISTRATION, saved, AffectedEntityType.USER, saved.getIdentifier()),

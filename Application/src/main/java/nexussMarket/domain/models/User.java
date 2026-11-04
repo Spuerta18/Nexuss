@@ -1,5 +1,6 @@
 package nexussMarket.domain.models;
 
+import nexussMarket.domain.valueobjects.EmailAddress;
 import nexussMarket.domain.valueobjects.SystemRole;
 import nexussMarket.domain.valueobjects.UserStatus;
 
@@ -24,11 +25,12 @@ public abstract class User {
     private UserStatus status;
     private String passwordHash;
     private int authTokenVersion;
+    private long version;
 
     protected User(String identifier, String fullName, String email, SystemRole role, UserStatus status) {
         this.identifier = identifier;
         this.fullName = fullName;
-        this.email = email;
+        this.email = EmailAddress.normalize(email);
         this.role = role;
         this.status = status;
     }
@@ -47,7 +49,7 @@ public abstract class User {
         this.fullName = fullName;
     }
 
-    /** Primary email address, unique across the platform. */
+    /** Primary email address, unique across the platform; always normalized (see {@link EmailAddress}). */
     public String getEmail() {
         return email;
     }
@@ -98,5 +100,23 @@ public abstract class User {
             throw new IllegalArgumentException("authTokenVersion must never be negative");
         }
         this.authTokenVersion = authTokenVersion;
+    }
+
+    /**
+     * Optimistic-locking version of the stored {@code user}: the number of
+     * times it has been saved. A save whose version is not the stored one
+     * fails with {@code ConcurrentUpdateException}, so two concurrent changes
+     * never overwrite each other. Unrelated to {@code authTokenVersion}.
+     */
+    public long getVersion() {
+        return version;
+    }
+
+    /** Sets the stored version; only for persistence adapters, after loading or saving. */
+    public void restoreVersion(long version) {
+        if (version < 0) {
+            throw new IllegalArgumentException("version must never be negative");
+        }
+        this.version = version;
     }
 }

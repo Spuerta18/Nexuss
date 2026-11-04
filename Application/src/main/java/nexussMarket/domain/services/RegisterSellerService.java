@@ -43,7 +43,7 @@ public class RegisterSellerService {
         Seller newSeller = new Seller(seller.getIdentifier(), seller.getFullName(), seller.getEmail(),
                 UserStatus.ACTIVE, SellerStatus.ACTIVE);
         newSeller.setPasswordHash(passwordHasherPort.hash(password));
-        Seller saved = (Seller) userRepositoryPort.save(newSeller);
+        Seller saved = (Seller) userRepositoryPort.insert(newSeller);
         registerOperationAndAuditService.execute(
                 Operation.of(OperationType.SELLER_REGISTRATION, actor, AffectedEntityType.USER, saved.getIdentifier()),
                 AuditDetails.of("newStatus", saved.getStatus().getCode()));
