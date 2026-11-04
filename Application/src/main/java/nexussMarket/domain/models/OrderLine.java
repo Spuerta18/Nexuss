@@ -62,4 +62,13 @@ public class OrderLine {
     public Money getSubtotal() {
         return Money.of(unitPrice.getAmount().multiply(BigDecimal.valueOf(quantity)), unitPrice.getCurrency());
     }
+
+    /**
+     * Whether this line reserved stock in a warehouse. Lines of digital
+     * products have no warehouse: nothing is reserved, released, shipped or
+     * returned for them.
+     */
+    public boolean holdsStock() {
+        return warehouse != null;
+    }
 }

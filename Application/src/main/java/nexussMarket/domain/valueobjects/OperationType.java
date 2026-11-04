@@ -89,6 +89,14 @@ public final class OperationType extends DomainCatalog {
     public static final OperationType REFUND_PROCESSING =
             new OperationType("REFUND_PROCESSING", "Refund Processing", "A pending refund was paid to the buyer.");
 
+    // Payments
+    public static final OperationType ORDER_PAYMENT = new OperationType("ORDER_PAYMENT", "Order Payment",
+            "A buyer paid an order through the payment gateway; the order is PAID and invoiced.");
+    public static final OperationType PAYMENT_DECLINED = new OperationType("PAYMENT_DECLINED", "Payment Declined",
+            "The payment gateway declined a buyer's payment; the order was not changed.");
+    public static final OperationType DIGITAL_ORDER_FULFILLMENT = new OperationType("DIGITAL_ORDER_FULFILLMENT",
+            "Digital Order Fulfillment", "A paid order holding only digital products was delivered without a shipment.");
+
     private OperationType(String code, String name, String description) {
         super(code, name, description);
     }
@@ -102,7 +110,8 @@ public final class OperationType extends DomainCatalog {
                 INVENTORY_DAMAGE_REPORT, INVENTORY_RETURN, CART_CREATION, CART_LINE_ADDITION,
                 CART_LINE_QUANTITY_UPDATE, CART_LINE_REMOVAL, ORDER_CONFIRMATION, ORDER_CANCELLATION,
                 ORDER_STATUS_ADVANCE, SHIPMENT_CREATION, SHIPMENT_PACKING, SHIPMENT_DISPATCH, SHIPMENT_DELIVERY,
-                RETURN_REQUEST, RETURN_APPROVAL, RETURN_REJECTION, REFUND_PROCESSING);
+                RETURN_REQUEST, RETURN_APPROVAL, RETURN_REJECTION, REFUND_PROCESSING, ORDER_PAYMENT,
+                PAYMENT_DECLINED, DIGITAL_ORDER_FULFILLMENT);
     }
 
     /** Resolves an {@code OperationType} from its code, or {@code null} if unknown. */

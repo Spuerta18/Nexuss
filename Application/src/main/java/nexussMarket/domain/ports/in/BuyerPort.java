@@ -61,6 +61,9 @@ public interface BuyerPort {
     /** The shipment of one of the buyer's orders. */
     Shipment consultOrderShipment(User user, Order order);
 
+    /** Pays one of the buyer's {@code PENDING_PAYMENT} orders through the payment gateway. */
+    Order payOrder(User user, Order order, String paymentToken);
+
     /** Logs {@code user} out, revoking every access token issued to them. */
     void logout(User user);
 

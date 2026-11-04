@@ -62,6 +62,9 @@ public class ApproveReturnService {
         Refund refund = refundRepositoryPort.insert(new Refund("REF-" + returnRequest.getIdentifier(), returnRequest,
                 OrderTotals.totalOf(returnRequest.getOrder())));
         for (OrderLine line : returnRequest.getOrder().getLines()) {
+            if (!line.holdsStock()) {
+                continue;
+            }
             registerInventoryReturnService.execute(actor, line.getProduct(), line.getWarehouse(), line.getQuantity());
         }
         registerOperationAndAuditService.execute(

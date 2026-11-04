@@ -57,6 +57,9 @@ public class CancelOrderService {
         // this line, so a reservation is never released twice.
         Order saved = orderRepositoryPort.save(order);
         for (OrderLine line : order.getLines()) {
+            if (!line.holdsStock()) {
+                continue;
+            }
             releaseInventoryReservationService.execute(line.getProduct(), line.getWarehouse(), line.getQuantity());
         }
         registerOperationAndAuditService.execute(

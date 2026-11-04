@@ -69,7 +69,7 @@ public final class OrderMapper {
         document.setProductName(line.getProductName());
         document.setQuantity(line.getQuantity());
         document.setUnitPrice(MoneyMapper.toDocument(line.getUnitPrice()));
-        document.setWarehouseId(line.getWarehouse().getIdentifier());
+        document.setWarehouseId(line.holdsStock() ? line.getWarehouse().getIdentifier() : null);
         return document;
     }
 }

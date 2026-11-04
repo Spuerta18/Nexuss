@@ -41,6 +41,7 @@ import nexussMarket.domain.exceptions.InventoryNotTrackedException;
 import nexussMarket.domain.exceptions.OperationNotAllowedException;
 import nexussMarket.domain.exceptions.OrderNotShippableException;
 import nexussMarket.domain.exceptions.OrderStatusRequiresShipmentException;
+import nexussMarket.domain.exceptions.PaymentDeclinedException;
 import nexussMarket.domain.exceptions.ProductNotPurchasableException;
 import nexussMarket.domain.exceptions.RefundAlreadyProcessedException;
 import nexussMarket.domain.exceptions.ReturnAlreadyDecidedException;
@@ -112,6 +113,13 @@ public class GlobalExceptionHandler {
             OrderStatusRequiresShipmentException.class})
     public ResponseEntity<ErrorResponse> handleInvalidValue(DomainException ex, HttpServletRequest request) {
         return RestErrors.response(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    /** The payment gateway declined the buyer's payment; the order is unchanged. */
+    @ExceptionHandler(PaymentDeclinedException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentDeclined(PaymentDeclinedException ex,
+                                                               HttpServletRequest request) {
+        return RestErrors.response(HttpStatus.PAYMENT_REQUIRED, ex.getMessage(), request);
     }
 
     /** Any other domain exception, present or future. */

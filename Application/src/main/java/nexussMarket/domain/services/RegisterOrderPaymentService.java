@@ -19,15 +19,20 @@ public class RegisterOrderPaymentService {
 
     private final AdvanceOrderStatusService advanceOrderStatusService;
     private final ValidateRoleAuthorizationService validateRoleAuthorizationService;
+    private final FulfillDigitalOrderService fulfillDigitalOrderService;
 
     public RegisterOrderPaymentService(AdvanceOrderStatusService advanceOrderStatusService,
-                                       ValidateRoleAuthorizationService validateRoleAuthorizationService) {
+                                       ValidateRoleAuthorizationService validateRoleAuthorizationService,
+                                       FulfillDigitalOrderService fulfillDigitalOrderService) {
         this.advanceOrderStatusService = advanceOrderStatusService;
         this.validateRoleAuthorizationService = validateRoleAuthorizationService;
+        this.fulfillDigitalOrderService = fulfillDigitalOrderService;
     }
 
     public Order execute(User actor, Order orderReference) {
         validateRoleAuthorizationService.execute(actor, SystemRole.ADMINISTRATOR);
-        return advanceOrderStatusService.execute(actor, orderReference, OrderStatus.PAID);
+        Order paid = advanceOrderStatusService.execute(actor, orderReference, OrderStatus.PAID);
+        // An order with only digital products is delivered right away (FulfillDigitalOrderService).
+        return fulfillDigitalOrderService.execute(actor, paid);
     }
 }

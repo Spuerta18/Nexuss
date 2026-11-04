@@ -39,12 +39,24 @@ tests, 4 JaCoCo / guard tests / SETUP.md / Postman, 5 Docker, 6 closing campaign
   all roles, product lifecycle, sale to delivery + invoice, return + refund, 403 matrix, duplicate id 409,
   logout / password change, 60 buyers over HTTP for 10 units → 10), `DemoDataSeederTest`. The rejected-payment
   scenario comes with Block 2.
-- **Priority order (user, 2026-11-04):** Block 2 next (buyer payment with simulated gateway, PUT/DELETE product,
-  PUT /api/me, lists and reports) → Block 4 (SETUP.md and Postman first; JaCoCo and guard tests last) → remaining
-  Block 1, JaCoCo, Block 5, Block 6. Commit + push after each block and move the `demo-stable` tag to every green
-  block commit.
-- **Next:** Block 2. Verify with `./mvnw -o clean test` from `Application/` (Maven is not on the PATH; use the
-  wrapper). Scratchpad launcher `run-app.sh <db> <port> <log>` runs the app with `java -cp`.
+- **Block 2 — in progress (user order: payment → PUT/DELETE product → PUT /api/me → lists and reports; commit +
+  push after every step; verify on port 8081 only, never 8080, which the user uses for manual demos).**
+  - **Step 1 — buyer payment, done.** `PaymentGatewayPort` + `SimulatedPaymentGatewayAdapter` (approves, reference
+    `SIM-<orderId>`; the test token `DECLINED` is always declined). `PayOrderService` (BUYER + ownership through
+    `AuthorizeOrderAccessService`; only `PENDING_PAYMENT`, else 409; declined → `PaymentDeclinedException` 402, order
+    unchanged, `PAYMENT_DECLINED` audited; approved → versioned save to `PAID`, invoice insert, `ORDER_PAYMENT`
+    audited). `POST /api/buyer/orders/{orderId}/payment` (`PayOrderRequest.paymentToken`, never echoed). Digital
+    products: no stock reserved (`OrderLine.holdsStock()` false, no warehouse), and `FulfillDigitalOrderService`
+    moves a digital-only order PAID → SHIPPED → DELIVERED after either payment path (`DIGITAL_ORDER_FULFILLMENT`).
+    Before this, confirming a digital product failed with insufficient stock. Tests: `BuyerPaymentScenariosTest`,
+    `BuyerPaymentRestControllerTest`, two new `EndToEndScenariosTest` cases. 362 tests green; checked on 8081.
+  - **Next:** step 2, `PUT /api/seller/products/{id}` and `DELETE` (logical, `DISCONTINUED`).
+- **After Block 2:** Block 4 (SETUP.md and Postman first; JaCoCo and guard tests last) → remaining Block 1, JaCoCo,
+  Block 5, Block 6. Move the `demo-stable` tag to every green block commit.
+- Verify with `./mvnw -o clean test` from `Application/` (Maven is not on the PATH; use the wrapper). Scratchpad
+  launchers: `run-app.sh <db> <port> <log>` (Mongo) and `run-memory-8081.sh` (memory profile on 8081).
+- **Local demo launcher (not committed):** `demo-local/iniciar-demo-memory.bat` (memory profile on 8080, copies
+  classes and jars to `demo-local/runtime`, demo password only in that file).
 
 ## Language Rule (permanent)
 

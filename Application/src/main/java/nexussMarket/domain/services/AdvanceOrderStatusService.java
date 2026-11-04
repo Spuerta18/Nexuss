@@ -72,7 +72,7 @@ public class AdvanceOrderStatusService {
     }
 
     /** The invoice of a just-paid order. One invoice per order, so its identifier derives from the order's. */
-    private static Invoice invoiceFor(Order order) {
+    static Invoice invoiceFor(Order order) {
         return new Invoice("INV-" + order.getIdentifier(), order, order.getBuyer(), OrderTotals.totalOf(order),
                 LocalDateTime.now());
     }

@@ -129,6 +129,47 @@ class EndToEndScenariosTest {
     }
 
     @Test
+    void aDeclinedPaymentIs402AndTheBuyerCanPayAgainOnlyOnce() throws Exception {
+        String buyer = login(registerBuyer(), PASSWORD);
+        call("POST", "/api/buyer/cart/items", buyer,
+                "{\"productId\":\"" + DemoDataSeeder.PHYSICAL_PRODUCT_IDS.get(0) + "\",\"quantity\":1}").expect(200);
+        String orderId = call("POST", "/api/buyer/orders", buyer, null).expect(201).json().get("identifier")
+                .asString();
+
+        call("POST", "/api/buyer/orders/" + orderId + "/payment", buyer, "{\"paymentToken\":\"DECLINED\"}")
+                .expect(402);
+        assertEquals("PENDING_PAYMENT", call("GET", "/api/buyer/orders/" + orderId, buyer, null).json()
+                .get("status").asString());
+        call("GET", "/api/buyer/orders/" + orderId + "/invoice", buyer, null).expect(404);
+        boolean declinedAudited = false;
+        for (JsonNode entry : call("GET", "/api/supervisor/audit-logs",
+                login(DemoDataSeeder.SUPERVISOR_EMAIL, DEMO_PASSWORD), null).expect(200).json()) {
+            declinedAudited |= "PAYMENT_DECLINED".equals(entry.get("operationType").asString())
+                    && orderId.equals(entry.get("affectedEntityId").asString());
+        }
+        assertTrue(declinedAudited, "the declined attempt is audited");
+
+        assertEquals("PAID", call("POST", "/api/buyer/orders/" + orderId + "/payment", buyer,
+                "{\"paymentToken\":\"tok_test_visa\"}").expect(200).json().get("status").asString());
+        call("GET", "/api/buyer/orders/" + orderId + "/invoice", buyer, null).expect(200);
+        call("POST", "/api/buyer/orders/" + orderId + "/payment", buyer, "{\"paymentToken\":\"tok_test_visa\"}")
+                .expect(409);
+    }
+
+    @Test
+    void aDigitalOnlyOrderIsDeliveredWhenPaid() throws Exception {
+        String buyer = login(registerBuyer(), PASSWORD);
+        call("POST", "/api/buyer/cart/items", buyer,
+                "{\"productId\":\"" + DemoDataSeeder.DIGITAL_PRODUCT_ID + "\",\"quantity\":1}").expect(200);
+        String orderId = call("POST", "/api/buyer/orders", buyer, null).expect(201).json().get("identifier")
+                .asString();
+
+        assertEquals("DELIVERED", call("POST", "/api/buyer/orders/" + orderId + "/payment", buyer,
+                "{\"paymentToken\":\"tok_test_visa\"}").expect(200).json().get("status").asString());
+        call("GET", "/api/buyer/orders/" + orderId + "/invoice", buyer, null).expect(200);
+    }
+
+    @Test
     void everyRoleIsForbiddenOnTheRoutesOfTheOthers() throws Exception {
         Map<String, String> tokens = new LinkedHashMap<>();
         tokens.put("BUYER", login(DemoDataSeeder.BUYER_EMAIL, DEMO_PASSWORD));

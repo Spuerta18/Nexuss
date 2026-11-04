@@ -59,6 +59,9 @@ public class DispatchShipmentService {
         Shipment saved = shipmentRepositoryPort.save(shipment);
         order = OrderFollowUp.save(orderRepositoryPort, order, OrderStatus.SHIPPED);
         for (OrderLine line : order.getLines()) {
+            if (!line.holdsStock()) {
+                continue;
+            }
             confirmInventoryOutboundService.execute(line.getProduct(), line.getWarehouse(), line.getQuantity());
         }
         registerOperationAndAuditService.execute(

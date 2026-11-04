@@ -30,6 +30,7 @@ import nexussMarket.domain.services.CreateShoppingCartService;
 import nexussMarket.domain.services.ListBuyerOrdersService;
 import nexussMarket.domain.services.ListPublishedProductsService;
 import nexussMarket.domain.services.LogoutService;
+import nexussMarket.domain.services.PayOrderService;
 import nexussMarket.domain.services.RemoveActiveCartLineService;
 import nexussMarket.domain.services.RemoveCartLineService;
 import nexussMarket.domain.services.RequestReturnService;
@@ -60,6 +61,7 @@ public class BuyerUseCaseImpl implements BuyerPort {
     private final RequestReturnService requestReturnService;
     private final ConsultOrderInvoiceService consultOrderInvoiceService;
     private final ConsultOrderShipmentService consultOrderShipmentService;
+    private final PayOrderService payOrderService;
     private final LogoutService logoutService;
     private final ChangeUserPasswordService changeUserPasswordService;
 
@@ -156,6 +158,11 @@ public class BuyerUseCaseImpl implements BuyerPort {
     @Override
     public Shipment consultOrderShipment(User user, Order order) {
         return consultOrderShipmentService.execute(user, order);
+    }
+
+    @Override
+    public Order payOrder(User user, Order order, String paymentToken) {
+        return payOrderService.execute(user, order, paymentToken);
     }
 
     @Override

@@ -28,6 +28,7 @@ import nexussMarket.domain.valueobjects.CustomerStatus;
 import nexussMarket.domain.valueobjects.OperationType;
 import nexussMarket.domain.valueobjects.OrderStatus;
 import nexussMarket.domain.valueobjects.ProductStatus;
+import nexussMarket.domain.valueobjects.ProductType;
 import nexussMarket.domain.valueobjects.SystemRole;
 import nexussMarket.domain.valueobjects.UserStatus;
 
@@ -124,6 +125,12 @@ public class ConfirmOrderService {
         try {
             for (CartLine cartLine : cart.getLines()) {
                 Product product = cartLine.getProduct();
+                if (product.getProductType() == ProductType.DIGITAL) {
+                    // Digital products have no stock: the line is sold without a warehouse.
+                    orderLines.add(new OrderLine(product, product.getName(), cartLine.getQuantity(), product.getPrice(),
+                            null));
+                    continue;
+                }
                 InventoryItem reservedItem = reserveInventoryService.reserve(product.getIdentifier(), cartLine.getQuantity());
                 orderLines.add(new OrderLine(product, product.getName(), cartLine.getQuantity(), product.getPrice(),
                         reservedItem.getWarehouse()));
@@ -148,6 +155,9 @@ public class ConfirmOrderService {
     }
 
     private void release(OrderLine line) {
+        if (!line.holdsStock()) {
+            return;
+        }
         releaseInventoryReservationService.execute(line.getProduct(), line.getWarehouse(), line.getQuantity());
     }
 

@@ -49,7 +49,7 @@ class PaymentInvoiceShipmentServicesTest extends AuditedServiceTestSupport {
 
     private final RegisterOrderPaymentService payment = new RegisterOrderPaymentService(
             new AdvanceOrderStatusService(orderRepositoryPort, invoiceRepositoryPort, validateRole, audit),
-            validateRole);
+            validateRole, new FulfillDigitalOrderService(orderRepositoryPort, audit));
     private final ConsultOrderInvoiceService invoice =
             new ConsultOrderInvoiceService(orderRepositoryPort, invoiceRepositoryPort, validateRole, authorizeOrder);
     private final ConsultOrderShipmentService shipment =

@@ -28,6 +28,7 @@ import nexussMarket.adapters.in.rest.requests.AddCartLineRequest;
 import nexussMarket.adapters.in.rest.requests.ChangePasswordRequest;
 import nexussMarket.adapters.in.rest.requests.ConfirmOrderRequest;
 import nexussMarket.adapters.in.rest.requests.CreateCartRequest;
+import nexussMarket.adapters.in.rest.requests.PayOrderRequest;
 import nexussMarket.adapters.in.rest.requests.QuantityRequest;
 import nexussMarket.adapters.in.rest.requests.RequestReturnRequest;
 import nexussMarket.adapters.in.rest.responses.CartResponse;
@@ -181,6 +182,17 @@ public class BuyerRestController {
     public ShipmentResponse consultOrderShipment(@AuthenticationPrincipal(expression = "user") User actor,
                                                  @PathVariable String orderId) {
         return ShipmentRestMapper.toResponse(buyerPort.consultOrderShipment(actor, DomainReferences.order(orderId)));
+    }
+
+    /**
+     * Pays one of the caller's {@code PENDING_PAYMENT} orders: {@code 200} with the order {@code PAID} (or
+     * {@code DELIVERED} when it holds only digital products), {@code 402} when the gateway declines it.
+     */
+    @PostMapping("/orders/{orderId}/payment")
+    public OrderResponse payOrder(@AuthenticationPrincipal(expression = "user") User actor,
+                                  @PathVariable String orderId, @Valid @RequestBody PayOrderRequest request) {
+        return OrderRestMapper.toResponse(buyerPort.payOrder(actor, DomainReferences.order(orderId),
+                request.paymentToken()));
     }
 
     /** Revokes every token of the caller, including the one used for this request. */
