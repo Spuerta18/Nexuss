@@ -29,11 +29,21 @@ tests, 4 JaCoCo / guard tests / SETUP.md / Postman, 5 Docker, 6 closing campaign
   and confirm no migration log line (idempotence on real data; already covered by the integration test); SDD updates
   for Block 1 (Domain Model, Output-ports, Persistence, Rest-security-cors, services); verify the demo flow on the
   migrated `nexusmarket_demo`.
-- **New priority order (user, 2026-11-04):** Block 3 (memory profile startup, demo seed, E2E scenarios) → Block 2
-  (buyer payment with simulated gateway, PUT/DELETE product, PUT /api/me, lists and reports) → Block 4 (SETUP.md and
-  Postman first; JaCoCo and guard tests last) → remaining Block 1, JaCoCo, Block 5, Block 6. Commit + push after each
-  block and move the `demo-stable` tag to every green block commit.
-- **Next:** Block 3. Verify with `./mvnw -o clean test` from `Application/` (Maven is not on the PATH; use the
+- **Block 3 — done, 341 tests green.** Profile `memory`: `application-memory.properties` excludes every Mongo
+  auto-configuration; the in-memory adapters serve every output port; `nexus.security.jwt.generate-if-missing=true`
+  signs with a random key when `NEXUS_JWT_SECRET` is unset. One command: `./mvnw spring-boot:run
+  -Dspring-boot.run.profiles=memory` (the plugin artifacts are now in `~/.m2`). `DemoDataSeeder`
+  (`nexus.seed.demo.enabled`, on by default only in `memory`): `admin|seller|buyer|logistics|supervisor@demo.nexus`,
+  warehouse `WH-DEMO-1`, `PRD-DEMO-1..3` physical with stock 50/30/10, `PRD-DEMO-4` digital; password from
+  `NEXUS_DEMO_PASSWORD`, otherwise generated and logged once. Tests: `EndToEndScenariosTest` (real HTTP, random port:
+  all roles, product lifecycle, sale to delivery + invoice, return + refund, 403 matrix, duplicate id 409,
+  logout / password change, 60 buyers over HTTP for 10 units → 10), `DemoDataSeederTest`. The rejected-payment
+  scenario comes with Block 2.
+- **Priority order (user, 2026-11-04):** Block 2 next (buyer payment with simulated gateway, PUT/DELETE product,
+  PUT /api/me, lists and reports) → Block 4 (SETUP.md and Postman first; JaCoCo and guard tests last) → remaining
+  Block 1, JaCoCo, Block 5, Block 6. Commit + push after each block and move the `demo-stable` tag to every green
+  block commit.
+- **Next:** Block 2. Verify with `./mvnw -o clean test` from `Application/` (Maven is not on the PATH; use the
   wrapper). Scratchpad launcher `run-app.sh <db> <port> <log>` runs the app with `java -cp`.
 
 ## Language Rule (permanent)
@@ -48,6 +58,8 @@ Run from `Application/`:
 
 - Compile: `./mvnw -o clean compile` (Maven is not on the PATH; the wrapper uses `~/.m2/wrapper`)
 - Tests (including the Spring context load): `./mvnw -o clean test`
+- Run without a database: `./mvnw spring-boot:run -Dspring-boot.run.profiles=memory` (demo data, password in the log
+  or from `NEXUS_DEMO_PASSWORD`)
 
 `ApplicationTests.contextLoads` starts the full context without a running MongoDB: the driver logs
 `MongoSocketOpenException` in its monitor thread, but the context still loads. The test JWT secret is in

@@ -1,5 +1,6 @@
 package nexussMarket.infrastructure.security;
 
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Optional;
@@ -41,11 +42,19 @@ public class JwtProvider {
 
     public JwtProvider(JwtProperties properties) {
         if (properties.secret() == null || properties.secret().isBlank()) {
-            throw new IllegalStateException(
-                    "nexus.security.jwt.secret is not set: define the NEXUS_JWT_SECRET environment variable");
+            if (!properties.generateIfMissing()) {
+                throw new IllegalStateException(
+                        "nexus.security.jwt.secret is not set: define the NEXUS_JWT_SECRET environment variable");
+            }
+            byte[] generated = new byte[48];
+            new SecureRandom().nextBytes(generated);
+            this.signingKey = Keys.hmacShaKeyFor(generated);
+            log.warn("NEXUS_JWT_SECRET is not set: signing tokens with a random key generated at startup;"
+                    + " tokens stop working when the application restarts");
+        } else {
+            // Keys.hmacShaKeyFor rejects keys shorter than 256 bits.
+            this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(properties.secret()));
         }
-        // Keys.hmacShaKeyFor rejects keys shorter than 256 bits.
-        this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(properties.secret()));
         this.properties = properties;
     }
 
